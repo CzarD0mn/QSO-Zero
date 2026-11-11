@@ -1,0 +1,16 @@
+[Unit]
+Description=NeonQRP digital-mode terminal
+After=multi-user.target sound.target
+
+[Service]
+Type=simple
+User=pi
+SupplementaryGroups=dialout audio video input
+ExecStart=/usr/local/bin/neonqrp
+Restart=on-failure
+RestartSec=3
+# keep the decoder responsive while TX audio is playing
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target
