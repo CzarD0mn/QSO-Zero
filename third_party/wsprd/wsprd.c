@@ -69,7 +69,7 @@ static int results_snr_desc(const void *a, const void *b) {
 #define TWOPIDT             2.0 * M_PI * DT
 
 
-/* NeonQRP: FFTW replaced by kissfft (same forward sign convention).
+/* QSO-Zero: FFTW replaced by kissfft (same forward sign convention).
    Possible PATIENCE options (unused): F
    FTW_ESTIMATE,
    FFTW_ESTIMATE_PATIENT,
@@ -471,7 +471,7 @@ int wspr_decode(float  *idat,
         mettab[1][i] = roundf(10.0 * (metric_tables[2][255 - i] - bias));
     }
 
-    /* Hash tables: kept in memory across cycles (NeonQRP) so that hashed
+    /* Hash tables: kept in memory across cycles (QSO-Zero) so that hashed
        callsigns in type 2/3 messages resolve once the station has sent a
        type 1 message; no hashtable.txt on disk. */
     static char hashtab[HASHTAB_SIZE * HASHTAB_ENTRY_LEN];

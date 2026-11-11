@@ -1,7 +1,7 @@
-/* NeonQRP - NMEA GPS reader (M5Stack Cap LoRa-1262 / LoRa868: ATGM336H,
+/* QSO-Zero - NMEA GPS reader (M5Stack Cap LoRa-1262 / LoRa868: ATGM336H,
  * UART 115200 8N1). Feeds the disciplined clock and the Maidenhead grid. */
-#ifndef NEONQRP_GPS_H
-#define NEONQRP_GPS_H
+#ifndef QSOZERO_GPS_H
+#define QSOZERO_GPS_H
 
 typedef struct {
     int    fix;          /* 0 none, 1 2D/3D */

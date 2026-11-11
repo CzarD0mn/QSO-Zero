@@ -1,12 +1,12 @@
-/* NeonQRP - wsprnet uploader with an internet check every 5 minutes.
+/* QSO-Zero - wsprnet uploader with an internet check every 5 minutes.
  * Spots collected since the last check are uploaded if the check finds a
  * connection, and dropped if it doesn't (no backlog when operating offline).
  *
  * Transport: HTTPS first (certificate verified against the system CA store,
  * via libssl loaded at runtime); if HTTPS fails for any reason, the same
  * request is retried over plain HTTP. */
-#ifndef NEONQRP_UPLINK_H
-#define NEONQRP_UPLINK_H
+#ifndef QSOZERO_UPLINK_H
+#define QSOZERO_UPLINK_H
 
 #include <stdint.h>
 

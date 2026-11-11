@@ -80,7 +80,7 @@ static rxline_t mk(const char *t, int snr, int odd)
 static void sequencer(app_t *a)
 {
     printf("[2] FT8 auto-sequencer\n");
-    snprintf(a->cfg.log_path, sizeof a->cfg.log_path, "/tmp/neonqrp_test.adi");
+    snprintf(a->cfg.log_path, sizeof a->cfg.log_path, "/tmp/qso-zero_test.adi");
     remove(a->cfg.log_path);
     a->tx_enabled = 0;                 /* keep the TX thread from consuming the queue */
     a->mode = MODE_FT8;
@@ -241,7 +241,7 @@ static void autoreply(app_t *a)
     queued(a, q, sizeof q);
     CHECK(strstr(q, "QTH HILLTOP NEAR BOSTON") != NULL, "AGN?      -> \"%s\"", q);
 
-    snprintf(a->cfg.inbox_path, sizeof a->cfg.inbox_path, "/tmp/neonqrp_inbox.txt");
+    snprintf(a->cfg.inbox_path, sizeof a->cfg.inbox_path, "/tmp/qso-zero_inbox.txt");
     remove(a->cfg.inbox_path);
     rx_js8(a, "VE3XYZ", "KN4CRD MSG MEET ON 7078 AT 1800Z", -9, 1400);
     queued(a, q, sizeof q);

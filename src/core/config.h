@@ -1,6 +1,6 @@
-/* NeonQRP - configuration (simple key = value file). */
-#ifndef NEONQRP_CONFIG_H
-#define NEONQRP_CONFIG_H
+/* QSO-Zero - configuration (simple key = value file). */
+#ifndef QSOZERO_CONFIG_H
+#define QSOZERO_CONFIG_H
 
 typedef struct {
     char callsign[16];

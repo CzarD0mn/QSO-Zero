@@ -1,5 +1,5 @@
 /*
- * NeonQRP - JS8 message layer. C port of JS8Call varicode.cpp, jsc.cpp and
+ * QSO-Zero - JS8 message layer. C port of JS8Call varicode.cpp, jsc.cpp and
  * decodedtext.cpp (C) 2018 Jordan Sherer KN4CRD, GPLv3.
  *
  * The Qt regular expressions are replaced by small hand-written matchers that

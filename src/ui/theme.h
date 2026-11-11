@@ -1,6 +1,6 @@
-/* NeonQRP - "retro synth" palette: saturated neon on deep indigo, no glow. */
-#ifndef NEONQRP_THEME_H
-#define NEONQRP_THEME_H
+/* QSO-Zero - "retro synth" palette: saturated neon on deep indigo, no glow. */
+#ifndef QSOZERO_THEME_H
+#define QSOZERO_THEME_H
 
 #include "gfx.h"
 

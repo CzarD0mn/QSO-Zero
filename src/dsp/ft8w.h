@@ -1,6 +1,6 @@
-/* NeonQRP - FT8/FT4 wrapper around ft8_lib (MIT, Karlis Goba YL3JG). */
-#ifndef NEONQRP_FT8W_H
-#define NEONQRP_FT8W_H
+/* QSO-Zero - FT8/FT4 wrapper around ft8_lib (MIT, Karlis Goba YL3JG). */
+#ifndef QSOZERO_FT8W_H
+#define QSOZERO_FT8W_H
 
 #include <stdint.h>
 #include <stddef.h>

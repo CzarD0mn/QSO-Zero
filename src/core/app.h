@@ -1,6 +1,6 @@
-/* NeonQRP - application state shared by the engine threads and the UI. */
-#ifndef NEONQRP_APP_H
-#define NEONQRP_APP_H
+/* QSO-Zero - application state shared by the engine threads and the UI. */
+#ifndef QSOZERO_APP_H
+#define QSOZERO_APP_H
 
 #include <pthread.h>
 #include <stdint.h>

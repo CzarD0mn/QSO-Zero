@@ -1,6 +1,6 @@
-/* NeonQRP - Linux framebuffer output with LCD/HDMI auto-selection. */
-#ifndef NEONQRP_FB_H
-#define NEONQRP_FB_H
+/* QSO-Zero - Linux framebuffer output with LCD/HDMI auto-selection. */
+#ifndef QSOZERO_FB_H
+#define QSOZERO_FB_H
 
 #include <stddef.h>
 #include "gfx.h"

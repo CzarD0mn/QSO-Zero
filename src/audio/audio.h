@@ -1,7 +1,7 @@
-/* NeonQRP - audio I/O. ALSA is loaded with dlopen so the binary has no
+/* QSO-Zero - audio I/O. ALSA is loaded with dlopen so the binary has no
  * build-time dependency on libasound headers. */
-#ifndef NEONQRP_AUDIO_H
-#define NEONQRP_AUDIO_H
+#ifndef QSOZERO_AUDIO_H
+#define QSOZERO_AUDIO_H
 
 #include <stddef.h>
 #include <stdint.h>

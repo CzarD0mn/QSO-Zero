@@ -1,6 +1,6 @@
-/* NeonQRP - tiny software renderer on an RGB565 surface. */
-#ifndef NEONQRP_GFX_H
-#define NEONQRP_GFX_H
+/* QSO-Zero - tiny software renderer on an RGB565 surface. */
+#ifndef QSOZERO_GFX_H
+#define QSOZERO_GFX_H
 
 #include <stdint.h>
 

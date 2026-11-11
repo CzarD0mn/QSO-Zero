@@ -19,16 +19,16 @@ void config_defaults(config_t *c)
     c->gps_latency_ms = 50;
     strcpy(c->display, "auto");
     strcpy(c->keyboard, "auto");
-    strcpy(c->jsc_path, "/usr/local/share/neonqrp/js8.jsc");
+    strcpy(c->jsc_path, "/usr/local/share/qso-zero/js8.jsc");
     c->wspr_dbm = 37;
     c->wspr_tx_pct = 20;
     c->js8_submode = 0;
     c->rx_offset = 1500;
     c->tx_offset = 1500;
-    strcpy(c->log_path, "/home/pi/neonqrp.adi");
+    strcpy(c->log_path, "/home/pi/qso-zero.adi");
     c->js8_autoreply = 0;
     c->js8_hb_ack = 0;
-    strcpy(c->inbox_path, "/home/pi/neonqrp-inbox.txt");
+    strcpy(c->inbox_path, "/home/pi/qso-zero-inbox.txt");
     c->wspr_rx = 1;
     c->wsprnet_upload = 1;
     strcpy(c->wsprnet_host, "wsprnet.org");
@@ -38,7 +38,7 @@ const char *config_default_path(void)
 {
     static char p[256];
     const char *home = getenv("HOME");
-    snprintf(p, sizeof p, "%s/.config/neonqrp.conf", home ? home : "/root");
+    snprintf(p, sizeof p, "%s/.config/qso-zero.conf", home ? home : "/root");
     return p;
 }
 
@@ -95,7 +95,7 @@ int config_save(const config_t *c, const char *path)
     if (sl) { *sl = 0; mkdir(dir, 0755); }
     FILE *f = fopen(path, "w");
     if (!f) return -1;
-    fprintf(f, "# NeonQRP configuration\n");
+    fprintf(f, "# QSO-Zero configuration\n");
     fprintf(f, "callsign = %s\ngrid = %s\nauto_grid = %d\n", c->callsign, c->grid, c->auto_grid);
     fprintf(f, "\n# radio: qmx | qmxplus | g90 | x6100 | x6200 | ft891\nradio = %s\n", c->radio);
     fprintf(f, "rig_device = %s\nrig_baud = %d\nptt = %s\nptt_device = %s\nspawn_rigctld = %d\n",

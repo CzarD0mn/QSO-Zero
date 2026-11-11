@@ -203,8 +203,8 @@ static int post_spot(const uplink_spot_t *s, const char *rcall, const char *rgri
     double mhz = (s->dial_hz + s->audio_hz) / 1e6;
     int n = snprintf(req, sizeof req,
         "GET /post?function=wspr&rcall=%s&rgrid=%s&rqrg=%.6f&date=%02d%02d%02d&time=%02d%02d"
-        "&sig=%d&dt=%.1f&drift=%d&tqrg=%.6f&tcall=%s&tgrid=%s&dbm=%d&version=NeonQRP-1&mode=2 HTTP/1.0\r\n"
-        "Host: %s\r\nUser-Agent: NeonQRP\r\nConnection: close\r\n\r\n",
+        "&sig=%d&dt=%.1f&drift=%d&tqrg=%.6f&tcall=%s&tgrid=%s&dbm=%d&version=QSO-Zero-1&mode=2 HTTP/1.0\r\n"
+        "Host: %s\r\nUser-Agent: QSO-Zero\r\nConnection: close\r\n\r\n",
         rc, rg, mhz, tm.tm_year % 100, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
         s->snr, s->dt, s->drift, mhz, tc, tg, s->dbm, g_host);
     int ok = conn_write(&c, req, n) == n;

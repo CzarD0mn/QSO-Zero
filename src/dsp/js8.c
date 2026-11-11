@@ -1,5 +1,5 @@
 /*
- * NeonQRP - JS8 modem, C99 port of JS8Call's JS8.cpp (GPLv3).
+ * QSO-Zero - JS8 modem, C99 port of JS8Call's JS8.cpp (GPLv3).
  *
  * Faithful to the reference decoder's pipeline:
  *   syncjs8   - Nuttall-windowed 1/4-symbol spectra, polynomial noise baseline,

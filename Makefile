@@ -1,4 +1,4 @@
-# NeonQRP build
+# QSO-Zero build
 #   make                 native build (on the Cardputer Zero itself)
 #   make CROSS=aarch64-linux-gnu-   cross build from a PC
 #   make test            run DSP loopback tests on the build host
@@ -36,9 +36,9 @@ BUILD   := build
 CORE_OBJ:= $(CORE_SRC:%.c=$(BUILD)/%.o)
 APP_OBJ := $(APP_SRC:%.c=$(BUILD)/%.o)
 
-all: $(BUILD)/neonqrp
+all: $(BUILD)/qso-zero
 
-$(BUILD)/neonqrp: $(APP_OBJ) $(CORE_OBJ)
+$(BUILD)/qso-zero: $(APP_OBJ) $(CORE_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 $(BUILD)/third_party/%.o: third_party/%.c
@@ -62,7 +62,7 @@ test: $(TESTS)
 	@for t in $(TESTS); do echo "### $$t"; $$t || exit 1; done
 
 $(BUILD)/preview: tools/preview.c $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ)) $(CORE_OBJ)
-	$(CC) $(CFLAGS) -DNEONQRP_PREVIEW -o $@ $^ $(LDLIBS)
+	$(CC) $(CFLAGS) -DQSOZERO_PREVIEW -o $@ $^ $(LDLIBS)
 
 clean:
 	rm -rf $(BUILD)
@@ -71,14 +71,14 @@ clean:
 .PHONY: all test clean
 
 PREFIX ?= /usr/local
-install: $(BUILD)/neonqrp
-	install -D -m 755 $(BUILD)/neonqrp $(DESTDIR)$(PREFIX)/bin/neonqrp
-	install -D -m 644 data/js8.jsc $(DESTDIR)$(PREFIX)/share/neonqrp/js8.jsc
-	install -D -m 644 dist/neonqrp.conf.example $(DESTDIR)$(PREFIX)/share/neonqrp/neonqrp.conf.example
+install: $(BUILD)/qso-zero
+	install -D -m 755 $(BUILD)/qso-zero $(DESTDIR)$(PREFIX)/bin/qso-zero
+	install -D -m 644 data/js8.jsc $(DESTDIR)$(PREFIX)/share/qso-zero/js8.jsc
+	install -D -m 644 dist/qso-zero.conf.example $(DESTDIR)$(PREFIX)/share/qso-zero/qso-zero.conf.example
 
 install-service: install
-	install -D -m 644 dist/neonqrp.service /etc/systemd/system/neonqrp.service
+	install -D -m 644 dist/qso-zero.service /etc/systemd/system/qso-zero.service
 	systemctl daemon-reload
-	@echo "enable with: sudo systemctl enable --now neonqrp"
+	@echo "enable with: sudo systemctl enable --now qso-zero"
 
 .PHONY: install install-service

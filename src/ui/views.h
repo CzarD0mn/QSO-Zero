@@ -1,5 +1,5 @@
-#ifndef NEONQRP_VIEWS_H
-#define NEONQRP_VIEWS_H
+#ifndef QSOZERO_VIEWS_H
+#define QSOZERO_VIEWS_H
 
 #include "core/app.h"
 #include "gfx.h"

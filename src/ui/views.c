@@ -1,4 +1,4 @@
-/* NeonQRP - screens. Compact layout targets the 320x170 ST7789; the large
+/* QSO-Zero - screens. Compact layout targets the 320x170 ST7789; the large
  * layout is drawn on a 640x360 canvas and integer-scaled to HDMI. */
 #include "views.h"
 #include <math.h>
@@ -269,8 +269,8 @@ static void render_large_main(app_t *a, surface_t *s)
     /* header with sun logo */
     gfx_fill(s, 0, 0, s->w, 28, C_PANEL);
     draw_sun(s, 20, 24, 14);
-    gfx_text(s, 40, 4, "NEON", C_MAGENTA, 2);
-    gfx_text(s, 40 + 4 * 12, 4, "QRP", C_CYAN, 2);
+    gfx_text(s, 40, 4, "QSO", C_MAGENTA, 2);
+    gfx_text(s, 40 + 3 * 12, 4, "ZERO", C_CYAN, 2);
     int x = gfx_chip(s, 128, 5, mode_name(a->mode), C_MAGENTA, C_BG, 2);
     if (a->mode == MODE_JS8) x = gfx_chip(s, x + 4, 5, sub_short(a->js8_sub), C_PURPLE, C_BG, 2);
     if (a->mode == MODE_JS8 && a->cfg.js8_autoreply) x = gfx_chip(s, x + 4, 5, "AUTO", C_MINT, C_BG, 2);

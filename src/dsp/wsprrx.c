@@ -1,4 +1,4 @@
-/* NeonQRP - WSPR receive front end. Mirrors WSJT-X wsprd's readwavfile():
+/* QSO-Zero - WSPR receive front end. Mirrors WSJT-X wsprd's readwavfile():
  * one 2^21-point real FFT of the 114 s recording, keep +/-187.5 Hz around
  * 1500 Hz, inverse 65536-point complex FFT -> 375 sample/s I/Q. */
 #include "wsprrx.h"

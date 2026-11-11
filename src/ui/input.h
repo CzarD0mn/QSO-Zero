@@ -1,6 +1,6 @@
-/* NeonQRP - keyboard input via Linux evdev (Cardputer keyboard + USB). */
-#ifndef NEONQRP_INPUT_H
-#define NEONQRP_INPUT_H
+/* QSO-Zero - keyboard input via Linux evdev (Cardputer keyboard + USB). */
+#ifndef QSOZERO_INPUT_H
+#define QSOZERO_INPUT_H
 
 enum {
     K_NONE = 0, K_CHAR, K_ENTER, K_BKSP, K_TAB, K_ESC, K_UP, K_DOWN, K_LEFT, K_RIGHT,
