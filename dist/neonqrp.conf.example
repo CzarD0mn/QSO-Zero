@@ -1,0 +1,43 @@
+# NeonQRP configuration -> copy to ~/.config/neonqrp.conf
+callsign = N0CALL
+grid = FN42
+auto_grid = 1              # take the grid from GPS when there is a fix
+
+# radio: qmx | qmxplus | g90 | x6100 | x6200 | ft891
+radio = qmx
+rig_device =               # blank = profile default (/dev/ttyACM0 or /dev/ttyUSB0)
+                           # tip: use /dev/serial/by-id/... so it survives re-plugging
+rig_baud = 0               # 0 = profile default
+ptt =                      # cat | rts | dtr, blank = profile default
+ptt_device =               # only if RTS/DTR keying is on a different port
+spawn_rigctld = 1          # 0 = connect to a rigctld you started yourself on :4532
+
+audio_in =                 # blank = auto-detect the radio's USB sound card
+audio_out =                # e.g. plughw:CARD=Device
+tx_level = 0.50            # TX audio drive 0..1; set so ALC barely moves
+
+# Cap LoRa-1262 / LoRa868 GPS (ATGM336H, NMEA 115200 8N1)
+gps_device = /dev/serial0
+gps_baud = 115200
+gps_latency_ms = 50        # NMEA burst delay after the UTC second edge
+
+display = auto             # auto = HDMI when connected, else the 1.9" LCD
+keyboard = auto
+jsc_path = /usr/local/share/neonqrp/js8.jsc
+
+wspr_dbm = 37              # snapped to 0,3,7,10,...  (37 dBm = 5 W)
+wspr_tx_pct = 20
+js8_submode = 0            # 0 normal, 1 fast, 2 turbo, 3 slow
+rx_offset = 1500
+tx_offset = 1500
+log_path = /home/pi/neonqrp.adi
+
+# JS8 automatic replies (only to messages addressed to you)
+js8_autoreply = 0
+js8_hb_ack = 0             # ACK heartbeats (needs js8_autoreply = 1)
+js8_info = QMX 5W EFHW
+js8_status = QRV POTA
+inbox_path = /home/pi/neonqrp-inbox.txt
+wspr_rx = 1                # decode WSPR between beacon slots
+wsprnet_upload = 1         # checked every 5 min; spots dropped when offline
+wsprnet_host = wsprnet.org

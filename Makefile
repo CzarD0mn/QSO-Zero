@@ -1,0 +1,84 @@
+# NeonQRP build
+#   make                 native build (on the Cardputer Zero itself)
+#   make CROSS=aarch64-linux-gnu-   cross build from a PC
+#   make test            run DSP loopback tests on the build host
+
+CROSS   ?=
+CC      := $(CROSS)gcc
+ARCH    := $(shell $(CC) -dumpmachine)
+
+OPT     ?= -O2
+ifneq (,$(findstring aarch64,$(ARCH)))
+  # Cortex-A53 (RP3A0 / BCM2710A1)
+  OPT   += -mcpu=cortex-a53 -ffast-math -ftree-vectorize
+else
+  OPT   += -ffast-math
+endif
+
+CFLAGS  += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare \
+           -Wno-missing-field-initializers -Wno-format-truncation $(OPT) -Isrc -Ithird_party -MMD
+LDLIBS  += -lm -lpthread -ldl
+
+FT8_SRC := third_party/ft8/constants.c third_party/ft8/crc.c third_party/ft8/decode.c \
+           third_party/ft8/encode.c third_party/ft8/ldpc.c third_party/ft8/message.c \
+           third_party/ft8/text.c third_party/common/monitor.c
+FFT_SRC := third_party/fft/kiss_fft.c third_party/fft/kiss_fftr.c
+WSPRD_SRC := third_party/wsprd/wsprd.c third_party/wsprd/fano.c third_party/wsprd/nhash.c \
+           third_party/wsprd/tab.c third_party/wsprd/wsprd_utils.c third_party/wsprd/wsprsim_utils.c
+DSP_SRC := src/dsp/js8.c src/dsp/js8_varicode.c src/dsp/ft8w.c src/dsp/wspr.c src/dsp/wsprrx.c
+CORE_SRC:= $(DSP_SRC) $(FT8_SRC) $(FFT_SRC) $(WSPRD_SRC)
+
+APP_SRC := src/main.c src/core/app.c src/core/config.c src/core/clock.c src/core/scheduler.c src/core/js8auto.c \
+           src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c \
+           src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
+
+BUILD   := build
+CORE_OBJ:= $(CORE_SRC:%.c=$(BUILD)/%.o)
+APP_OBJ := $(APP_SRC:%.c=$(BUILD)/%.o)
+
+all: $(BUILD)/neonqrp
+
+$(BUILD)/neonqrp: $(APP_OBJ) $(CORE_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+$(BUILD)/third_party/%.o: third_party/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -w -c -o $@ $<
+
+$(BUILD)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink
+ENGINE_OBJ := $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ))
+$(BUILD)/test_uplink: tests/test_uplink.c $(BUILD)/src/net/uplink.o $(BUILD)/src/core/clock.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+$(BUILD)/test_engine: tests/test_engine.c $(ENGINE_OBJ) $(CORE_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+$(BUILD)/test_%: tests/test_%.c $(CORE_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+test: $(TESTS)
+	@for t in $(TESTS); do echo "### $$t"; $$t || exit 1; done
+
+$(BUILD)/preview: tools/preview.c $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ)) $(CORE_OBJ)
+	$(CC) $(CFLAGS) -DNEONQRP_PREVIEW -o $@ $^ $(LDLIBS)
+
+clean:
+	rm -rf $(BUILD)
+
+-include $(shell find $(BUILD) -name '*.d' 2>/dev/null)
+.PHONY: all test clean
+
+PREFIX ?= /usr/local
+install: $(BUILD)/neonqrp
+	install -D -m 755 $(BUILD)/neonqrp $(DESTDIR)$(PREFIX)/bin/neonqrp
+	install -D -m 644 data/js8.jsc $(DESTDIR)$(PREFIX)/share/neonqrp/js8.jsc
+	install -D -m 644 dist/neonqrp.conf.example $(DESTDIR)$(PREFIX)/share/neonqrp/neonqrp.conf.example
+
+install-service: install
+	install -D -m 644 dist/neonqrp.service /etc/systemd/system/neonqrp.service
+	systemctl daemon-reload
+	@echo "enable with: sudo systemctl enable --now neonqrp"
+
+.PHONY: install install-service
