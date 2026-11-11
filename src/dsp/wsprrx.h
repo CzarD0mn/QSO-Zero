@@ -1,6 +1,6 @@
-/* NeonQRP - WSPR receive: 12 kHz audio -> 375 Hz baseband -> wsprd decoder. */
-#ifndef NEONQRP_WSPRRX_H
-#define NEONQRP_WSPRRX_H
+/* QSO-Zero - WSPR receive: 12 kHz audio -> 375 Hz baseband -> wsprd decoder. */
+#ifndef QSOZERO_WSPRRX_H
+#define QSOZERO_WSPRRX_H
 
 #include <stdint.h>
 

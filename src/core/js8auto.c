@@ -1,4 +1,4 @@
-/* NeonQRP - JS8 automatic replies, following JS8Call's behaviour and wording
+/* QSO-Zero - JS8 automatic replies, following JS8Call's behaviour and wording
  * (mainwindow.cpp processCommandActivity). Called with a->lock held, once a
  * message is complete (its LAST frame arrived).
  *

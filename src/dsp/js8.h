@@ -1,5 +1,5 @@
 /*
- * NeonQRP - JS8 modem (C99 port of the JS8Call JS8.cpp engine)
+ * QSO-Zero - JS8 modem (C99 port of the JS8Call JS8.cpp engine)
  *
  * Based on JS8Call (C) Jordan Sherer KN4CRD and Allan Bazinet W6BAZ, and on
  * WSJT-X by Joe Taylor K1JT et al. Licensed GPLv3, see LICENSE.
@@ -9,8 +9,8 @@
  * symbols. Message-level packing (heartbeat, directed, data frames) lives in
  * js8_varicode.c.
  */
-#ifndef NEONQRP_JS8_H
-#define NEONQRP_JS8_H
+#ifndef QSOZERO_JS8_H
+#define QSOZERO_JS8_H
 
 #include <stdint.h>
 #include <stddef.h>

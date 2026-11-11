@@ -1,6 +1,6 @@
-/* NeonQRP - Hamlib rig control via rigctld (spawned and supervised by us). */
-#ifndef NEONQRP_RIGCTL_H
-#define NEONQRP_RIGCTL_H
+/* QSO-Zero - Hamlib rig control via rigctld (spawned and supervised by us). */
+#ifndef QSOZERO_RIGCTL_H
+#define QSOZERO_RIGCTL_H
 
 #include "radios.h"
 #include <stdint.h>

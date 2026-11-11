@@ -1,7 +1,7 @@
 #include "monitor.h"
 #include <common/common.h>
 
-#define LOG_LEVEL LOG_ERROR /* NeonQRP: quiet */
+#define LOG_LEVEL LOG_ERROR /* QSO-Zero: quiet */
 #include <ft8/debug.h>
 
 #include <stdlib.h>

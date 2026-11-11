@@ -1,7 +1,7 @@
-/* NeonQRP - disciplined UTC clock. The app never touches the system clock;
+/* QSO-Zero - disciplined UTC clock. The app never touches the system clock;
  * it keeps an offset learned from GPS (or trusts NTP/system time). */
-#ifndef NEONQRP_CLOCK_H
-#define NEONQRP_CLOCK_H
+#ifndef QSOZERO_CLOCK_H
+#define QSOZERO_CLOCK_H
 
 typedef enum { CLK_SYSTEM = 0, CLK_GPS = 1 } clk_source_t;
 

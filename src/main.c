@@ -1,6 +1,6 @@
-/* NeonQRP - field digital-mode terminal for the M5Stack Cardputer Zero.
+/* QSO-Zero - field digital-mode terminal for the M5Stack Cardputer Zero.
  *
- *   neonqrp [--config FILE] [--fb /dev/fbN] [--nohw]
+ *   qso-zero [--config FILE] [--fb /dev/fbN] [--nohw]
  *
  * --nohw runs the UI and scheduler without radio, audio or GPS (demo/test).
  */
@@ -17,7 +17,7 @@
 
 static void usage(void)
 {
-    fprintf(stderr, "usage: neonqrp [--config FILE] [--fb /dev/fbN|auto] [--nohw]\n");
+    fprintf(stderr, "usage: qso-zero [--config FILE] [--fb /dev/fbN|auto] [--nohw]\n");
 }
 
 int main(int argc, char **argv)
@@ -36,11 +36,11 @@ int main(int argc, char **argv)
 
     fb_t fb;
     if (fb_open(&fb, fbdev ? fbdev : a->cfg.display)) {
-        fprintf(stderr, "neonqrp: no framebuffer (is the LCD/HDMI fb enabled?)\n");
+        fprintf(stderr, "qso-zero: no framebuffer (is the LCD/HDMI fb enabled?)\n");
         app_shutdown(a);
         return 1;
     }
-    if (input_open(a->cfg.keyboard)) fprintf(stderr, "neonqrp: no keyboard found (check /dev/input permissions)\n");
+    if (input_open(a->cfg.keyboard)) fprintf(stderr, "qso-zero: no keyboard found (check /dev/input permissions)\n");
 
     surface_t *compact = surf_new(320, 170), *large = surf_new(LARGE_W, LARGE_H);
     app_start_threads(a);

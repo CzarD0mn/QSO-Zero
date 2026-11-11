@@ -1,6 +1,6 @@
-/* NeonQRP - radio profiles. Hamlib model IDs taken from Hamlib's riglist.h. */
-#ifndef NEONQRP_RADIOS_H
-#define NEONQRP_RADIOS_H
+/* QSO-Zero - radio profiles. Hamlib model IDs taken from Hamlib's riglist.h. */
+#ifndef QSOZERO_RADIOS_H
+#define QSOZERO_RADIOS_H
 
 typedef enum { PTT_CAT = 0, PTT_RTS, PTT_DTR, PTT_VOX } ptt_method_t;
 

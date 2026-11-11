@@ -1,4 +1,4 @@
-/* NeonQRP - 5x7 bitmap font (ASCII 32..126), column-major, LSB = top row,
+/* QSO-Zero - 5x7 bitmap font (ASCII 32..126), column-major, LSB = top row,
  * bit 7 = descender. The classic "glcdfont" shapes, public domain. */
 #include <stdint.h>
 

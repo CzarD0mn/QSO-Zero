@@ -1,9 +1,9 @@
 /*
- * NeonQRP - JS8 message layer (port of JS8Call varicode.cpp / jsc.cpp /
+ * QSO-Zero - JS8 message layer (port of JS8Call varicode.cpp / jsc.cpp /
  * decodedtext.cpp, GPLv3). Turns text into 12-char frames and back.
  */
-#ifndef NEONQRP_JS8_VARICODE_H
-#define NEONQRP_JS8_VARICODE_H
+#ifndef QSOZERO_JS8_VARICODE_H
+#define QSOZERO_JS8_VARICODE_H
 
 #include "js8.h"
 

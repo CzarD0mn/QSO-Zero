@@ -1,4 +1,4 @@
-# NeonQRP configuration -> copy to ~/.config/neonqrp.conf
+# QSO-Zero configuration -> copy to ~/.config/qso-zero.conf
 callsign = N0CALL
 grid = FN42
 auto_grid = 1              # take the grid from GPS when there is a fix
@@ -23,21 +23,21 @@ gps_latency_ms = 50        # NMEA burst delay after the UTC second edge
 
 display = auto             # auto = HDMI when connected, else the 1.9" LCD
 keyboard = auto
-jsc_path = /usr/local/share/neonqrp/js8.jsc
+jsc_path = /usr/local/share/qso-zero/js8.jsc
 
 wspr_dbm = 37              # snapped to 0,3,7,10,...  (37 dBm = 5 W)
 wspr_tx_pct = 20
 js8_submode = 0            # 0 normal, 1 fast, 2 turbo, 3 slow
 rx_offset = 1500
 tx_offset = 1500
-log_path = /home/pi/neonqrp.adi
+log_path = /home/pi/qso-zero.adi
 
 # JS8 automatic replies (only to messages addressed to you)
 js8_autoreply = 0
 js8_hb_ack = 0             # ACK heartbeats (needs js8_autoreply = 1)
 js8_info = QMX 5W EFHW
 js8_status = QRV POTA
-inbox_path = /home/pi/neonqrp-inbox.txt
+inbox_path = /home/pi/qso-zero-inbox.txt
 wspr_rx = 1                # decode WSPR between beacon slots
 wsprnet_upload = 1         # checked every 5 min; spots dropped when offline
 wsprnet_host = wsprnet.org

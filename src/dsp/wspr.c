@@ -1,4 +1,4 @@
-/* NeonQRP - WSPR type-1 encoder, written from the protocol description
+/* QSO-Zero - WSPR type-1 encoder, written from the protocol description
  * (K1JT / G4JNT "Non-normative specification of WSPR protocol"). Verified
  * against Etherkit JTEncode in tests/test_wspr.c. */
 #include "wspr.h"

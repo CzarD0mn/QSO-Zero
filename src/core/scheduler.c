@@ -1,4 +1,4 @@
-/* NeonQRP - QSO logic: FT8 auto-sequencer, JS8 message assembly, ADIF log.
+/* QSO-Zero - QSO logic: FT8 auto-sequencer, JS8 message assembly, ADIF log.
  * All functions here are called with a->lock held. */
 #include <ctype.h>
 #include <math.h>
@@ -228,7 +228,7 @@ void adif_log(app_t *a, const char *call, const char *grid, const char *mode, in
 {
     FILE *f = fopen(a->cfg.log_path, "a");
     if (!f) { app_status(a, "log: cannot open %s", a->cfg.log_path); return; }
-    if (ftell(f) == 0) fprintf(f, "NeonQRP ADIF export\n<adif_ver:5>3.1.4 <programid:7>NeonQRP <eoh>\n");
+    if (ftell(f) == 0) fprintf(f, "QSO-Zero ADIF export\n<adif_ver:5>3.1.4 <programid:7>QSO-Zero <eoh>\n");
     time_t t = (time_t)clk_now();
     struct tm tm;
     gmtime_r(&t, &tm);

@@ -1,6 +1,6 @@
-/* NeonQRP - WSPR type-1 beacon encoder (transmit). */
-#ifndef NEONQRP_WSPR_H
-#define NEONQRP_WSPR_H
+/* QSO-Zero - WSPR type-1 beacon encoder (transmit). */
+#ifndef QSOZERO_WSPR_H
+#define QSOZERO_WSPR_H
 
 #include <stdint.h>
 #include <stddef.h>

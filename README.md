@@ -1,4 +1,4 @@
-# NeonQRP
+# QSO-Zero
 
 A lightweight FT8 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, built for field ops with QRP radios. Plain C, no Qt, no X, no SDL: it draws straight to the Linux framebuffer and runs as a single ~200 KB binary.
 
@@ -6,7 +6,7 @@ A lightweight FT8 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, buil
 * **JS8**: native C port of the JS8Call modem and message layer. All four speeds (Normal/Fast/Turbo/Slow), heartbeats, CQ, directed commands, compound calls, Huffman and JSC-compressed free text, multi-frame messages
 * **JS8 auto-replies** (off by default, a toggle in Setup): answers `SNR?`, `GRID?`, `INFO?`, `STATUS?`, `HEARING?`, `AGN?`, stores checksummed `MSG`s in an inbox file and ACKs them, and optionally ACKs heartbeats. Wording matches JS8Call's own replies
 * **WSPR**: receive (a port of the WSJT-X `wsprd` decoder: sync search, Fano decoding, signal subtraction) with distance to each spotter, plus a type-1 beacon transmitter with %-of-slots scheduling
-* **Rig control** through Hamlib `rigctld` (spawned and supervised by NeonQRP), with PTT that drops on exit or crash
+* **Rig control** through Hamlib `rigctld` (spawned and supervised by QSO-Zero), with PTT that drops on exit or crash
 * **GPS time and grid** from the Cap LoRa-1262 / LoRa868 (ATGM336H). The app keeps its own disciplined clock, so it needs no root and no internet
 * **Two layouts**: compact 320×170 for the built-in LCD, and a 640×360 canvas scaled to HDMI. It switches automatically when a monitor is plugged in
 
@@ -21,22 +21,22 @@ A lightweight FT8 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, buil
 | `x6200` | Xiegu X6200 | 3091 (→ 3087) | built-in USB | CAT |
 | `ft891` | Yaesu FT-891 | 1036 | Digirig: CAT + DATA jack | RTS |
 
-The model IDs come from Hamlib's `riglist.h`. QMX and X6200 need Hamlib 4.6 or newer. On older Hamlib, NeonQRP automatically retries with the compatible backend.
+The model IDs come from Hamlib's `riglist.h`. QMX and X6200 need Hamlib 4.6 or newer. On older Hamlib, QSO-Zero automatically retries with the compatible backend.
 
 ## Install on the Cardputer Zero
 
 ```sh
 sudo apt install build-essential libhamlib-utils     # rigctld
-git clone <this repo> neonqrp && cd neonqrp
+git clone <this repo> qso-zero && cd qso-zero
 make -j4
 make test                                            # optional, ~1 min
 sudo make install-service
-mkdir -p ~/.config && cp dist/neonqrp.conf.example ~/.config/neonqrp.conf
-nano ~/.config/neonqrp.conf                          # callsign, radio
-sudo systemctl enable --now neonqrp
+mkdir -p ~/.config && cp dist/qso-zero.conf.example ~/.config/qso-zero.conf
+nano ~/.config/qso-zero.conf                          # callsign, radio
+sudo systemctl enable --now qso-zero
 ```
 
-The user running it needs to be in the `dialout`, `audio`, `video` and `input` groups (the service file adds them). To try the UI without a radio: `neonqrp --nohw`.
+The user running it needs to be in the `dialout`, `audio`, `video` and `input` groups (the service file adds them). To try the UI without a radio: `qso-zero --nohw`.
 
 **GPS:** the Cap's GPS is on a UART at 115200 8N1. Point `gps_device` at it (usually `/dev/serial0`; enable the UART and disable the serial console if your image hasn't). The Cap has no PPS line, so timing comes from NMEA burst arrival. That's typically ±50 ms after the median filter, well inside the ±1 s FT8/JS8 tolerance. The header chip shows **GPS** (green = locked) or **SYS** (orange = system clock).
 
@@ -70,7 +70,7 @@ Uploads go over **HTTPS first**, with wsprnet's certificate checked against the 
 
 ## JS8 auto-replies
 
-Turn on with **Setup → JS8 auto-reply** (or `/auto on`). When it's on, an **AUTO** chip shows in the header. NeonQRP then answers, the same way JS8Call does:
+Turn on with **Setup → JS8 auto-reply** (or `/auto on`). When it's on, an **AUTO** chip shows in the header. QSO-Zero then answers, the same way JS8Call does:
 
 | Query to your call | Reply |
 |---|---|
@@ -89,7 +89,7 @@ It only answers messages addressed to your callsign. It never answers while you 
 
 All of this runs with `make test`:
 
-* **JS8 modem is bit-exact with JS8Call:** 20,000 random frames across all submodes and frame types give identical tones from JS8Call's own `JS8::encode()` and from NeonQRP. CRC-12 matches Boost `augmented_crc` on 100,000 frames. The LDPC tables are extracted mechanically and checked (every generator codeword satisfies every parity check).
+* **JS8 modem is bit-exact with JS8Call:** 20,000 random frames across all submodes and frame types give identical tones from JS8Call's own `JS8::encode()` and from QSO-Zero. CRC-12 matches Boost `augmented_crc` on 100,000 frames. The LDPC tables are extracted mechanically and checked (every generator codeword satisfies every parity check).
 * **JS8 decode:** 4 simultaneous signals per submode with no false decodes. Single-signal 10/10 copy down to −18 dB (Normal) and −20 dB (Slow).
 * **JS8 messages:** callsign, grid and CRC-16 primitives, every frame type, and free text in all submodes round-trip identically.
 * **FT8:** 4 simultaneous signals, 20/20 down to −18 dB, about 11 ms per slot on a desktop CPU.

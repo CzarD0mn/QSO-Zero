@@ -1,4 +1,4 @@
-/* NeonQRP - engine: audio ring, waterfall, decode and transmit threads. */
+/* QSO-Zero - engine: audio ring, waterfall, decode and transmit threads. */
 #include "app.h"
 #include <ctype.h>
 #include <math.h>
@@ -220,7 +220,7 @@ int app_init(app_t *a, const char *cfgpath, int hw)
     g_wf_cfg = kiss_fftr_alloc(WF_NFFT, 0, NULL, NULL);
     for (int i = 0; i < WF_NFFT; ++i) g_wf_win[i] = 0.5f - 0.5f * cosf(2 * (float)M_PI * i / WF_NFFT);
     clk_init();
-    if (js8v_load_jsc(a->cfg.jsc_path) && js8v_load_jsc("data/js8.jsc") && js8v_load_jsc("/usr/share/neonqrp/js8.jsc"))
+    if (js8v_load_jsc(a->cfg.jsc_path) && js8v_load_jsc("data/js8.jsc") && js8v_load_jsc("/usr/share/qso-zero/js8.jsc"))
         app_status(a, "js8.jsc not found: JS8 free text limited to Huffman");
 
     if (hw) {

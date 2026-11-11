@@ -1,4 +1,4 @@
-/* NeonQRP - FT8/FT4 wrapper around ft8_lib (MIT). Adds a callsign hash
+/* QSO-Zero - FT8/FT4 wrapper around ft8_lib (MIT). Adds a callsign hash
  * table, duplicate suppression, an SNR estimate and GFSK synthesis. */
 #include "ft8w.h"
 #include <math.h>
