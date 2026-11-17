@@ -1,0 +1,92 @@
+# Builds installable .deb packages for the Cardputer Zero (Raspberry Pi CM0).
+# arm64 = 64-bit Raspberry Pi OS, armhf = 32-bit. Built inside Debian Bookworm
+# (the base of current Raspberry Pi OS) under QEMU, with the DSP tests run on
+# the emulated ARM CPU before packaging.
+#   push to main -> packages published on the `packages` branch
+#   push a tag vX.Y.Z -> also a GitHub Release with the .deb files attached
+name: packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            platform: linux/arm64
+          - arch: armhf
+            platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - name: Version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}";
+          else v="0.1.0~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Build, test and package (${{ matrix.arch }})
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -e VERSION -v "$PWD":/src -w /src debian:bookworm sh -ec '
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends build-essential binutils >/dev/null
+            echo "building $VERSION on $(dpkg --print-architecture), $(gcc -dumpmachine)"
+            make -j"$(nproc)" VERSION="$VERSION"
+            for t in varicode wspr wsprrx ft8 js8; do
+              make -s build/test_$t VERSION="$VERSION"
+              echo "### test_$t"; build/test_$t | tail -12
+            done
+            make deb VERSION="$VERSION"
+            chown -R '"$(id -u):$(id -g)"' build'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qso-zero-${{ matrix.arch }}
+          path: build/*.deb
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: debs
+          merge-multiple: true
+      - name: Publish to the packages branch
+        run: |
+          mkdir pkg && cp debs/*.deb pkg/ && cd pkg
+          {
+            echo "# QSO-Zero packages"
+            echo
+            echo "Built from ${GITHUB_SHA} on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            echo '| file | sha256 |'
+            echo '|---|---|'
+            for f in *.deb; do echo "| $f | $(sha256sum "$f" | cut -c1-16)… |"; done
+            echo
+            echo 'On the Cardputer Zero: `dpkg --print-architecture` tells you which one you need (arm64 or armhf), then'
+            echo '`sudo apt install ./qso-zero_<version>_<arch>.deb`'
+          } > README.md
+          sha256sum *.deb > SHA256SUMS
+          git init -q -b packages
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "packages for ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" packages
+      - name: GitHub Release (tags only)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" debs/*.deb --repo "${GITHUB_REPOSITORY}" \
+            --title "QSO-Zero ${GITHUB_REF_NAME}" \
+            --notes "Install on the Cardputer Zero: pick arm64 or armhf to match \`dpkg --print-architecture\`, then \`sudo apt install ./qso-zero_*.deb\` and run \`qso-zero-setup\`."

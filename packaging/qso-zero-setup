@@ -1,0 +1,85 @@
+#!/bin/sh
+# QSO-Zero first-run helper.
+#   qso-zero-setup           create ~/.config/qso-zero.conf and fix group membership
+#   qso-zero-setup --check   print what QSO-Zero will find on this machine (no changes)
+set -u
+CONF="${HOME}/.config/qso-zero.conf"
+EXAMPLE=/usr/share/qso-zero/qso-zero.conf.example
+[ -f "$EXAMPLE" ] || EXAMPLE=/usr/local/share/qso-zero/qso-zero.conf.example
+ME=$(id -un)
+
+ok()   { printf '  \033[32mOK\033[0m    %s\n' "$*"; }
+warn() { printf '  \033[33mWARN\033[0m  %s\n' "$*"; }
+info() { printf '        %s\n' "$*"; }
+
+check() {
+    echo "QSO-Zero environment check ($(qso-zero --version 2>/dev/null || echo 'qso-zero not on PATH'))"
+    echo "  arch: $(dpkg --print-architecture 2>/dev/null || uname -m)   kernel: $(uname -r)"
+    echo
+    echo "Display"
+    found=0
+    for fb in /sys/class/graphics/fb*; do
+        [ -e "$fb" ] || continue
+        found=1
+        n=$(basename "$fb")
+        info "/dev/$n  $(cat "$fb/name" 2>/dev/null)  $(cat "$fb/virtual_size" 2>/dev/null)  $(cat "$fb/bits_per_pixel" 2>/dev/null)bpp"
+    done
+    [ $found = 1 ] && ok "framebuffer(s) present" || warn "no /dev/fb* - the LCD/HDMI framebuffer driver is not loaded"
+    for s in /sys/class/drm/*HDMI*/status; do [ -e "$s" ] && info "$(basename "$(dirname "$s")"): $(cat "$s")"; done
+    echo "Keyboard"
+    if [ -r /proc/bus/input/devices ]; then
+        grep -B1 -A4 'EV=12001\|kbd' /proc/bus/input/devices | sed -n 's/^N: Name=/        /p' | sort -u
+    fi
+    echo "Serial ports (radio CAT, GPS)"
+    for d in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB* /dev/serial0 /dev/ttyAMA0 /dev/ttyS0; do
+        [ -e "$d" ] && info "$d -> $(readlink -f "$d")"
+    done
+    echo "Sound cards"
+    if [ -r /proc/asound/cards ]; then sed 's/^/        /' /proc/asound/cards; else warn "no ALSA"; fi
+    echo "Software"
+    command -v rigctld >/dev/null && ok "rigctld: $(rigctld --version 2>&1 | head -1)" || warn "rigctld missing: sudo apt install libhamlib-utils"
+    if rigctld -l 2>/dev/null | grep -q '^ *2057 '; then ok "Hamlib knows QMX (2057)"; else info "Hamlib has no QMX/X6200 model: QSO-Zero will use the TS-480/X6100 fallback"; fi
+    ldconfig -p 2>/dev/null | grep -q 'libasound.so.2' && ok "libasound (audio)" || warn "libasound.so.2 not found"
+    ldconfig -p 2>/dev/null | grep -q 'libssl.so.3\|libssl.so.1.1' && ok "libssl (HTTPS uploads)" || warn "no libssl: wsprnet uploads will use HTTP"
+    [ -f /usr/share/qso-zero/js8.jsc ] && ok "JS8 dictionary" || warn "js8.jsc missing"
+    echo "Permissions for $ME"
+    for g in dialout audio video input; do
+        if id -nG "$ME" | tr ' ' '\n' | grep -qx "$g"; then ok "in group $g"; else warn "not in group $g (run qso-zero-setup)"; fi
+    done
+    echo "Config"
+    [ -f "$CONF" ] && ok "$CONF" && grep -E '^(callsign|grid|radio|gps_device|display) *=' "$CONF" | sed 's/^/        /' || warn "no $CONF yet (run qso-zero-setup)"
+}
+
+setup() {
+    mkdir -p "${HOME}/.config"
+    if [ ! -f "$CONF" ]; then
+        cp "$EXAMPLE" "$CONF"
+        printf 'Callsign: '; read -r call
+        printf 'Radio (qmx qmxplus g90 x6100 x6200 ft891) [qmx]: '; read -r radio
+        call=$(printf '%s' "$call" | tr 'a-z' 'A-Z')
+        [ -n "$call" ] && sed -i "s/^callsign *=.*/callsign = $call/" "$CONF"
+        [ -n "$radio" ] && sed -i "s/^radio *=.*/radio = $radio/" "$CONF"
+        echo "Wrote $CONF"
+    else
+        echo "$CONF already exists - left unchanged"
+    fi
+    missing=""
+    for g in dialout audio video input; do
+        id -nG "$ME" | tr ' ' '\n' | grep -qx "$g" || missing="$missing $g"
+    done
+    if [ -n "$missing" ]; then
+        echo "Adding $ME to:$missing (needs sudo; log out and back in afterwards)"
+        for g in $missing; do sudo usermod -aG "$g" "$ME"; done
+    fi
+    echo
+    echo "Next:"
+    echo "  qso-zero --nohw          try the UI without a radio"
+    echo "  qso-zero                 run with radio, audio and GPS"
+    echo "  sudo systemctl enable --now qso-zero@$ME    start at boot"
+}
+
+case "${1:-}" in
+    --check|-c) check ;;
+    "") setup ;;
+    *) echo "usage: qso-zero-setup [--check]"; exit 2 ;;
+esac
