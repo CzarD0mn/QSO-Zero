@@ -113,6 +113,7 @@ typedef struct app {
     int        large;         /* large (HDMI) layout */
     int        screen;        /* 0 main, 1 menu, 2 tools, 3 help */
     int        menu_sel;
+    double     esc_t0;        /* >0 while ESC is held (exit countdown) */
     volatile int dirty;
     volatile int quit;
 } app_t;

@@ -55,8 +55,10 @@ $(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink
+TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink $(BUILD)/test_input
 ENGINE_OBJ := $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ))
+$(BUILD)/test_input: tests/test_input.c $(BUILD)/src/ui/input.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_uplink: tests/test_uplink.c $(BUILD)/src/net/uplink.o $(BUILD)/src/core/clock.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_engine: tests/test_engine.c $(ENGINE_OBJ) $(CORE_OBJ)

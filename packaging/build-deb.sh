@@ -12,6 +12,11 @@ install -D -m 755 packaging/qso-zero-setup     "$STAGE/usr/bin/qso-zero-setup"
 install -D -m 644 data/js8.jsc                 "$STAGE/usr/share/qso-zero/js8.jsc"
 install -D -m 644 dist/qso-zero.conf.example   "$STAGE/usr/share/qso-zero/qso-zero.conf.example"
 install -D -m 644 dist/qso-zero@.service       "$STAGE/usr/lib/systemd/system/qso-zero@.service"
+# CardputerZero launcher (APPLaunch): menu entry + icons
+install -D -m 644 packaging/qso-zero.desktop   "$STAGE/usr/share/APPLaunch/applications/qso-zero.desktop"
+for i in qso-zero.png qso-zero_100.png qso-zero_80.png; do
+    install -D -m 644 "packaging/appstore/$i" "$STAGE/usr/share/APPLaunch/share/images/$i"
+done
 install -D -m 644 README.md                    "$STAGE/usr/share/doc/qso-zero/README.md"
 install -D -m 644 packaging/copyright          "$STAGE/usr/share/doc/qso-zero/copyright"
 strip --strip-unneeded "$STAGE/usr/bin/qso-zero"

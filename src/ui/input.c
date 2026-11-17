@@ -5,11 +5,21 @@
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define MAXDEV 8
 static int g_fd[MAXDEV], g_n;
 static int g_mods;
+static int g_esc_code = -1, g_esc_fired;     /* key currently acting as ESC */
+static double g_esc_t0;
+
+static double now_s(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
 
 #define BITS_PER_LONG (sizeof(long) * 8)
 #define TESTBIT(b, a) ((a[(b) / BITS_PER_LONG] >> ((b) % BITS_PER_LONG)) & 1)
@@ -106,12 +116,24 @@ static int translate(int code, keyev_t *ev)
     return 0;
 }
 
+static int esc_hold_due(keyev_t *ev)
+{
+    if (g_esc_code >= 0 && !g_esc_fired && now_s() - g_esc_t0 >= ESC_HOLD_S) {
+        g_esc_fired = 1;
+        *ev = (keyev_t){.key = K_ESC_HOLD, .mods = g_mods};
+        return 1;
+    }
+    return 0;
+}
+
 int input_poll(keyev_t *ev, int timeout_ms)
 {
     struct pollfd p[MAXDEV];
+    if (esc_hold_due(ev)) return 1;
+    if (g_esc_code >= 0 && timeout_ms > 20) timeout_ms = 20;   /* watch the hold timer */
     for (int i = 0; i < g_n; ++i) p[i] = (struct pollfd){.fd = g_fd[i], .events = POLLIN};
     if (g_n == 0) { usleep(timeout_ms * 1000); return 0; }
-    if (poll(p, g_n, timeout_ms) <= 0) return 0;
+    if (poll(p, g_n, timeout_ms) <= 0) return esc_hold_due(ev);
     for (int i = 0; i < g_n; ++i) {
         if (!(p[i].revents & POLLIN)) continue;
         struct input_event e;
@@ -125,9 +147,25 @@ int input_poll(keyev_t *ev, int timeout_ms)
             case KEY_FN: m = MOD_FN; break;
             }
             if (m) { if (e.value) g_mods |= m; else g_mods &= ~m; continue; }
+            /* ESC (or the Cardputer's plain ` key): short press = back, hold = exit */
+            if (e.code == g_esc_code) {
+                if (e.value == 0) {
+                    int fired = g_esc_fired;
+                    g_esc_code = -1;
+                    if (!fired) { *ev = (keyev_t){.key = K_ESC, .mods = g_mods}; return 1; }
+                }
+                continue;                               /* autorepeat while held */
+            }
+            if (e.value == 1 && (e.code == KEY_ESC || (e.code == KEY_GRAVE && !(g_mods & (MOD_SHIFT | MOD_CTRL))))) {
+                g_esc_code = e.code;
+                g_esc_t0 = now_s();
+                g_esc_fired = 0;
+                *ev = (keyev_t){.key = K_ESC_HOLDING, .mods = g_mods};
+                return 1;
+            }
             if (e.value == 0) continue;                 /* release */
             if (translate(e.code, ev)) return 1;        /* press or autorepeat */
         }
     }
-    return 0;
+    return esc_hold_due(ev);
 }

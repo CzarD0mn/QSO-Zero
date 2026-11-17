@@ -1,0 +1,47 @@
+{
+  "package_name": "qso-zero",
+  "version": "0.1.0",
+  "app_name": "QSO-Zero",
+  "bin_name": "qso-zero",
+  "description": "FT8, JS8 and WSPR terminal for QRP radios on the Cardputer Zero",
+  "store": {
+    "summary": "FT8, JS8 and WSPR for QRP radios, with rig control and GPS time",
+    "description": "A weak-signal digital-mode station in your pocket. FT8 with automatic QSO sequencing and ADIF logging; a native JS8 implementation that interoperates with JS8Call (all speeds, directed messages, free text, optional auto-replies); WSPR beacon and receive with wsprnet upload when online. Controls QRP Labs QMX/QMX+, Xiegu G90/X6100/X6200 and Yaesu FT-891 through Hamlib (USB or Digirig), takes UTC and your grid from the LoRa/GPS Cap, and switches to a large layout on an HDMI monitor. Retro-synth look, keyboard driven. Requires an amateur radio licence to transmit. Hold ESC to exit.",
+    "categories": [
+      "Radio & Comms"
+    ],
+    "screenshots": [
+      "packaging/appstore/screenshot-ft8.png",
+      "packaging/appstore/screenshot-js8.png",
+      "packaging/appstore/screenshot-wspr.png",
+      "packaging/appstore/screenshot-setup.png"
+    ],
+    "icon": "packaging/appstore/icon-256.png",
+    "license": "GPL-3.0-or-later",
+    "source_repo": "https://github.com/CzarD0mn/QSO-Zero",
+    "author": {
+      "github": "CzarD0mn",
+      "display_name": "CzarD0mn"
+    },
+    "share_code": "QSOZ",
+    "permissions": {
+      "camera": false,
+      "microphone": false,
+      "imu": false,
+      "network": true,
+      "additional_hardware": true,
+      "background_service": false,
+      "external_display": true
+    },
+    "locales": {
+      "zh-CN": {
+        "title": "QSO-Zero",
+        "summary": "适用于QRP电台的FT8、JS8和WSPR，支持电台控制与GPS授时"
+      },
+      "ja": {
+        "title": "QSO-Zero",
+        "summary": "QRP無線機向けのFT8・JS8・WSPR。リグ制御とGPS時刻同期に対応"
+      }
+    }
+  }
+}

@@ -126,6 +126,12 @@ int main(int argc, char **argv)
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_wspr.ppm", dir); save_ppm(c, 3, p);
 
+    /* hold-ESC exit prompt over the FT8 screen */
+    a.mode = MODE_FT8; a.esc_t0 = clk_mono() - 0.55;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_exit.ppm", dir); save_ppm(c, 3, p);
+    a.esc_t0 = 0;
+
     a.screen = 1; a.menu_sel = 7;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu.ppm", dir); save_ppm(c, 3, p);

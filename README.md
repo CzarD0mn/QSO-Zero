@@ -33,8 +33,10 @@ sudo apt install ./qso-zero_<version>_<arch>.deb   # pulls in rigctld (libhamlib
 qso-zero-setup --check                         # what it finds: screen, keyboard, ports, sound cards
 qso-zero-setup                                 # callsign + radio, config file, group permissions
 qso-zero --nohw                                # try the interface without a radio
-sudo systemctl enable --now qso-zero@$USER     # start at boot
+sudo systemctl enable --now qso-zero@$USER     # optional: start at boot instead of from the launcher
 ```
+
+After installing, **QSO-Zero appears in the CardputerZero launcher** (APPLaunch) with its own icon. Open it from there like any other app. **Hold ESC for one second to exit back to the launcher.** A short ESC still means "back": it clears the input, then opens Setup. Exiting while transmitting stops TX first.
 
 **From source.**
 
@@ -59,7 +61,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `←` `→` (or `Ctrl` + `,` `/`) | move RX/TX offset 10 Hz (Shift: 100 Hz) |
 | `Tab` | FT8 → JS8 → WSPR |
 | `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band |
-| `Esc` or `` ` `` | setup menu |
+| `Esc` or `` ` `` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
 | `Ctrl+Q` | CQ |
 | `Ctrl+E` | JS8 heartbeat |
 | `Ctrl+X` | **halt TX now** |
@@ -94,6 +96,28 @@ Turn on with **Setup → JS8 auto-reply** (or `/auto on`). When it's on, an **AU
 
 It only answers messages addressed to your callsign. It never answers while you have something queued or are transmitting, or after `Ctrl+X`. Every reply is logged on screen as `AUTO-REPLY queued: …`. Relays (`>`) and `MSG TO:` store-and-forward are deliberately not automated.
 
+## CardputerZero launcher and App Store
+
+QSO-Zero follows M5Stack's [AppBuilder](https://github.com/m5stack/CardputerZero-AppBuilder) conventions:
+
+* `/usr/share/APPLaunch/applications/qso-zero.desktop` and icons in `/usr/share/APPLaunch/share/images/` put it in the launcher
+* it draws on the framebuffer the launcher passes in `APPLAUNCH_LINUX_FBDEV_DEVICE`. An HDMI monitor still takes priority and gets the large layout
+* hold ESC to exit, like M5's own apps
+* it runs as your user, never as root; the optional service is per-user (`qso-zero@<user>`)
+* [`app-builder.json`](app-builder.json) carries the store listing: summary, `Radio & Comms` category, four 320×170 screenshots, icon, GPL-3.0-or-later, share code `QSOZ`, permissions (network, additional hardware, external display) and Chinese/Japanese titles
+
+Locally, the arm64 package passes czdev's own preflight checks (`.desktop` present, no root services, valid name), the store's install-path policy, and its metadata policy.
+
+**Publishing** (from this repository, with the arm64 `.deb` of a tagged release):
+
+```sh
+git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
+../CardputerZero-AppBuilder/czdev login
+../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.0_arm64.deb
+```
+
+For a first release, the store wants a short video of the app running on a real device posted in the publish PR. The listing points at this repository as its source, and GPL code shared through the store should have public source, so make the repository public before publishing.
+
 ## How it was verified
 
 All of this runs with `make test`:
@@ -103,6 +127,7 @@ All of this runs with `make test`:
 * **JS8 messages:** callsign, grid and CRC-16 primitives, every frame type, and free text in all submodes round-trip identically.
 * **FT8:** 4 simultaneous signals, 20/20 down to −18 dB, about 11 ms per slot on a desktop CPU.
 * **WSPR:** TX symbols identical to Etherkit JTEncode. Receive: 5 stations in one cycle, all decoded with frequency to 0.1 Hz, 5/5 copy down to −28 dB. A full 2-minute cycle also decodes through the live audio ring and decode thread.
+* **Keyboard:** real evdev key events fed to the input code: short ESC gives "back", holding ESC 1 s exits, the Cardputer's `` ` `` key acts as ESC, Shift+`` ` `` types `~`, and Ctrl+X still halts TX.
 * **wsprnet upload:** tested against local servers in four cases: a valid HTTPS certificate (sent over HTTPS), a certificate for the wrong host (rejected, sent over HTTP, nothing leaked to the bad server), port 443 closed (sent over HTTP) and no network (spots dropped).
 * **JS8 auto-replies:** 16 checks, covering every reply's wording, off/on, only-to-me, checksum rejection, inbox writes, heartbeat rate limiting and hold-off while TX is queued or halted.
 * **Engine:** real-time decode through the live audio ring and UTC tagging (DT 0.00), a full auto-sequenced QSO including the ADIF entry, and a 3-frame JS8 message reassembled after passing through the modem.
