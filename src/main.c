@@ -15,9 +15,13 @@
 #include "ui/input.h"
 #include "ui/views.h"
 
+#ifndef QSOZERO_VERSION
+#define QSOZERO_VERSION "dev"
+#endif
+
 static void usage(void)
 {
-    fprintf(stderr, "usage: qso-zero [--config FILE] [--fb /dev/fbN|auto] [--nohw]\n");
+    fprintf(stderr, "usage: qso-zero [--config FILE] [--fb /dev/fbN|auto] [--nohw] [--version]\n");
 }
 
 int main(int argc, char **argv)
@@ -28,6 +32,7 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--config") && i + 1 < argc) cfg = argv[++i];
         else if (!strcmp(argv[i], "--fb") && i + 1 < argc) fbdev = argv[++i];
         else if (!strcmp(argv[i], "--nohw")) hw = 0;
+        else if (!strcmp(argv[i], "--version")) { printf("qso-zero %s\n", QSOZERO_VERSION); return 0; }
         else { usage(); return 2; }
     }
     static app_t app;

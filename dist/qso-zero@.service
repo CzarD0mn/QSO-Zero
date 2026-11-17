@@ -1,0 +1,20 @@
+# QSO-Zero for one user:   sudo systemctl enable --now qso-zero@<username>
+# Runs on the LCD/HDMI framebuffer, so stop any desktop/console app using it first.
+[Unit]
+Description=QSO-Zero digital-mode terminal (%i)
+After=multi-user.target sound.target network-online.target
+
+[Service]
+Type=simple
+User=%i
+SupplementaryGroups=dialout audio video input tty
+Environment=HOME=/home/%i
+WorkingDirectory=/home/%i
+ExecStart=/usr/bin/env qso-zero
+Restart=on-failure
+RestartSec=3
+# keep the decoder responsive while TX audio is playing
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

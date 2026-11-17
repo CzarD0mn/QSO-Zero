@@ -25,18 +25,27 @@ The model IDs come from Hamlib's `riglist.h`. QMX and X6200 need Hamlib 4.6 or n
 
 ## Install on the Cardputer Zero
 
+**From a package (easiest).** Each push to `main` builds `.deb` packages for 64-bit (`arm64`) and 32-bit (`armhf`) Raspberry Pi OS. They're published on the [`packages` branch](../../tree/packages), and attached to a GitHub Release for each `vX.Y.Z` tag.
+
 ```sh
-sudo apt install build-essential libhamlib-utils     # rigctld
-git clone <this repo> qso-zero && cd qso-zero
-make -j4
-make test                                            # optional, ~1 min
-sudo make install-service
-mkdir -p ~/.config && cp dist/qso-zero.conf.example ~/.config/qso-zero.conf
-nano ~/.config/qso-zero.conf                          # callsign, radio
-sudo systemctl enable --now qso-zero
+dpkg --print-architecture                      # arm64 or armhf
+sudo apt install ./qso-zero_<version>_<arch>.deb   # pulls in rigctld (libhamlib-utils)
+qso-zero-setup --check                         # what it finds: screen, keyboard, ports, sound cards
+qso-zero-setup                                 # callsign + radio, config file, group permissions
+qso-zero --nohw                                # try the interface without a radio
+sudo systemctl enable --now qso-zero@$USER     # start at boot
 ```
 
-The user running it needs to be in the `dialout`, `audio`, `video` and `input` groups (the service file adds them). To try the UI without a radio: `qso-zero --nohw`.
+**From source.**
+
+```sh
+sudo apt install build-essential libhamlib-utils
+git clone https://github.com/CzarD0mn/QSO-Zero.git && cd QSO-Zero
+make -j4 && make test        # tests optional, ~3 min
+make deb                     # or: sudo make install-service
+```
+
+The user running it needs to be in the `dialout`, `audio`, `video` and `input` groups; `qso-zero-setup` adds them.
 
 **GPS:** the Cap's GPS is on a UART at 115200 8N1. Point `gps_device` at it (usually `/dev/serial0`; enable the UART and disable the serial console if your image hasn't). The Cap has no PPS line, so timing comes from NMEA burst arrival. That's typically ±50 ms after the median filter, well inside the ±1 s FT8/JS8 tolerance. The header chip shows **GPS** (green = locked) or **SYS** (orange = system clock).
 

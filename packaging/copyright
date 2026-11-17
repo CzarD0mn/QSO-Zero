@@ -1,0 +1,33 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: QSO-Zero
+Source: https://github.com/CzarD0mn/QSO-Zero
+
+Files: *
+License: GPL-3+
+Comment: The JS8 modem and message layer are ports of JS8Call
+ (C) Jordan Sherer KN4CRD, Allan Bazinet W6BAZ, GPL-3+.
+
+Files: third_party/wsprd/*
+Copyright: 2001-2015 Joe Taylor K1JT; 2014-2015 Steven Franke K9AN; 2016 Guenael Jouchet VA2GKA
+License: GPL-3+
+
+Files: third_party/ft8/* third_party/common/*
+Copyright: Karlis Goba YL3JG
+License: MIT
+
+Files: third_party/fft/*
+Copyright: Mark Borgerding
+License: BSD-3-Clause
+
+Files: data/js8.jsc
+Comment: Generated from the JS8Call compression dictionary (GPL-3+).
+License: GPL-3+
+
+License: GPL-3+
+ On Debian systems the full text is in /usr/share/common-licenses/GPL-3.
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software, to deal in the Software without restriction. See
+ https://opensource.org/licenses/MIT for the full text.
+License: BSD-3-Clause
+ See https://opensource.org/licenses/BSD-3-Clause for the full text.

@@ -11,6 +11,9 @@ OPT     ?= -O2
 ifneq (,$(findstring aarch64,$(ARCH)))
   # Cortex-A53 (RP3A0 / BCM2710A1)
   OPT   += -mcpu=cortex-a53 -ffast-math -ftree-vectorize
+else ifneq (,$(findstring arm-linux-gnueabihf,$(ARCH)))
+  # 32-bit Raspberry Pi OS on the A53: ARMv8 NEON in AArch32
+  OPT   += -mcpu=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard -ffast-math -ftree-vectorize
 else
   OPT   += -ffast-math
 endif
@@ -31,6 +34,9 @@ CORE_SRC:= $(DSP_SRC) $(FT8_SRC) $(FFT_SRC) $(WSPRD_SRC)
 APP_SRC := src/main.c src/core/app.c src/core/config.c src/core/clock.c src/core/scheduler.c src/core/js8auto.c \
            src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c \
            src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
+
+VERSION ?= 0.1.0
+CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
 
 BUILD   := build
 CORE_OBJ:= $(CORE_SRC:%.c=$(BUILD)/%.o)
@@ -77,8 +83,11 @@ install: $(BUILD)/qso-zero
 	install -D -m 644 dist/qso-zero.conf.example $(DESTDIR)$(PREFIX)/share/qso-zero/qso-zero.conf.example
 
 install-service: install
-	install -D -m 644 dist/qso-zero.service /etc/systemd/system/qso-zero.service
+	install -D -m 644 dist/qso-zero@.service /etc/systemd/system/qso-zero@.service
 	systemctl daemon-reload
-	@echo "enable with: sudo systemctl enable --now qso-zero"
+	@echo "enable with: sudo systemctl enable --now qso-zero@$$USER"
 
-.PHONY: install install-service
+deb: $(BUILD)/qso-zero
+	VERSION=$(VERSION) packaging/build-deb.sh
+
+.PHONY: install install-service deb

@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    if [ -d /run/systemd/system ]; then systemctl daemon-reload || true; fi
+    cat <<'MSG'
+
+QSO-Zero installed.
+  qso-zero-setup --check   see what it finds on this machine
+  qso-zero-setup           create your config and set group permissions
+  qso-zero --nohw          try the interface without a radio
+
+MSG
+fi
+exit 0

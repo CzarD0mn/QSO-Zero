@@ -1,0 +1,17 @@
+Package: qso-zero
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: QSO-Zero <qso-zero@users.noreply.github.com>
+Installed-Size: @SIZE@
+Depends: libc6 (>= @GLIBC@), libhamlib-utils
+Recommends: libasound2 | libasound2t64, libssl3 | libssl3t64 | libssl1.1
+Section: hamradio
+Priority: optional
+Homepage: https://github.com/CzarD0mn/QSO-Zero
+Description: FT8, JS8 and WSPR terminal for QRP radios on the Cardputer Zero
+ Lightweight weak-signal digital-mode station for the M5Stack Cardputer Zero:
+ FT8 with auto-sequencing, a native JS8 implementation (JS8Call compatible)
+ with optional auto-replies, and WSPR beacon/receive with wsprnet upload.
+ Drives QRP Labs QMX/QMX+, Xiegu G90/X6100/X6200 and Yaesu FT-891 through
+ Hamlib, takes time and grid from a GPS cap, and draws directly to the
+ 1.9" LCD or an HDMI monitor.
