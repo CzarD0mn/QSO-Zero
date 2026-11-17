@@ -248,6 +248,10 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         if (a->cfg.wsprnet_upload) uplink_start(a->cfg.wsprnet_host, 443, 80, my_call, my_grid);
     }
     app_set_mode(a, MODE_FT8);
+    if (!strcmp(a->cfg.callsign, "N0CALL")) {
+        app_status(a, "Welcome! Set your callsign: ESC > Callsign");
+        a->status_until = clk_mono() + 60;
+    }
     return 0;
 }
 

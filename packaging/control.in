@@ -1,7 +1,7 @@
 Package: qso-zero
 Version: @VERSION@
 Architecture: @ARCH@
-Maintainer: QSO-Zero <qso-zero@users.noreply.github.com>
+Maintainer: CzarD0mn <CzarD0mn@users.noreply.github.com>
 Installed-Size: @SIZE@
 Depends: libc6 (>= @GLIBC@), libhamlib-utils
 Recommends: libasound2 | libasound2t64, libssl3 | libssl3t64 | libssl1.1

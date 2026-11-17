@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -50,6 +51,10 @@ static int fb_try(fb_t *fb, const char *path)
 int fb_open(fb_t *fb, const char *want)
 {
     if (want && strcmp(want, "auto")) return fb_try(fb, want);
+    /* Started from the CardputerZero launcher: it names the LCD framebuffer.
+     * An HDMI monitor, if connected, still takes priority (large layout). */
+    const char *launcher_fb = getenv("APPLAUNCH_LINUX_FBDEV_DEVICE");
+    if (launcher_fb && *launcher_fb && !fb_hdmi_connected() && fb_try(fb, launcher_fb) == 0) return 0;
     /* auto: classify every framebuffer by size; small = the LCD */
     int lcd = -1, big = -1;
     for (int i = 0; i < 4; ++i) {

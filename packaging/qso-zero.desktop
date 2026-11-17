@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=QSO-Zero
+Comment=FT8, JS8 and WSPR for QRP radios
+Exec=/usr/bin/qso-zero
+Icon=share/images/qso-zero.png
+Terminal=false
+Categories=HamRadio;Utility;
+StartupNotify=false
+Sysplause=true

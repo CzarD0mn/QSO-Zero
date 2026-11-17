@@ -457,7 +457,7 @@ static void render_help(app_t *a, surface_t *s)
 {
     (void)a;
     static const char *lines[] = {
-        "KEYS",
+        "KEYS            hold ESC: exit",
         "ENTER   send / reply to selected",
         "UP/DN   select decode   L/R move RX+TX",
         "TAB     next mode (FT8 JS8 WSPR)",
@@ -477,6 +477,21 @@ static void render_help(app_t *a, surface_t *s)
         gfx_text(s, 6, 4 + (int)i * 10 * sc + (i ? 4 : 0), lines[i], i ? C_TEXT : C_MAGENTA, sc);
 }
 
+static void draw_exit_toast(app_t *a, surface_t *s)
+{
+    int sc = s->w >= LARGE_W ? 2 : 1;
+    const char *t = a->tx_active ? "Hold ESC to exit (stops TX)" : "Hold ESC to exit";
+    int w = gfx_text_w(t, sc) + 16 * sc, h = 22 * sc;
+    int x = (s->w - w) / 2, y = (s->h - h) / 2;
+    gfx_fill(s, x, y, w, h, C_PANEL2);
+    gfx_rect(s, x, y, w, h, C_MAGENTA);
+    gfx_text(s, x + 8 * sc, y + 4 * sc, t, C_TEXT, sc);
+    double f = (clk_mono() - a->esc_t0) / ESC_HOLD_S;
+    if (f > 1) f = 1;
+    gfx_fill(s, x + 8 * sc, y + 15 * sc, w - 16 * sc, 3 * sc, C_PANEL);
+    gfx_hgrad(s, x + 8 * sc, y + 15 * sc, (int)((w - 16 * sc) * f), 3 * sc, C_PURPLE, C_MAGENTA);
+}
+
 void ui_render(app_t *a, surface_t *s)
 {
     int big = s->w >= LARGE_W;
@@ -486,6 +501,7 @@ void ui_render(app_t *a, surface_t *s)
     case 3: render_help(a, s); break;
     default: if (big) render_large_main(a, s); else render_compact_main(a, s);
     }
+    if (a->esc_t0 > 0) draw_exit_toast(a, s);
 }
 
 /* ------------------------------------------------------------------ */
@@ -544,6 +560,10 @@ static void menu_enter(app_t *a)
 void ui_key(app_t *a, const keyev_t *k)
 {
     a->dirty = 1;
+    /* launcher convention: hold ESC to exit (from any screen) */
+    if (k->key == K_ESC_HOLDING) { a->esc_t0 = clk_mono(); return; }
+    if (k->key == K_ESC_HOLD) { a->esc_t0 = 0; a->quit = 1; return; }
+    if (k->key == K_ESC) a->esc_t0 = 0;
     int ctrl = k->mods & MOD_CTRL;
     /* global hot keys */
     if (ctrl && k->key == K_CHAR) {
