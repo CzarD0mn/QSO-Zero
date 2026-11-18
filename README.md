@@ -74,7 +74,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+Q` | CQ |
 | `Ctrl+E` | JS8 heartbeat |
 | `Ctrl+X` | **halt TX now** |
-| `Ctrl+U` | tune carrier 5 s |
+| `Ctrl+U` | tune carrier 5 s. **`Q` or `Esc` stops it immediately** |
 | `Ctrl+W` | WSPR beacon on/off |
 | `Ctrl+T` | tools (GPS/time, rig, audio) |
 | `Ctrl+L` | force compact / large layout |
@@ -136,6 +136,7 @@ All of this runs with `make test`:
 * **JS8 messages:** callsign, grid and CRC-16 primitives, every frame type, and free text in all submodes round-trip identically.
 * **FT8:** 4 simultaneous signals, 20/20 down to −18 dB, about 11 ms per slot on a desktop CPU.
 * **WSPR:** TX symbols identical to Etherkit JTEncode. Receive: 5 stations in one cycle, all decoded with frequency to 0.1 Hz, 5/5 copy down to −28 dB. A full 2-minute cycle also decodes through the live audio ring and decode thread.
+* **Stopping a tune:** with the engine running, `Q` and `Esc` both stop a live carrier within one audio buffer. That `Esc` press doesn't also open Setup or start the exit countdown. A stop pressed before the carrier starts means it never transmits, Ctrl+X still halts, and `Q` types normally when nothing is tuning.
 * **Keyboard:** real evdev key events fed to the input code: short ESC gives "back", holding ESC 1 s exits, the Cardputer's `` ` `` key acts as ESC, Shift+`` ` `` types `~`, and Ctrl+X still halts TX.
 * **wsprnet upload:** tested against local servers in four cases: a valid HTTPS certificate (sent over HTTPS), a certificate for the wrong host (rejected, sent over HTTP, nothing leaked to the bad server), port 443 closed (sent over HTTP) and no network (spots dropped).
 * **JS8 auto-replies:** 16 checks, covering every reply's wording, off/on, only-to-me, checksum rejection, inbox writes, heartbeat rate limiting and hold-off while TX is queued or halted.

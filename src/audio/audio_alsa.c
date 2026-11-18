@@ -42,6 +42,7 @@ static volatile float g_level;
 const char *audio_error(void) { return g_err; }
 float audio_rx_level(void) { return g_level; }
 void audio_tx_abort(void) { g_abort = 1; }
+void audio_tx_reset(void) { g_abort = 0; }
 
 static int load_alsa(void)
 {
@@ -188,7 +189,9 @@ int audio_play(const float *buf, size_t n, float gain)
         A.close(g_out); g_out = NULL;
         return -1;
     }
-    g_abort = 0;
+    /* g_abort is cleared by audio_tx_reset() when the TX is picked up, not
+     * here, so a stop pressed while PTT is being keyed is never lost. */
+    if (g_abort) { A.close(g_out); g_out = NULL; return 1; }
     enum { CH = 1200 };
     int16_t pcm[CH];
     size_t pos = 0;
