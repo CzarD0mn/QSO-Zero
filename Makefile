@@ -35,7 +35,7 @@ APP_SRC := src/main.c src/core/app.c src/core/config.c src/core/clock.c src/core
            src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c \
            src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
 
-VERSION ?= 0.1.1
+VERSION ?= 0.1.0
 CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
 
 BUILD   := build
@@ -56,7 +56,7 @@ $(BUILD)/%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink $(BUILD)/test_input
-ENGINE_OBJ := $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o,$(APP_OBJ))
+ENGINE_OBJ := $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ))
 $(BUILD)/test_input: tests/test_input.c $(BUILD)/src/ui/input.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_uplink: tests/test_uplink.c $(BUILD)/src/net/uplink.o $(BUILD)/src/core/clock.o

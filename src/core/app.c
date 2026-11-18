@@ -464,12 +464,7 @@ static void *tx_thread(void *arg)
         pthread_mutex_lock(&a->lock);
         int have = a->ntxq > 0 && a->tx_enabled;
         txitem_t t;
-        if (have) {
-            t = a->txq[0];
-            a->tx_cur_kind = t.kind;
-            a->tx_abort = 0;                       /* a fresh item: forget older stops */
-            audio_tx_reset();
-        }
+        if (have) t = a->txq[0];
         pthread_mutex_unlock(&a->lock);
         if (!have) { struct timespec ts = {0, 50000000}; nanosleep(&ts, NULL); continue; }
 
@@ -495,12 +490,6 @@ static void *tx_thread(void *arg)
         }
         if (g_hw && a->rig_ok && rig_ptt(1)) { app_status(a, "PTT failed: %s", rig_error()); free(audio); goto pop; }
         sleep_until(a, start);
-        if (a->tx_abort) {                         /* stopped before it reached the air */
-            if (g_hw && a->rig_ok) rig_ptt(0);
-            if (t.kind == TXK_TUNE) a->tuning = 0;
-            free(audio);
-            goto pop;
-        }
         if (t.kind == TXK_WSPR) a->wspr_tx_slot = floor(start / 120.0) * 120.0;
         a->tx_active = 1;
         a->dirty = 1;
@@ -524,7 +513,7 @@ static void *tx_thread(void *arg)
         } else {
             /* no hardware: simulate the airtime */
             double end = clk_now() + n / (double)AUDIO_HW_RATE;
-            while (!a->quit && a->tx_enabled && !a->tx_abort && clk_now() < end) {
+            while (!a->quit && a->tx_enabled && clk_now() < end) {
                 a->tx_progress = 1.0f - (float)((end - clk_now()) / (n / (double)AUDIO_HW_RATE));
                 struct timespec ts = {0, 50000000};
                 nanosleep(&ts, NULL);
@@ -533,13 +522,11 @@ static void *tx_thread(void *arg)
         if (g_hw && a->rig_ok) rig_ptt(0);
         a->tx_active = 0;
         a->tx_progress = 0;
-        if (t.kind == TXK_TUNE) a->tuning = 0;
         free(audio);
     pop:
         pthread_mutex_lock(&a->lock);
         if (a->ntxq && !memcmp(&a->txq[0], &t, sizeof t)) memmove(a->txq, a->txq + 1, sizeof(txitem_t) * --a->ntxq);
         if (t.kind == TXK_FT8) a->seq.tries++;
-        a->tx_cur_kind = TXK_NONE;
         pthread_mutex_unlock(&a->lock);
         a->dirty = 1;
     next:;
@@ -618,8 +605,6 @@ void app_halt_tx(app_t *a)
     pthread_mutex_lock(&a->lock);
     a->ntxq = 0;
     a->wspr_beacon = 0;
-    if (a->tx_cur_kind != TXK_NONE) a->tx_abort = 1;   /* keying or on air */
-    if (a->tx_cur_kind != TXK_TUNE) a->tuning = 0;     /* else the TX thread clears it */
     seq_reset(a);
     pthread_mutex_unlock(&a->lock);
     audio_tx_abort();
@@ -631,33 +616,10 @@ void app_tune(app_t *a, double seconds)
 {
     pthread_mutex_lock(&a->lock);
     a->tune_until = clk_now() + seconds;
-    a->tuning = 1;
     a->ntxq = 0;
     a->txq[a->ntxq++] = (txitem_t){.kind = TXK_TUNE, .slot_odd = -1};
     pthread_mutex_unlock(&a->lock);
     app_status(a, "TUNE %.0f s at %d Hz", seconds, a->tx_off);
-}
-
-/* Stop a tune carrier now (Q / ESC while tuning). Other queued TX is kept. */
-void app_stop_tune(app_t *a)
-{
-    if (!a->tuning) return;
-    pthread_mutex_lock(&a->lock);
-    for (int i = 0; i < a->ntxq;) {
-        if (a->txq[i].kind == TXK_TUNE) memmove(a->txq + i, a->txq + i + 1, sizeof(txitem_t) * (--a->ntxq - i));
-        else ++i;
-    }
-    a->tune_until = 0;
-    if (a->tx_cur_kind == TXK_TUNE) {
-        /* the TX thread already has it (keying or on air): abort; it drops
-         * PTT and clears `tuning` itself */
-        a->tx_abort = 1;
-        audio_tx_abort();
-    } else {
-        a->tuning = 0;
-    }
-    pthread_mutex_unlock(&a->lock);
-    app_status(a, "TUNE stopped");
 }
 
 void app_toggle_wspr(app_t *a)

@@ -91,10 +91,6 @@ typedef struct app {
     int        wspr_beacon;   /* WSPR: beacon running */
     double     wspr_tx_slot;  /* start of the last slot we transmitted WSPR in */
     double     tune_until;
-    volatile int tuning;      /* tune carrier queued or on air */
-    int        tx_cur_kind;   /* kind the TX thread is working on (TXK_NONE idle) */
-    volatile int tx_abort;    /* stop the current transmission now */
-    int        esc_swallow;   /* this ESC press already stopped a tune */
     ft8seq_t   seq;
 
     /* JS8 automation */
@@ -146,7 +142,6 @@ void app_call_cq(app_t *a);
 void app_send_heartbeat(app_t *a);
 void app_halt_tx(app_t *a);
 void app_tune(app_t *a, double seconds);
-void app_stop_tune(app_t *a);
 void app_toggle_wspr(app_t *a);
 
 /* engine threads */
