@@ -4,7 +4,9 @@
 # (the base of current Raspberry Pi OS) under QEMU, with the DSP tests run on
 # the emulated ARM CPU before packaging.
 #   push to main -> packages published on the `packages` branch
-#   push a tag vX.Y.Z -> also a GitHub Release with the .deb files attached
+#   first push of a new app-builder.json "version" (no vX.Y.Z tag yet)
+#     -> plain X.Y.Z packages, and GitHub creates tag vX.Y.Z + a Release
+#   later pushes at the same version -> X.Y.Z~gitDATE.SHA snapshots
 name: packages
 
 on:
@@ -17,8 +19,28 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  version:
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          base=$(python3 -c 'import json;print(json.load(open("app-builder.json"))["version"])')
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}"; rel=false
+          elif [ -z "$(git ls-remote --tags origin "refs/tags/v$base")" ]; then v="$base"; rel=true
+          else v="$base~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; rel=false; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "release=$rel" >> "$GITHUB_OUTPUT"
+          echo "version $v (new release: $rel)"
+
+  build:
+    needs: version
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,11 +54,6 @@ jobs:
       - name: M5Stack AppBuilder (packager)
         run: git clone --depth 1 https://github.com/m5stack/CardputerZero-AppBuilder.git .appbuilder
       - uses: docker/setup-qemu-action@v3
-      - name: Version
-        run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}";
-          else v="$(python3 -c 'import json;print(json.load(open("app-builder.json"))["version"])')~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
-          echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: Build, test and package (${{ matrix.arch }})
         run: |
           docker run --rm --platform ${{ matrix.platform }} -e VERSION -v "$PWD":/src -w /src debian:bookworm sh -ec '
@@ -63,7 +80,7 @@ jobs:
             build/test-results-*.txt
 
   publish:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -94,11 +111,12 @@ jobs:
           git add -A
           git commit -q -m "packages for ${GITHUB_SHA}"
           git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" packages
-      - name: GitHub Release (tags only)
-        if: github.ref_type == 'tag'
+      - name: GitHub Release (new version)
+        if: needs.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ needs.version.outputs.version }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" debs/*.deb --repo "${GITHUB_REPOSITORY}" \
-            --title "QSO-Zero ${GITHUB_REF_NAME}" \
-            --notes "Install on the Cardputer Zero: pick arm64 or armhf to match \`dpkg --print-architecture\`, then \`sudo apt install ./qso-zero_*.deb\` and run \`qso-zero-setup\`."
+          gh release create "v$V" debs/*.deb --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" \
+            --title "QSO-Zero v$V" \
+            --notes "Built with M5Stack's AppBuilder packager. On the Cardputer Zero use the arm64 package (armhf is for 32-bit Raspberry Pi OS): \`sudo apt install ./qso-zero_${V}-1_arm64.deb && sudo systemctl restart APPLaunch.service\`, then open QSO-Zero from the launcher. Hold ESC to exit."
