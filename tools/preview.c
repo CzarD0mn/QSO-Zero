@@ -132,6 +132,11 @@ int main(int argc, char **argv)
     snprintf(p, sizeof p, "%s/compact_exit.ppm", dir); save_ppm(c, 3, p);
     a.esc_t0 = 0;
 
+    a.tuning = 1; a.tune_until = clk_now() + 3.2;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_tune.ppm", dir); save_ppm(c, 3, p);
+    a.tuning = 0;
+
     a.screen = 1; a.menu_sel = 7;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu.ppm", dir); save_ppm(c, 3, p);

@@ -16,6 +16,8 @@
 #include "dsp/js8_varicode.h"
 #include "dsp/wspr.h"
 #include "dsp/wsprrx.h"
+#include "ui/input.h"
+#include "ui/views.h"
 
 static int fails;
 #define CHECK(c, ...) do { if (c) printf("  ok    " __VA_ARGS__); else { printf("  FAIL  " __VA_ARGS__); ++fails; } printf("\n"); } while (0)
@@ -326,6 +328,56 @@ static void wspr_cycle(app_t *a)
     free(mix); free(w); free(pcm);
 }
 
+/* ---------------- stopping a tune carrier ---------------- */
+
+static int wait_for(volatile int *flag, int want, int ms)
+{
+    for (int i = 0; i < ms / 10; ++i) { if (*flag == want) return 1; usleep(10000); }
+    return *flag == want;
+}
+
+static void key(app_t *a, int k, int ch, int mods) { keyev_t e = {k, ch, mods}; ui_key(a, &e); }
+
+static void tune_stop(app_t *a)
+{
+    printf("[6] stopping a tune carrier\n");
+    a->screen = 0; a->input[0] = 0; a->input_len = 0; a->tx_enabled = 1; a->ntxq = 0;
+
+    app_tune(a, 5);
+    CHECK(wait_for(&a->tx_active, 1, 1000), "tune carrier on air");
+    double t0 = clk_mono();
+    key(a, K_CHAR, 'q', 0);
+    int off = wait_for(&a->tx_active, 0, 500);
+    CHECK(off && !a->tuning && a->ntxq == 0, "Q stops it within %.0f ms", (clk_mono() - t0) * 1000);
+    CHECK(a->input_len == 0, "the Q is not typed into the message line");
+
+    app_tune(a, 5);
+    CHECK(wait_for(&a->tx_active, 1, 1000), "tune again");
+    t0 = clk_mono();
+    key(a, K_ESC_HOLDING, 0, 0);                  /* ESC key-down */
+    off = wait_for(&a->tx_active, 0, 500);
+    CHECK(off && !a->tuning, "ESC stops it on key-down within %.0f ms", (clk_mono() - t0) * 1000);
+    key(a, K_ESC, 0, 0);                          /* ...and its release */
+    CHECK(a->screen == 0 && a->esc_t0 == 0 && !a->quit, "that ESC does not open Setup or start the exit countdown");
+    key(a, K_ESC_HOLDING, 0, 0); key(a, K_ESC, 0, 0);
+    CHECK(a->screen == 1, "the next ESC behaves normally again (opens Setup)");
+    a->screen = 0;
+
+    app_tune(a, 5);
+    key(a, K_CHAR, 'Q', MOD_SHIFT);               /* before the TX thread even starts it */
+    usleep(400000);
+    CHECK(!a->tx_active && !a->tuning && a->ntxq == 0, "stop pressed before the carrier started: never transmits");
+
+    app_tune(a, 5);
+    CHECK(wait_for(&a->tx_active, 1, 1000), "tune again");
+    key(a, K_CHAR, 'x', MOD_CTRL);
+    CHECK(wait_for(&a->tx_active, 0, 500) && !a->tuning, "Ctrl+X still halts it");
+
+    key(a, K_CHAR, 'q', 0);
+    CHECK(a->input_len == 1 && a->input[0] == 'q', "no tune running: Q types normally");
+    a->input[0] = 0; a->input_len = 0;
+}
+
 int main(void)
 {
     static app_t a;
@@ -339,6 +391,7 @@ int main(void)
     autoreply(&a);
     app_start_threads(&a);
     realtime_ft8(&a);
+    tune_stop(&a);
     wspr_cycle(&a);
     app_stop_threads(&a);
     printf(fails ? "FAIL (%d)\n" : "PASS\n", fails);
