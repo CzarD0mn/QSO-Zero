@@ -36,6 +36,15 @@ qso-zero --nohw                                # try the interface without a rad
 sudo systemctl enable --now qso-zero@$USER     # optional: start at boot instead of from the launcher
 ```
 
+**From your computer over SSH** (the current czdev has no deploy command):
+
+```sh
+scp qso-zero_<version>_arm64.deb pi@<device-ip>:/tmp/
+ssh pi@<device-ip> 'sudo apt install -y /tmp/qso-zero_<version>_arm64.deb && sudo systemctl restart APPLaunch.service'
+```
+
+Restarting `APPLaunch.service` makes the launcher show the new app straight away. M5's `scripts/deploy.sh` in the AppBuilder repository does the same copy-and-restart, but installs with `dpkg -i`, which doesn't fetch dependencies. Run `sudo apt install libhamlib-utils` on the device once first if you use it.
+
 After installing, **QSO-Zero appears in the CardputerZero launcher** (APPLaunch) with its own icon. Open it from there like any other app. **Hold ESC for one second to exit back to the launcher.** A short ESC still means "back": it clears the input, then opens Setup. Exiting while transmitting stops TX first.
 
 **From source.**
