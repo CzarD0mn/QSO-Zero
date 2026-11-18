@@ -37,6 +37,8 @@ APP_SRC := src/main.c src/core/app.c src/core/devices.c src/core/config.c src/co
 
 VERSION ?= 0.1.3
 CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
+# 32-bit ARM: 64-bit inode numbers/offsets, or readdir() fails with EOVERFLOW
+CFLAGS  += -D_FILE_OFFSET_BITS=64
 
 BUILD   := build
 CORE_OBJ:= $(CORE_SRC:%.c=$(BUILD)/%.o)
