@@ -15,6 +15,7 @@ typedef void (*audio_rx_cb)(const int16_t *pcm, int n, double utc_first, void *u
 
 int  audio_open(const char *in_dev, const char *out_dev, audio_rx_cb cb, void *user);
 void audio_close(void);
+void audio_set_output(const char *out_dev);   /* used by the next audio_play() */
 const char *audio_error(void);
 
 /* Blocking playback of a float buffer at AUDIO_HW_RATE (-1..1). Returns 0

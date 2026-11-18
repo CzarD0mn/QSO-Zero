@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include "config.h"
+#include "devices.h"
 #include "rig/radios.h"
 
 typedef enum { MODE_FT8 = 0, MODE_JS8, MODE_WSPR, MODE_COUNT } op_mode_t;
@@ -103,6 +104,8 @@ typedef struct app {
 
     /* status */
     int        rig_ok, audio_ok, gps_ok;
+    volatile int rig_busy;    /* reconnecting to the radio in the background */
+    char       audio_in_dev[96], audio_out_dev[96];   /* what is actually open */
     char       status[96];
     double     status_until;
     float      swr, power;
@@ -113,7 +116,9 @@ typedef struct app {
     char       input[160];
     int        input_len;
     int        large;         /* large (HDMI) layout */
-    int        screen;        /* 0 main, 1 menu, 2 tools, 3 help */
+    int        screen;        /* 0 main, 1 menu, 2 tools, 3 help, 4 device picker */
+    int        pick_kind, pick_n, pick_sel;
+    dev_opt_t  pick[DEV_MAX];
     int        menu_sel;
     double     esc_t0;        /* >0 while ESC is held (exit countdown) */
     volatile int dirty;
@@ -131,7 +136,12 @@ int  app_init(app_t *a, const char *config_path, int hw);
 void app_shutdown(app_t *a);
 void app_set_mode(app_t *a, op_mode_t m);
 void app_set_band(app_t *a, int band);      /* explicit band choice: always tunes */
-void app_step_band(app_t *a, int dir);      /* next/previous band the radio covers */
+void app_step_band(app_t *a, int dir);
+/* Setup pickers: change the radio, CAT port or sound cards and reconnect
+ * without restarting. NULL leaves that setting as it is. */
+void app_use_radio(app_t *a, const char *id);
+void app_use_rig_device(app_t *a, const char *dev);
+void app_use_audio(app_t *a, const char *in, const char *out);      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */
 unsigned app_bands(const app_t *a);         /* usable band bits */
 void app_status(app_t *a, const char *fmt, ...);

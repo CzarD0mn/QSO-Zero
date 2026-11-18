@@ -138,6 +138,18 @@ int main(int argc, char **argv)
     a.screen = 2;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_tools.ppm", dir); save_ppm(c, 3, p);
+    /* device pickers (CAT port / audio in), using QSOZERO_DEVROOT if set */
+    a.screen = 1; a.menu_sel = 7;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_menu_devices.ppm", dir); save_ppm(c, 3, p);
+    keyev_t ent = {K_ENTER, 0, 0};
+    ui_key(&a, &ent);
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_pick_port.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 1; a.menu_sel = 8;
+    ui_key(&a, &ent);
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_pick_audio.ppm", dir); save_ppm(c, 3, p);
     printf("wrote previews to %s\n", dir);
     return 0;
 }
