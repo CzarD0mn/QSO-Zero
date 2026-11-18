@@ -351,7 +351,7 @@ static void render_large_main(app_t *a, surface_t *s)
 /* menu / tools / help                                                  */
 /* ------------------------------------------------------------------ */
 
-enum { MI_MODE, MI_SUB, MI_BAND, MI_CALL, MI_GRID, MI_RADIO, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static void menu_value(app_t *a, int i, char *out)
 {
@@ -371,6 +371,7 @@ static void menu_value(app_t *a, int i, char *out)
                     if (mw >= 1000) sprintf(out, "%d dBm (%.0f W)", d, mw / 1000); else sprintf(out, "%d dBm (%.0f mW)", d, mw); } break;
     case MI_WPCT: sprintf(out, "%d%%", a->cfg.wspr_tx_pct); break;
     case MI_AGRID: strcpy(out, a->cfg.auto_grid ? "ON" : "off"); break;
+    case MI_QSY: strcpy(out, a->cfg.auto_qsy ? "ON" : "off"); break;
     case MI_AUTO: strcpy(out, a->cfg.js8_autoreply ? "ON" : "off"); break;
     case MI_HBACK: strcpy(out, !a->cfg.js8_autoreply ? "(needs auto)" : a->cfg.js8_hb_ack ? "ON" : "off"); break;
     case MI_INFO: snprintf(out, 64, "%.20s", a->cfg.js8_info[0] ? a->cfg.js8_info : "(none)"); break;
@@ -381,7 +382,7 @@ static void menu_value(app_t *a, int i, char *out)
     }
 }
 
-static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Callsign", "Grid", "Radio", "TX audio level",
+static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "Callsign", "Grid", "Radio", "TX audio level",
                                             "JS8 auto-reply", "JS8 heartbeat ACK", "JS8 INFO text", "JS8 STATUS text",
                                             "WSPR receive", "WSPR power", "WSPR TX %", "Grid from GPS", "Layout", "Tune 5 s",
                                             "Save settings", "Quit"};
@@ -410,6 +411,7 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
     }
     const char *hint = a->menu_sel == MI_RADIO ? "radio change applies after restart"
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
+                     : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
                      : a->menu_sel == MI_AUTO ? "answers SNR? GRID? INFO? STATUS? HEARING? AGN? MSG"
                      : a->menu_sel == MI_HBACK ? "ACK heartbeats, max 1 per station / 15 min"
                                                                           : "</> change  ENTER select";
@@ -436,6 +438,15 @@ static void render_tools(app_t *a, surface_t *s, int big)
     gfx_text(s, 4, y, "RADIO", C_MAGENTA, sc); y += lh;
     snprintf(b, sizeof b, "%s  hamlib %d  %s", a->radio->name, a->radio->hamlib_model, a->rig_ok ? "online" : rig_error());
     gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, a->rig_ok ? C_MINT : C_ORANGE, 1); y += 10;
+    {
+        int nb, n = 0;
+        const band_t *bt = band_table(&nb);
+        n = snprintf(b, sizeof b, "bands:");
+        for (int i = 0; i < nb && n < (int)sizeof b - 6; ++i)
+            if (app_bands(a) & (1u << i)) n += snprintf(b + n, sizeof b - n, " %.*s", (int)strlen(bt[i].name) - 1, bt[i].name);
+        snprintf(b + n, sizeof b - n, "   auto QSY %s", a->cfg.auto_qsy ? "on" : "off");
+        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
+    }
     y += draw_wrapped(s, 4, y, a->radio->notes, s->w / FONT_W - 1, 3, C_DIM) * FONT_H + 4;
     gfx_text(s, 4, y, "AUDIO / DSP", C_MAGENTA, sc); y += lh;
     snprintf(b, sizeof b, "RX peak %.0f%%  last decode %.0f ms  TX level %.0f%%", audio_rx_level() * 100, a->last_decode_ms, a->cfg.tx_level * 100);
@@ -465,7 +476,7 @@ static void render_help(app_t *a, surface_t *s)
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
         "^U tune  ^W WSPR beacon  ^T tools",
         "^L layout compact/large",
-        "/band 40  /mode js8  /sub fast",
+        "/band 40  /mode js8  /sub fast  /qsy on|off",
         "/freq 7.074  /call K1ABC  /grid FN42",
         "/level 40  /pwr 23  /save  /quit",
         "/auto on|off  /hback on|off",
@@ -515,7 +526,7 @@ static void menu_change(app_t *a, int dir)
     switch (a->menu_sel) {
     case MI_MODE: app_set_mode(a, (op_mode_t)((a->mode + MODE_COUNT + dir) % MODE_COUNT)); break;
     case MI_SUB: a->js8_sub = (a->js8_sub + 4 + dir) % 4; break;
-    case MI_BAND: app_set_band(a, a->band + dir); break;
+    case MI_BAND: app_step_band(a, dir); break;
     case MI_RADIO: {
         int n, cur = 0;
         const radio_profile_t *rl = radio_list(&n);
@@ -536,6 +547,10 @@ static void menu_change(app_t *a, int dir)
     }
     case MI_WPCT: a->cfg.wspr_tx_pct = (int)fmax(0, fmin(100, a->cfg.wspr_tx_pct + dir * 10)); break;
     case MI_AGRID: a->cfg.auto_grid = !a->cfg.auto_grid; break;
+    case MI_QSY:
+        a->cfg.auto_qsy = !a->cfg.auto_qsy;
+        if (a->cfg.auto_qsy) app_set_band(a, a->band);    /* snap to the mode frequency now */
+        break;
     case MI_AUTO: a->cfg.js8_autoreply = !a->cfg.js8_autoreply; break;
     case MI_HBACK: a->cfg.js8_hb_ack = !a->cfg.js8_hb_ack; break;
     case MI_WRX: a->cfg.wspr_rx = !a->cfg.wspr_rx; break;
@@ -576,8 +591,8 @@ void ui_key(app_t *a, const keyev_t *k)
         case 'q': app_call_cq(a); return;
         case 'e': app_send_heartbeat(a); return;
         case 'r': app_reply_selected(a); return;
-        case 'n': app_set_band(a, a->band + 1); return;
-        case 'p': app_set_band(a, a->band - 1); return;
+        case 'n': app_step_band(a, 1); return;
+        case 'p': app_step_band(a, -1); return;
         /* Cardputer has no arrow keys: Ctrl + ; . , / are the printed arrows */
         case ';': { keyev_t e = {K_UP, 0, 0}; ui_key(a, &e); return; }
         case '.': { keyev_t e = {K_DOWN, 0, 0}; ui_key(a, &e); return; }
@@ -638,7 +653,7 @@ void ui_key(app_t *a, const keyev_t *k)
         break;
     case K_LEFT: a->rx_off = (int)fmax(200, a->rx_off - step); a->tx_off = a->rx_off; break;
     case K_RIGHT: a->rx_off = (int)fmin(2900, a->rx_off + step); a->tx_off = a->rx_off; break;
-    case K_PGUP: app_set_band(a, a->band + 1); break;
-    case K_PGDN: app_set_band(a, a->band - 1); break;
+    case K_PGUP: app_step_band(a, 1); break;
+    case K_PGDN: app_step_band(a, -1); break;
     }
 }

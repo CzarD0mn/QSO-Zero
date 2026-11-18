@@ -16,11 +16,18 @@ typedef struct {
     const char  *audio_hint;    /* substrings in /proc/asound/cards, '|' separated */
     const char  *data_mode;     /* Hamlib mode for digital: USB or PKTUSB */
     float        max_watts;
+    unsigned     bands;         /* bit i = band_table()[i] the radio can work */
     const char  *notes;
 } radio_profile_t;
 
 const radio_profile_t *radio_find(const char *id);
 const radio_profile_t *radio_list(int *count);
 const char *ptt_name(ptt_method_t p);
+
+/* band bits, in band_table() order: 160 80 60 40 30 20 17 15 12 10 6 */
+#define BANDS_ALL      0x7FFu
+#define BANDS_NO160    (BANDS_ALL & ~0x001u)
+#define BANDS_NO6      (BANDS_ALL & ~0x400u)
+#define BANDS_80_TO_10 (BANDS_ALL & ~0x401u)
 
 #endif

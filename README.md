@@ -69,7 +69,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `↑` `↓` (or `Ctrl` + `;` `.`) | select decode |
 | `←` `→` (or `Ctrl` + `,` `/`) | move RX/TX offset 10 Hz (Shift: 100 Hz) |
 | `Tab` | FT8 → JS8 → WSPR |
-| `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band |
+| `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band (skips bands the radio can't do) |
 | `Esc` or `` ` `` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
 | `Ctrl+Q` | CQ |
 | `Ctrl+E` | JS8 heartbeat |
@@ -80,7 +80,38 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+L` | force compact / large layout |
 | `F1` | help |
 
-Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+
+### Automatic frequency (auto QSY)
+
+QSO-Zero drives the radio's VFO to the usual frequency for the current mode on each band (FT8 and WSPR: the WSJT-X defaults; JS8: the JS8Call defaults).
+
+| Band | FT8 | JS8 | WSPR (dial) |
+|---|---|---|---|
+| 160 m | 1.840 | 1.842 | 1.8366 |
+| 80 m | 3.573 | 3.578 | 3.5686 |
+| 60 m | 5.357 | 5.357 | 5.2872 |
+| 40 m | 7.074 | 7.078 | 7.0386 |
+| 30 m | 10.136 | 10.130 | 10.1387 |
+| 20 m | 14.074 | 14.078 | 14.0956 |
+| 17 m | 18.100 | 18.104 | 18.1046 |
+| 15 m | 21.074 | 21.078 | 21.0946 |
+| 12 m | 24.915 | 24.922 | 24.9246 |
+| 10 m | 28.074 | 28.078 | 28.1246 |
+| 6 m | 50.313 | 50.318 | 50.293 |
+
+* **At start-up** it reads the radio and stays on the band the radio is already on, rather than always starting on 20 m.
+* **Changing mode or band** retunes the radio and sets USB (PKTUSB on the FT-891).
+* **Turning the VFO knob onto another band** is noticed within about 2 s, and the radio is moved to the mode's frequency on that band. Tuning within a band is left alone.
+* **Bands per radio:**
+  * QMX: 80–10 m
+  * G90: 160–10 m
+  * QMX+, X6100, X6200, FT-891: 160–6 m
+
+  Band stepping skips the rest. If the radio refuses a frequency (a 5-band QMX, for example), QSO-Zero shows "radio won't tune" and skips that band for the session.
+* **During transmit** the frequency never changes, and any queued messages are cleared on a band change.
+* **Turning it off:** use ESC › **Auto frequency**, `/qsy off`, or `auto_qsy = 0` in the config. With it off, mode changes leave the VFO alone and the band display just follows the radio. Picking a band explicitly still tunes the radio.
+* **Limiting the band list:** set `bands = 40,30,20` in the config, for example.
 
 ## wsprnet upload
 
@@ -122,7 +153,7 @@ Locally, the arm64 package passes czdev's own preflight checks (`.desktop` prese
 ```sh
 git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
 ../CardputerZero-AppBuilder/czdev login
-../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.0_arm64.deb
+../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.2_arm64.deb
 ```
 
 For a first release, the store wants a short video of the app running on a real device posted in the publish PR. The listing points at this repository as its source, and GPL code shared through the store should have public source, so make the repository public before publishing.

@@ -63,6 +63,8 @@ typedef struct app {
     int        band;          /* index into the band table */
     int64_t    dial_hz;
     int        rx_off, tx_off;
+    unsigned   band_mask;     /* bands this radio covers (and config allows) */
+    unsigned   band_rejected; /* bands the radio refused this session */
 
     /* audio ring (12 kHz) with UTC mapping */
     int16_t   *ring;
@@ -118,7 +120,7 @@ typedef struct app {
     volatile int quit;
 } app_t;
 
-typedef struct { const char *name; int64_t ft8, js8, wspr; } band_t;
+typedef struct { const char *name; int64_t ft8, js8, wspr, lo, hi; } band_t;
 const band_t *band_table(int *count);
 
 const char *mode_name(op_mode_t m);
@@ -128,7 +130,10 @@ int  mode_period(const app_t *a);
 int  app_init(app_t *a, const char *config_path, int hw);
 void app_shutdown(app_t *a);
 void app_set_mode(app_t *a, op_mode_t m);
-void app_set_band(app_t *a, int band);
+void app_set_band(app_t *a, int band);      /* explicit band choice: always tunes */
+void app_step_band(app_t *a, int dir);      /* next/previous band the radio covers */
+int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */
+unsigned app_bands(const app_t *a);         /* usable band bits */
 void app_status(app_t *a, const char *fmt, ...);
 void app_add_line(app_t *a, const rxline_t *l);
 
