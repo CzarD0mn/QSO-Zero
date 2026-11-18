@@ -292,6 +292,122 @@ void app_set_mode(app_t *a, op_mode_t m)
     app_status(a, "%s %s", mode_name(m), m == MODE_JS8 ? js8_submode_info(a->js8_sub)->name : "");
 }
 
+/* ---- hardware connections (startup and the Setup pickers) ---------- */
+
+static void apply_band_mask(app_t *a)
+{
+    a->band_mask = a->radio->bands ? a->radio->bands : BANDS_ALL;
+    a->band_rejected = 0;
+    unsigned want = parse_bands(a->cfg.bands);
+    if (want && (a->band_mask & want)) a->band_mask &= want;
+    if (!(a->band_mask & (1u << a->band)))               /* current band not covered */
+        for (int i = 0; i < 11; ++i) if (a->band_mask & (1u << i)) { a->band = i; break; }
+}
+
+/* (Re)open rigctld for the configured radio and port. Blocking: a failed
+ * attempt can take a few seconds. On success, adopts the radio's band. */
+static void rig_connect(app_t *a)
+{
+    a->rig_ok = 0;
+    rig_close();
+    rig_config_t rc = {.profile = a->radio, .baud = a->cfg.rig_baud, .spawn = a->cfg.spawn_rigctld, .port = 4532};
+    snprintf(rc.serial, sizeof rc.serial, "%s", a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default);
+    rc.ptt = a->radio->ptt;
+    if (!strcmp(a->cfg.ptt, "cat")) rc.ptt = PTT_CAT;
+    if (!strcmp(a->cfg.ptt, "rts")) rc.ptt = PTT_RTS;
+    if (!strcmp(a->cfg.ptt, "dtr")) rc.ptt = PTT_DTR;
+    snprintf(rc.ptt_device, sizeof rc.ptt_device, "%s", a->cfg.ptt_device);
+    if (rig_open(&rc) != 0) { app_status(a, "RIG %s: %s", rc.serial, rig_error()); a->dirty = 1; return; }
+    int64_t f = rig_get_freq();
+    int b = band_from_freq(f);
+    if (f > 0) a->dial_hz = f;
+    if (b >= 0 && (a->band_mask & (1u << b))) a->band = b;
+    a->rig_ok = 1;
+    a->dirty = 1;
+}
+
+static void audio_connect(app_t *a)
+{
+    char in[96], out[96];
+    snprintf(in, sizeof in, "%s", a->cfg.audio_in);
+    snprintf(out, sizeof out, "%s", a->cfg.audio_out);
+    if (!in[0] && audio_find_card(a->radio->audio_hint, in, sizeof in)) snprintf(in, sizeof in, "default");
+    if (!out[0]) snprintf(out, sizeof out, "%s", in);
+    audio_close();
+    a->audio_ok = audio_open(in, out, app_audio_in, a) == 0;
+    snprintf(a->audio_in_dev, sizeof a->audio_in_dev, "%s", in);
+    snprintf(a->audio_out_dev, sizeof a->audio_out_dev, "%s", out);
+    if (!a->audio_ok) app_status(a, "AUDIO: %s", audio_error());
+    a->dirty = 1;
+}
+
+static void *rig_reconnect_thread(void *arg)
+{
+    app_t *a = arg;
+    rig_connect(a);
+    if (a->rig_ok) {
+        app_set_mode(a, a->mode);                        /* tunes (auto QSY) and sets USB */
+        app_status(a, "%s online", a->radio->name);
+    }
+    a->rig_busy = 0;
+    a->dirty = 1;
+    return NULL;
+}
+
+static int hw_change_ok(app_t *a)
+{
+    if (!g_hw) { app_status(a, "saved (hardware is off: --nohw)"); return 0; }
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return 0; }
+    if (a->rig_busy) { app_status(a, "still connecting to the radio..."); return 0; }
+    return 1;
+}
+
+static void rig_reconnect(app_t *a)
+{
+    if (!hw_change_ok(a)) return;
+    a->rig_busy = 1;
+    a->rig_ok = 0;
+    app_status(a, "connecting to %s on %s...", a->radio->name,
+               a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default);
+    pthread_t t;
+    if (pthread_create(&t, NULL, rig_reconnect_thread, a)) { a->rig_busy = 0; return; }
+    pthread_detach(t);
+}
+
+void app_use_radio(app_t *a, const char *id)
+{
+    const radio_profile_t *r = radio_find(id);
+    if (!r) return;
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    a->radio = r;
+    snprintf(a->cfg.radio, sizeof a->cfg.radio, "%s", r->id);
+    apply_band_mask(a);
+    if (!hw_change_ok(a)) return;
+    if (!a->cfg.audio_in[0]) audio_connect(a);           /* "auto" audio follows the radio */
+    rig_reconnect(a);
+}
+
+void app_use_rig_device(app_t *a, const char *dev)
+{
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    snprintf(a->cfg.rig_device, sizeof a->cfg.rig_device, "%s", dev);
+    rig_reconnect(a);
+}
+
+void app_use_audio(app_t *a, const char *in, const char *out)
+{
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    if (in) snprintf(a->cfg.audio_in, sizeof a->cfg.audio_in, "%s", in);
+    if (out) snprintf(a->cfg.audio_out, sizeof a->cfg.audio_out, "%s", out);
+    if (!hw_change_ok(a)) return;
+    if (in) audio_connect(a);                            /* reopen capture */
+    else {                                               /* output only: used from the next TX */
+        snprintf(a->audio_out_dev, sizeof a->audio_out_dev, "%s", a->cfg.audio_out[0] ? a->cfg.audio_out : a->audio_in_dev);
+        audio_set_output(a->audio_out_dev);
+    }
+    if (a->audio_ok) app_status(a, "audio in %s, out %s", a->audio_in_dev, a->audio_out_dev);
+}
+
 int app_init(app_t *a, const char *cfgpath, int hw)
 {
     memset(a, 0, sizeof *a);
@@ -317,40 +433,13 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         js8v_load_jsc("/usr/local/share/qso-zero/js8.jsc") && js8v_load_jsc("data/js8.jsc"))
         app_status(a, "js8.jsc not found: JS8 free text limited to Huffman");
 
+    apply_band_mask(a);
     if (hw) {
-        rig_config_t rc = {.profile = a->radio, .baud = a->cfg.rig_baud, .spawn = a->cfg.spawn_rigctld, .port = 4532};
-        snprintf(rc.serial, sizeof rc.serial, "%s", a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default);
-        rc.ptt = a->radio->ptt;
-        if (!strcmp(a->cfg.ptt, "cat")) rc.ptt = PTT_CAT;
-        if (!strcmp(a->cfg.ptt, "rts")) rc.ptt = PTT_RTS;
-        if (!strcmp(a->cfg.ptt, "dtr")) rc.ptt = PTT_DTR;
-        snprintf(rc.ptt_device, sizeof rc.ptt_device, "%s", a->cfg.ptt_device);
-        a->rig_ok = rig_open(&rc) == 0;
+        rig_connect(a);
         rig_install_safety();
-        if (!a->rig_ok) app_status(a, "RIG: %s", rig_error());
-
-        char in[96], out[96];
-        snprintf(in, sizeof in, "%s", a->cfg.audio_in);
-        snprintf(out, sizeof out, "%s", a->cfg.audio_out);
-        if (!in[0] && audio_find_card(a->radio->audio_hint, in, sizeof in)) snprintf(in, sizeof in, "default");
-        if (!out[0]) snprintf(out, sizeof out, "%s", in);
-        a->audio_ok = audio_open(in, out, app_audio_in, a) == 0;
-        if (!a->audio_ok) app_status(a, "AUDIO: %s", audio_error());
-
+        audio_connect(a);
         a->gps_ok = gps_start(a->cfg.gps_device, a->cfg.gps_baud, a->cfg.gps_latency_ms) == 0;
         if (a->cfg.wsprnet_upload) uplink_start(a->cfg.wsprnet_host, 443, 80, my_call, my_grid);
-    }
-    a->band_mask = a->radio->bands ? a->radio->bands : BANDS_ALL;
-    unsigned want = parse_bands(a->cfg.bands);
-    if (want && (a->band_mask & want)) a->band_mask &= want;
-    if (!(a->band_mask & (1u << a->band))) {            /* default band not covered */
-        for (int i = 0; i < 11; ++i) if (a->band_mask & (1u << i)) { a->band = i; break; }
-    }
-    if (hw && a->rig_ok) {                               /* start on the band the radio is on */
-        int64_t f = rig_get_freq();
-        int b = band_from_freq(f);
-        if (f > 0) a->dial_hz = f;
-        if (b >= 0 && (a->band_mask & (1u << b))) a->band = b;
     }
     app_set_mode(a, MODE_FT8);
     if (!strcmp(a->cfg.callsign, "N0CALL")) {
@@ -849,6 +938,9 @@ static int handle_command(app_t *a, char *cmd)
         app_status(a, "wsprnet: %s, sent %d (https %d) dropped %d - checking now", u.online ? "online" : "offline",
                    u.sent_https + u.sent_http, u.sent_https, u.dropped);
     }
+    else if (!strcmp(cmd, "/port")) app_use_rig_device(a, strcmp(arg, "auto") ? arg : "");
+    else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);
+    else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/qsy")) {
         a->cfg.auto_qsy = !strncasecmp(arg, "on", 2);
         app_status(a, "auto frequency %s", a->cfg.auto_qsy ? "ON" : "off");

@@ -3,6 +3,7 @@
 #include "views.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "core/clock.h"
@@ -351,7 +352,11 @@ static void render_large_main(app_t *a, surface_t *s)
 /* menu / tools / help                                                  */
 /* ------------------------------------------------------------------ */
 
-enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+static const char *dev_root(void);
+static void open_picker(app_t *a, int menu_item);
+static void render_picker(app_t *a, surface_t *s, int big);
+
+enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static void menu_value(app_t *a, int i, char *out)
 {
@@ -366,6 +371,22 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_CALL: strcpy(out, a->cfg.callsign); break;
     case MI_GRID: strcpy(out, a->cfg.grid); break;
     case MI_RADIO: strcpy(out, a->radio->name); break;
+    case MI_PORT: {
+        char n[48];
+        dev_short_name(dev_root(), a->cfg.rig_device, n, sizeof n);
+        if (a->cfg.rig_device[0]) snprintf(out, 64, "%s", n);
+        else snprintf(out, 64, "auto (%s)", a->radio->serial_default + 5);
+        break;
+    }
+    case MI_AIN: case MI_AOUT: {
+        const char *v = i == MI_AIN ? a->cfg.audio_in : a->cfg.audio_out;
+        char n[48];
+        dev_short_name(dev_root(), v, n, sizeof n);
+        if (v[0]) snprintf(out, 64, "%s", n);
+        else if (i == MI_AOUT) snprintf(out, 64, "same as input");
+        else { dev_short_name(dev_root(), a->audio_in_dev, n, sizeof n); snprintf(out, 64, a->audio_in_dev[0] ? "auto (%s)" : "auto", n); }
+        break;
+    }
     case MI_TXL: sprintf(out, "%.0f%%", a->cfg.tx_level * 100); break;
     case MI_WPWR: { int d = wspr_valid_dbm(a->cfg.wspr_dbm); double mw = pow(10, d / 10.0);
                     if (mw >= 1000) sprintf(out, "%d dBm (%.0f W)", d, mw / 1000); else sprintf(out, "%d dBm (%.0f mW)", d, mw); } break;
@@ -382,7 +403,7 @@ static void menu_value(app_t *a, int i, char *out)
     }
 }
 
-static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "Callsign", "Grid", "Radio", "TX audio level",
+static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "Callsign", "Grid", "Radio", "CAT port", "Audio in", "Audio out", "TX audio level",
                                             "JS8 auto-reply", "JS8 heartbeat ACK", "JS8 INFO text", "JS8 STATUS text",
                                             "WSPR receive", "WSPR power", "WSPR TX %", "Grid from GPS", "Layout", "Tune 5 s",
                                             "Save settings", "Quit"};
@@ -409,7 +430,8 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
         int vx = s->w - gfx_text_w(v, sc) - 6 * sc;
         if (v[0]) gfx_text(s, vx, y, v, i == a->menu_sel ? C_SUN : C_CYAN, sc);
     }
-    const char *hint = a->menu_sel == MI_RADIO ? "radio change applies after restart"
+    const char *hint = (a->menu_sel == MI_RADIO || a->menu_sel == MI_PORT || a->menu_sel == MI_AIN || a->menu_sel == MI_AOUT)
+                         ? "ENTER: choose from what's connected"
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
                      : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
                      : a->menu_sel == MI_AUTO ? "answers SNR? GRID? INFO? STATUS? HEARING? AGN? MSG"
@@ -445,6 +467,12 @@ static void render_tools(app_t *a, surface_t *s, int big)
         for (int i = 0; i < nb && n < (int)sizeof b - 6; ++i)
             if (app_bands(a) & (1u << i)) n += snprintf(b + n, sizeof b - n, " %.*s", (int)strlen(bt[i].name) - 1, bt[i].name);
         snprintf(b + n, sizeof b - n, "   auto QSY %s", a->cfg.auto_qsy ? "on" : "off");
+        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
+    }
+    {
+        char p[48];
+        dev_short_name(dev_root(), a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default, p, sizeof p);
+        snprintf(b, sizeof b, "CAT %s   audio in %s  out %s", p, a->audio_in_dev[0] ? a->audio_in_dev : "-", a->audio_out_dev[0] ? a->audio_out_dev : "-");
         gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
     }
     y += draw_wrapped(s, 4, y, a->radio->notes, s->w / FONT_W - 1, 3, C_DIM) * FONT_H + 4;
@@ -510,6 +538,7 @@ void ui_render(app_t *a, surface_t *s)
     case 1: render_menu(a, s, big); break;
     case 2: render_tools(a, s, 0); break;
     case 3: render_help(a, s); break;
+    case 4: render_picker(a, s, big); break;
     default: if (big) render_large_main(a, s); else render_compact_main(a, s);
     }
     if (a->esc_t0 > 0) draw_exit_toast(a, s);
@@ -519,6 +548,109 @@ void ui_render(app_t *a, surface_t *s)
 /* keys                                                                 */
 /* ------------------------------------------------------------------ */
 
+/* ---- device picker (screen 4): radio, CAT port, audio in, audio out ---- */
+
+static const char *dev_root(void)
+{
+    const char *r = getenv("QSOZERO_DEVROOT");     /* tests / screenshots only */
+    return r ? r : "";
+}
+
+static const char *k_pick_title[] = {"RADIO", "CAT PORT", "AUDIO IN", "AUDIO OUT"};
+
+static const char *pick_current(app_t *a)
+{
+    switch (a->pick_kind) {
+    case 0: return a->radio->id;
+    case 1: return a->cfg.rig_device;
+    case 2: return a->cfg.audio_in;
+    default: return a->cfg.audio_out;
+    }
+}
+
+static void fill_picker(app_t *a)
+{
+    char d[96];
+    switch (a->pick_kind) {
+    case 0: {
+        int n;
+        const radio_profile_t *rl = radio_list(&n);
+        a->pick_n = 0;
+        for (int i = 0; i < n && i < DEV_MAX; ++i, ++a->pick_n) {
+            dev_opt_t *o = &a->pick[i];
+            snprintf(o->value, sizeof o->value, "%s", rl[i].id);
+            snprintf(o->label, sizeof o->label, "%s", rl[i].name);
+            snprintf(o->desc, sizeof o->desc, "%s, %s PTT", rl[i].serial_default, ptt_name(rl[i].ptt));
+        }
+        break;
+    }
+    case 1:
+        snprintf(d, sizeof d, "%s default: %s", a->radio->name, a->radio->serial_default);
+        a->pick_n = dev_serial_list(dev_root(), d, a->pick, DEV_MAX);
+        break;
+    case 2:
+        snprintf(d, sizeof d, "the card that matches the %s", a->radio->name);
+        a->pick_n = dev_audio_list(dev_root(), 1, d, a->pick, DEV_MAX);
+        break;
+    default:
+        a->pick_n = dev_audio_list(dev_root(), 0, "the same card as Audio in", a->pick, DEV_MAX);
+    }
+    /* put the cursor on the current choice */
+    const char *cur = pick_current(a);
+    a->pick_sel = 0;
+    for (int i = 0; i < a->pick_n; ++i)
+        if (!strcmp(a->pick[i].value, cur) || (cur[0] && !strcmp(a->pick[i].label, cur))) a->pick_sel = i;
+}
+
+static void open_picker(app_t *a, int menu_item)
+{
+    a->pick_kind = menu_item == MI_RADIO ? 0 : menu_item == MI_PORT ? 1 : menu_item == MI_AIN ? 2 : 3;
+    fill_picker(a);
+    a->screen = 4;
+}
+
+static void picker_apply(app_t *a)
+{
+    const char *v = a->pick[a->pick_sel].value;
+    switch (a->pick_kind) {
+    case 0: app_use_radio(a, v); break;
+    case 1: app_use_rig_device(a, v); break;
+    case 2: app_use_audio(a, v, NULL); break;
+    default: app_use_audio(a, NULL, v);
+    }
+    a->screen = 1;
+}
+
+static void render_picker(app_t *a, surface_t *s, int big)
+{
+    int sc = big ? 2 : 1;
+    gfx_clear(s, C_BG);
+    gfx_fill(s, 0, 0, s->w, 12 * sc, C_PANEL);
+    gfx_text(s, 2 * sc, 2 * sc, k_pick_title[a->pick_kind], C_MAGENTA, sc);
+    gfx_text(s, s->w - gfx_text_w("ESC back", 1) - 4, 2 * sc, "ESC back", C_DIM, 1);
+    gfx_hgrad(s, 0, 12 * sc, s->w, 1, C_MAGENTA, C_CYAN);
+    if (a->pick_kind > 0 && a->pick_n <= (a->pick_kind == 1 ? 1 : 2)) {
+        gfx_text(s, 8, 18 * sc, a->pick_kind == 1 ? "no USB serial ports found" : "no sound cards found", C_ORANGE, sc);
+        gfx_text(s, 8, 30 * sc, "plug the radio in, then press R", C_DIM, sc);
+    }
+    int y0 = 16 * sc, rowh = 21 * sc;
+    int vis = (s->h - y0 - 12) / rowh;
+    int first = a->pick_sel - vis + 1;
+    if (first < 0) first = 0;
+    const char *cur = pick_current(a);
+    int cols = s->w / (FONT_W * sc) - 3;
+    for (int i = first; i < a->pick_n && i < first + vis; ++i) {
+        const dev_opt_t *o = &a->pick[i];
+        int y = y0 + (i - first) * rowh;
+        int is_cur = !strcmp(o->value, cur) || (cur[0] && !strcmp(o->label, cur));
+        if (i == a->pick_sel) { gfx_fill(s, 0, y - 1, s->w, rowh - 2, C_PANEL2); gfx_fill(s, 0, y - 1, 3 * sc, rowh - 2, C_MAGENTA); }
+        gfx_text_n(s, 8 * sc, y, o->label, cols - 10, i == a->pick_sel ? C_TEXT : C_CYAN, sc);
+        if (is_cur) gfx_text(s, s->w - gfx_text_w("in use", sc) - 6 * sc, y, "in use", C_MINT, sc);
+        gfx_text_n(s, 8 * sc, y + 10 * sc, o->desc, cols, C_DIM, sc);
+    }
+    gfx_text(s, 4, s->h - 10, "ENTER use  R rescan  then Setup > Save settings", C_FAINT, 1);
+}
+
 static void menu_change(app_t *a, int dir)
 {
     int nb;
@@ -527,15 +659,7 @@ static void menu_change(app_t *a, int dir)
     case MI_MODE: app_set_mode(a, (op_mode_t)((a->mode + MODE_COUNT + dir) % MODE_COUNT)); break;
     case MI_SUB: a->js8_sub = (a->js8_sub + 4 + dir) % 4; break;
     case MI_BAND: app_step_band(a, dir); break;
-    case MI_RADIO: {
-        int n, cur = 0;
-        const radio_profile_t *rl = radio_list(&n);
-        for (int i = 0; i < n; ++i) if (&rl[i] == a->radio) cur = i;
-        cur = (cur + n + dir) % n;
-        a->radio = &rl[cur];
-        snprintf(a->cfg.radio, sizeof a->cfg.radio, "%s", rl[cur].id);
-        break;
-    }
+    case MI_RADIO: case MI_PORT: case MI_AIN: case MI_AOUT: open_picker(a, a->menu_sel); break;
     case MI_TXL: a->cfg.tx_level = (float)fmax(0.05, fmin(1.0, a->cfg.tx_level + dir * 0.05)); break;
     case MI_WPWR: {
         static const int v[] = {0,3,7,10,13,17,20,23,27,30,33,37,40,43,47};
@@ -627,6 +751,16 @@ void ui_key(app_t *a, const keyev_t *k)
         return;
     }
     if (a->screen == 3) { a->screen = 0; return; }
+    if (a->screen == 4) {
+        switch (k->key) {
+        case K_ESC: a->screen = 1; break;
+        case K_UP: if (a->pick_sel > 0) --a->pick_sel; break;
+        case K_DOWN: if (a->pick_sel + 1 < a->pick_n) ++a->pick_sel; break;
+        case K_ENTER: if (a->pick_n) picker_apply(a); break;
+        case K_CHAR: if (k->ch == 'r' || k->ch == 'R') fill_picker(a); break;
+        }
+        return;
+    }
 
     /* main screen */
     int step = (k->mods & MOD_SHIFT) ? 100 : 10;

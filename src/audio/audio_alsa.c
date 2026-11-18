@@ -147,6 +147,7 @@ static void *rx_thread(void *arg)
 
 int audio_open(const char *in_dev, const char *out_dev, audio_rx_cb cb, void *user)
 {
+    snprintf(g_out_dev, sizeof g_out_dev, "%s", out_dev);
     if (load_alsa()) return -1;
     int e;
     if ((e = A.open(&g_in, in_dev, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
@@ -158,7 +159,6 @@ int audio_open(const char *in_dev, const char *out_dev, audio_rx_cb cb, void *us
         A.close(g_in); g_in = NULL;
         return -1;
     }
-    snprintf(g_out_dev, sizeof g_out_dev, "%s", out_dev);
     g_cb = cb;
     g_user = user;
     g_run = 1;
@@ -174,6 +174,8 @@ void audio_close(void)
     A.close(g_in);
     g_in = NULL;
 }
+
+void audio_set_output(const char *out_dev) { snprintf(g_out_dev, sizeof g_out_dev, "%s", out_dev); }
 
 int audio_play(const float *buf, size_t n, float gain)
 {

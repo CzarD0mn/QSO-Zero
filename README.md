@@ -80,7 +80,16 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+L` | force compact / large layout |
 | `F1` | help |
 
-Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+
+### Choosing the radio, CAT port and sound cards
+
+Setup (ESC) has four pickers: **Radio**, **CAT port**, **Audio in** and **Audio out**. Press ENTER on one to see what's plugged in right now. Use ↑/↓ to choose, ENTER to use it, R to rescan after plugging something in, then **Save settings** to keep the choice. Changes take effect straight away without restarting. The radio reconnects in the background, and you can't make changes while transmitting.
+
+* **CAT port** lists every `/dev/ttyUSB#` and `/dev/ttyACM#` with what it is (for example, *Silicon Labs CP2102N…* for a Digirig, *QRP Labs QMX* for a QMX). QSO-Zero saves your choice by its USB ID (`/dev/serial/by-id/…`), so it keeps finding the right radio even if the `ttyUSB` numbers change between boots. **auto** uses the radio's usual port.
+* **Audio in** lists the sound cards that can record, as `plughw:CARD=<name>`. **auto** picks the card that matches the radio (QMX, C-Media for the Digirig, and so on).
+* **Audio out** lists the cards that can play, including HDMI. **same as input** is the default and is right for every supported radio.
+* The Tools screen (Ctrl+T) shows the port and cards in use. The same settings are `rig_device`, `audio_in` and `audio_out` in the config file.
 
 ### Automatic frequency (auto QSY)
 
@@ -153,7 +162,7 @@ Locally, the arm64 package passes czdev's own preflight checks (`.desktop` prese
 ```sh
 git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
 ../CardputerZero-AppBuilder/czdev login
-../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.2_arm64.deb
+../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.3_arm64.deb
 ```
 
 For a first release, the store wants a short video of the app running on a real device posted in the publish PR. The listing points at this repository as its source, and GPL code shared through the store should have public source, so make the repository public before publishing.

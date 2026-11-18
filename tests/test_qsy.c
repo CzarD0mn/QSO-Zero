@@ -150,6 +150,22 @@ int main(void)
     CHECK(g_sets == before && a.band == 5 && a.mode == MODE_JS8, "band and mode held during TX");
     a.tx_active = 0;
 
+    printf("[8] switching the CAT port and audio from Setup\n");
+    app_use_rig_device(&a, "/dev/ttyUSB1");
+    CHECK(a.rig_busy && !a.rig_ok, "reconnecting in the background (UI not blocked)");
+    for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+    CHECK(!a.rig_busy && a.rig_ok, "back online: \"%s\"", a.status);
+    CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyUSB1"), "port stored in settings");
+    app_use_audio(&a, NULL, "plughw:CARD=Device");
+    CHECK(!strcmp(a.audio_out_dev, "plughw:CARD=Device") && !strcmp(a.cfg.audio_out, "plughw:CARD=Device"), "audio out switched");
+    app_use_radio(&a, "g90");
+    for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+    CHECK(a.rig_ok && a.radio && !strcmp(a.radio->id, "g90") && (a.band_mask & 1u), "radio switched live to G90 (160 m now allowed)");
+    a.tx_active = 1;
+    app_use_rig_device(&a, "/dev/ttyUSB0");
+    CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyUSB1") && a.rig_ok, "no port change while transmitting");
+    a.tx_active = 0;
+
     app_stop_threads(&a);
     unlink(cfg);
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);

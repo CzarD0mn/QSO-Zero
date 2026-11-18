@@ -31,11 +31,11 @@ WSPRD_SRC := third_party/wsprd/wsprd.c third_party/wsprd/fano.c third_party/wspr
 DSP_SRC := src/dsp/js8.c src/dsp/js8_varicode.c src/dsp/ft8w.c src/dsp/wspr.c src/dsp/wsprrx.c
 CORE_SRC:= $(DSP_SRC) $(FT8_SRC) $(FFT_SRC) $(WSPRD_SRC)
 
-APP_SRC := src/main.c src/core/app.c src/core/config.c src/core/clock.c src/core/scheduler.c src/core/js8auto.c \
+APP_SRC := src/main.c src/core/app.c src/core/devices.c src/core/config.c src/core/clock.c src/core/scheduler.c src/core/js8auto.c \
            src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c \
            src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
 
-VERSION ?= 0.1.2
+VERSION ?= 0.1.3
 CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
 
 BUILD   := build
@@ -55,13 +55,15 @@ $(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink $(BUILD)/test_input $(BUILD)/test_qsy
+TESTS := $(BUILD)/test_js8 $(BUILD)/test_ft8 $(BUILD)/test_wspr $(BUILD)/test_wsprrx $(BUILD)/test_varicode $(BUILD)/test_engine $(BUILD)/test_uplink $(BUILD)/test_input $(BUILD)/test_qsy $(BUILD)/test_devices
 ENGINE_OBJ := $(filter-out $(BUILD)/src/main.o $(BUILD)/src/ui/fb.o $(BUILD)/src/ui/input.o,$(APP_OBJ))
 $(BUILD)/test_input: tests/test_input.c $(BUILD)/src/ui/input.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_uplink: tests/test_uplink.c $(BUILD)/src/net/uplink.o $(BUILD)/src/core/clock.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_engine $(BUILD)/test_qsy: $(BUILD)/test_%: tests/test_%.c $(ENGINE_OBJ) $(CORE_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+$(BUILD)/test_devices: tests/test_devices.c $(BUILD)/src/core/devices.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_%: tests/test_%.c $(CORE_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
