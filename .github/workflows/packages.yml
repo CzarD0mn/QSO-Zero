@@ -32,7 +32,7 @@ jobs:
       - name: Version
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}";
-          else v="0.1.0~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
+          else v="0.1.2~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
           echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: Build, test and package (${{ matrix.arch }})
         run: |
@@ -43,7 +43,7 @@ jobs:
             make -j"$(nproc)" VERSION="$VERSION"
             out=build/test-results-$(dpkg --print-architecture).txt
             echo "QSO-Zero $VERSION tests on $(dpkg --print-architecture) ($(gcc -dumpmachine), QEMU)" > $out
-            for t in input varicode wspr wsprrx ft8 js8; do
+            for t in input varicode wspr wsprrx ft8 js8 qsy; do
               make -s build/test_$t VERSION="$VERSION"
               echo "### test_$t" >> $out
               if build/test_$t > build/t.log 2>&1; then tail -12 build/t.log >> $out

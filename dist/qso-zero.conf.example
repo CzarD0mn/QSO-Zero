@@ -41,3 +41,9 @@ js8_status = QRV POTA
 wspr_rx = 1                # decode WSPR between beacon slots
 wsprnet_upload = 1         # checked every 5 min; spots dropped when offline
 wsprnet_host = wsprnet.org
+
+# Automatic frequency: tune the radio to the standard FT8/JS8/WSPR frequency
+# whenever the mode or band changes, or the VFO is turned onto another band.
+auto_qsy = 1
+# Limit band switching to these bands (blank = every band the radio covers)
+bands =

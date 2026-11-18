@@ -23,19 +23,61 @@
 #define RING_SECONDS 128   /* a full 2-minute WSPR cycle */
 #define WF_NFFT 1280
 
+/* Standard dial frequencies (USB) per mode, and the band edges used to work
+ * out which band the radio's VFO is on. FT8/WSPR: WSJT-X defaults; JS8:
+ * JS8Call defaults. Edges cover all three IARU regions. */
 static const band_t k_bands[] = {
-    {"160m", 1840000, 1842000, 1836600},   {"80m", 3573000, 3578000, 3568600},
-    {"60m", 5357000, 5357000, 5287200},    {"40m", 7074000, 7078000, 7038600},
-    {"30m", 10136000, 10130000, 10138700}, {"20m", 14074000, 14078000, 14095600},
-    {"17m", 18100000, 18104000, 18104600}, {"15m", 21074000, 21078000, 21094600},
-    {"12m", 24915000, 24922000, 24924600}, {"10m", 28074000, 28078000, 28124600},
-    {"6m", 50313000, 50318000, 50293000},
+    {"160m",  1840000,  1842000,  1836600,  1800000,  2000000},
+    {"80m",   3573000,  3578000,  3568600,  3500000,  4000000},
+    {"60m",   5357000,  5357000,  5287200,  5250000,  5450000},
+    {"40m",   7074000,  7078000,  7038600,  7000000,  7300000},
+    {"30m",  10136000, 10130000, 10138700, 10100000, 10150000},
+    {"20m",  14074000, 14078000, 14095600, 14000000, 14350000},
+    {"17m",  18100000, 18104000, 18104600, 18068000, 18168000},
+    {"15m",  21074000, 21078000, 21094600, 21000000, 21450000},
+    {"12m",  24915000, 24922000, 24924600, 24890000, 24990000},
+    {"10m",  28074000, 28078000, 28124600, 28000000, 29700000},
+    {"6m",   50313000, 50318000, 50293000, 50000000, 54000000},
 };
 
 const band_t *band_table(int *count)
 {
     *count = (int)(sizeof k_bands / sizeof *k_bands);
     return k_bands;
+}
+
+int band_from_freq(int64_t hz)
+{
+    for (int i = 0; i < (int)(sizeof k_bands / sizeof *k_bands); ++i)
+        if (hz >= k_bands[i].lo && hz <= k_bands[i].hi) return i;
+    return -1;
+}
+
+static int64_t mode_freq(const app_t *a, int band)
+{
+    const band_t *b = &k_bands[band];
+    return a->mode == MODE_FT8 ? b->ft8 : a->mode == MODE_JS8 ? b->js8 : b->wspr;
+}
+
+/* config "bands = 40,30,20" (with or without the m) -> bit mask; 0 = no limit */
+static unsigned parse_bands(const char *list)
+{
+    unsigned m = 0;
+    char buf[64];
+    snprintf(buf, sizeof buf, "%s", list);
+    for (char *t = strtok(buf, ", "); t; t = strtok(NULL, ", "))
+        for (int i = 0; i < (int)(sizeof k_bands / sizeof *k_bands); ++i) {
+            size_t n = strlen(t);
+            if (!strncasecmp(k_bands[i].name, t, n) && (k_bands[i].name[n] == 'm' || k_bands[i].name[n] == 0))
+                m |= 1u << i;
+        }
+    return m;
+}
+
+unsigned app_bands(const app_t *a)
+{
+    unsigned m = a->band_mask & ~a->band_rejected;
+    return m ? m : a->band_mask;
 }
 
 const char *mode_name(op_mode_t m)
@@ -174,28 +216,79 @@ static const char *my_call(void) { return g_app->cfg.callsign; }
 static const char *my_grid(void) { return g_app->cfg.grid; }
 static pthread_t g_dec_thr, g_tx_thr, g_misc_thr;
 
+static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
+
+/* Tune the radio and confirm it took the frequency. Returns 0 on success. */
+static int do_qsy(app_t *a, int band, int64_t hz)
+{
+    char f[16];
+    fmt_mhz(hz, f);
+    if (!(g_hw && a->rig_ok)) { a->dial_hz = hz; return 0; }
+    int rc = rig_set_freq(hz);
+    int64_t back = rc ? -1 : rig_get_freq();
+    if (rc || back < 0 || llabs(back - hz) > 100) {
+        a->band_rejected |= 1u << band;           /* skip it from now on */
+        if (back > 0) a->dial_hz = back;
+        app_status(a, "%s: radio won't tune %s MHz - band skipped", k_bands[band].name, f);
+        return -1;
+    }
+    rig_set_mode(a->radio->data_mode, 0);
+    a->dial_hz = hz;
+    app_status(a, "QSY %s %s MHz %s", k_bands[band].name, f, mode_name(a->mode));
+    return 0;
+}
+
+static void clear_tx_for_qsy(app_t *a)
+{
+    pthread_mutex_lock(&a->lock);
+    a->ntxq = 0;                                  /* nothing queued for the old band goes out on the new one */
+    seq_reset(a);
+    pthread_mutex_unlock(&a->lock);
+}
+
 void app_set_band(app_t *a, int band)
 {
     int nb;
-    const band_t *bt = band_table(&nb);
-    if (band < 0) band = nb - 1;
-    if (band >= nb) band = 0;
+    band_table(&nb);
+    if (band < 0 || band >= nb) return;
+    if (a->tx_active) { app_status(a, "can't change band while transmitting"); return; }
+    if (!(a->band_mask & (1u << band))) {
+        app_status(a, "%s doesn't cover %s", a->radio->name, k_bands[band].name);
+        return;
+    }
+    clear_tx_for_qsy(a);
+    int prev = a->band;
     a->band = band;
-    a->dial_hz = a->mode == MODE_FT8 ? bt[band].ft8 : a->mode == MODE_JS8 ? bt[band].js8 : bt[band].wspr;
-    if (g_hw && a->rig_ok) {
-        if (rig_set_freq(a->dial_hz)) app_status(a, "QSY failed: %s", rig_error());
-        rig_set_mode(a->radio->data_mode, 0);
+    if (do_qsy(a, band, mode_freq(a, band))) {    /* refused: show the band the radio is really on */
+        int b = band_from_freq(a->dial_hz);
+        a->band = b >= 0 ? b : prev;
     }
     a->dirty = 1;
 }
 
+void app_step_band(app_t *a, int dir)
+{
+    int nb;
+    band_table(&nb);
+    unsigned m = app_bands(a);
+    int b = a->band;
+    for (int i = 0; i < nb; ++i) {
+        b = (b + dir + nb) % nb;
+        if (m & (1u << b)) {
+            app_set_band(a, b);
+            if (a->band == b) return;
+            m &= ~a->band_rejected;                   /* refused: keep going to the next one */
+        }
+    }
+}
+
 void app_set_mode(app_t *a, op_mode_t m)
 {
+    if (a->tx_active) { app_status(a, "can't change mode while transmitting"); return; }
     a->mode = m;
     if (m == MODE_WSPR) { a->tx_off = 1500; a->rx_off = 1500; }
-    seq_reset(a);
-    a->ntxq = 0;
-    app_set_band(a, a->band);
+    clear_tx_for_qsy(a);
+    if (a->cfg.auto_qsy || !(g_hw && a->rig_ok)) app_set_band(a, a->band);
     app_status(a, "%s %s", mode_name(m), m == MODE_JS8 ? js8_submode_info(a->js8_sub)->name : "");
 }
 
@@ -246,6 +339,18 @@ int app_init(app_t *a, const char *cfgpath, int hw)
 
         a->gps_ok = gps_start(a->cfg.gps_device, a->cfg.gps_baud, a->cfg.gps_latency_ms) == 0;
         if (a->cfg.wsprnet_upload) uplink_start(a->cfg.wsprnet_host, 443, 80, my_call, my_grid);
+    }
+    a->band_mask = a->radio->bands ? a->radio->bands : BANDS_ALL;
+    unsigned want = parse_bands(a->cfg.bands);
+    if (want && (a->band_mask & want)) a->band_mask &= want;
+    if (!(a->band_mask & (1u << a->band))) {            /* default band not covered */
+        for (int i = 0; i < 11; ++i) if (a->band_mask & (1u << i)) { a->band = i; break; }
+    }
+    if (hw && a->rig_ok) {                               /* start on the band the radio is on */
+        int64_t f = rig_get_freq();
+        int b = band_from_freq(f);
+        if (f > 0) a->dial_hz = f;
+        if (b >= 0 && (a->band_mask & (1u << b))) a->band = b;
     }
     app_set_mode(a, MODE_FT8);
     if (!strcmp(a->cfg.callsign, "N0CALL")) {
@@ -548,7 +653,19 @@ static void *misc_thread(void *arg)
         double now = clk_now();
         if (g_hw && a->rig_ok && !a->tx_active && clk_mono() - last_poll > 2.0) {
             int64_t f = rig_get_freq();
-            if (f > 0 && f != a->dial_hz) { a->dial_hz = f; a->dirty = 1; }
+            if (f > 0 && f != a->dial_hz) {
+                a->dial_hz = f;
+                a->dirty = 1;
+                /* VFO turned onto another band: follow it, and (auto) jump to
+                 * this mode's frequency there. Tuning within a band is left alone. */
+                int b = band_from_freq(f);
+                if (b >= 0 && b != a->band && !a->tx_active) {
+                    a->band_rejected &= ~(1u << b);      /* the radio is clearly on it */
+                    a->band_mask |= 1u << b;
+                    if (a->cfg.auto_qsy) app_set_band(a, b);
+                    else { a->band = b; app_status(a, "radio moved to %s", k_bands[b].name); }
+                }
+            }
             last_poll = clk_mono();
         }
         if (g_hw && a->rig_ok && a->tx_active) {
@@ -691,7 +808,7 @@ static int handle_command(app_t *a, char *cmd)
     const band_t *bt = band_table(&nb);
     if (!strcmp(cmd, "/band") || !strcmp(cmd, "/b")) {
         for (int i = 0; i < nb; ++i)
-            if (!strncasecmp(bt[i].name, arg, strlen(arg)) && *arg) { app_set_band(a, i); return 1; }
+            if (*arg && !strncasecmp(bt[i].name, arg, strlen(arg)) && (bt[i].name[strlen(arg)] == 'm' || !bt[i].name[strlen(arg)])) { app_set_band(a, i); return 1; }
         app_status(a, "bands: 160 80 60 40 30 20 17 15 12 10 6");
     } else if (!strcmp(cmd, "/mode") || !strcmp(cmd, "/m")) {
         if (!strncasecmp(arg, "ft8", 3)) app_set_mode(a, MODE_FT8);
@@ -731,6 +848,11 @@ static int handle_command(app_t *a, char *cmd)
         uplink_check_now();
         app_status(a, "wsprnet: %s, sent %d (https %d) dropped %d - checking now", u.online ? "online" : "offline",
                    u.sent_https + u.sent_http, u.sent_https, u.dropped);
+    }
+    else if (!strcmp(cmd, "/qsy")) {
+        a->cfg.auto_qsy = !strncasecmp(arg, "on", 2);
+        app_status(a, "auto frequency %s", a->cfg.auto_qsy ? "ON" : "off");
+        if (a->cfg.auto_qsy) app_set_band(a, a->band);
     }
     else if (!strcmp(cmd, "/quit")) a->quit = 1;
     else if (!strcmp(cmd, "/help")) a->screen = 3;
