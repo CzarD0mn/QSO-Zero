@@ -450,7 +450,7 @@ static void render_tools(app_t *a, surface_t *s, int big)
         if (u.last_error[0]) { gfx_text_n(s, 4, y, u.last_error, s->w / FONT_W - 1, C_ORANGE, 1); y += 10; }
         y += 4;
     }
-    gfx_text(s, 4, y, "U tune 5s (Q stops)  W WSPR  X halt  +/- level", C_CYAN, 1);
+    gfx_text(s, 4, y, "U tune 5s   W WSPR beacon   X halt TX   +/- TX level", C_CYAN, 1);
 }
 
 static void render_help(app_t *a, surface_t *s)
@@ -463,7 +463,7 @@ static void render_help(app_t *a, surface_t *s)
         "TAB     next mode (FT8 JS8 WSPR)",
         "PGUP/DN band            ESC setup",
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
-        "^U tune (Q/ESC stops)  ^W WSPR  ^T tools",
+        "^U tune  ^W WSPR beacon  ^T tools",
         "^L layout compact/large",
         "/band 40  /mode js8  /sub fast",
         "/freq 7.074  /call K1ABC  /grid FN42",
@@ -492,24 +492,6 @@ static void draw_exit_toast(app_t *a, surface_t *s)
     gfx_hgrad(s, x + 8 * sc, y + 15 * sc, (int)((w - 16 * sc) * f), 3 * sc, C_PURPLE, C_MAGENTA);
 }
 
-static void draw_tune_toast(app_t *a, surface_t *s)
-{
-    int sc = s->w >= LARGE_W ? 2 : 1;
-    char t[48];
-    double left = a->tune_until - clk_now();
-    if (left < 0) left = 0;
-    snprintf(t, sizeof t, "TUNING %d Hz  Q/ESC = stop", a->tx_off);
-    int w = gfx_text_w(t, sc) + 16 * sc, h = 22 * sc;
-    int x = (s->w - w) / 2, y = (s->h - h) / 2;
-    gfx_fill(s, x, y, w, h, C_PANEL2);
-    gfx_rect(s, x, y, w, h, C_RED);
-    gfx_text(s, x + 8 * sc, y + 4 * sc, t, C_TEXT, sc);
-    double f = left / 5.0;
-    if (f > 1) f = 1;
-    gfx_fill(s, x + 8 * sc, y + 15 * sc, w - 16 * sc, 3 * sc, C_PANEL);
-    gfx_hgrad(s, x + 8 * sc, y + 15 * sc, (int)((w - 16 * sc) * f), 3 * sc, C_ORANGE, C_RED);
-}
-
 void ui_render(app_t *a, surface_t *s)
 {
     int big = s->w >= LARGE_W;
@@ -519,7 +501,6 @@ void ui_render(app_t *a, surface_t *s)
     case 3: render_help(a, s); break;
     default: if (big) render_large_main(a, s); else render_compact_main(a, s);
     }
-    if (a->tuning) draw_tune_toast(a, s);
     if (a->esc_t0 > 0) draw_exit_toast(a, s);
 }
 
@@ -580,15 +561,6 @@ void ui_key(app_t *a, const keyev_t *k)
 {
     a->dirty = 1;
     /* launcher convention: hold ESC to exit (from any screen) */
-    /* While tuning: ESC (on key-down, no waiting) or Q stops the carrier.
-     * The same ESC press then does nothing else (no Setup, no exit countdown). */
-    if (a->tuning && (k->key == K_ESC_HOLDING || k->key == K_ESC ||
-                      (k->key == K_CHAR && (k->ch == 'q' || k->ch == 'Q') && !(k->mods & MOD_CTRL)))) {
-        app_stop_tune(a);
-        if (k->key == K_ESC_HOLDING) a->esc_swallow = 1;
-        return;
-    }
-    if (a->esc_swallow && (k->key == K_ESC || k->key == K_ESC_HOLD)) { a->esc_swallow = 0; return; }
     if (k->key == K_ESC_HOLDING) { a->esc_t0 = clk_mono(); return; }
     if (k->key == K_ESC_HOLD) { a->esc_t0 = 0; a->quit = 1; return; }
     if (k->key == K_ESC) a->esc_t0 = 0;

@@ -21,8 +21,6 @@ const char *audio_error(void);
  * when done, -1 on error, 1 if aborted by audio_tx_abort(). */
 int  audio_play(const float *buf, size_t n, float gain);
 void audio_tx_abort(void);
-/* Clear a pending abort; call when a transmission is picked up, before PTT. */
-void audio_tx_reset(void);
 
 /* Peak input level 0..1 over the last ~0.5 s (for the RX level meter). */
 float audio_rx_level(void);
