@@ -1,4 +1,5 @@
-# Builds installable .deb packages for the Cardputer Zero (Raspberry Pi CM0).
+# Builds installable .deb packages for the Cardputer Zero (Raspberry Pi CM0)
+# with M5Stack's own packager (CardputerZero-AppBuilder scripts/pack-deb.sh).
 # arm64 = 64-bit Raspberry Pi OS, armhf = 32-bit. Built inside Debian Bookworm
 # (the base of current Raspberry Pi OS) under QEMU, with the DSP tests run on
 # the emulated ARM CPU before packaging.
@@ -28,11 +29,13 @@ jobs:
             platform: linux/arm/v7
     steps:
       - uses: actions/checkout@v4
+      - name: M5Stack AppBuilder (packager)
+        run: git clone --depth 1 https://github.com/m5stack/CardputerZero-AppBuilder.git .appbuilder
       - uses: docker/setup-qemu-action@v3
       - name: Version
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}";
-          else v="0.1.0~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
+          else v="$(python3 -c 'import json;print(json.load(open("app-builder.json"))["version"])')~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
           echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: Build, test and package (${{ matrix.arch }})
         run: |
@@ -50,7 +53,7 @@ jobs:
               else cat build/t.log >> $out; cat $out; echo "test_$t FAILED"; exit 1; fi
             done
             cat $out
-            make deb VERSION="$VERSION"
+            bash .appbuilder/scripts/pack-deb.sh . --output-dir build
             chown -R '"$(id -u):$(id -g)"' build'
       - uses: actions/upload-artifact@v4
         with:
