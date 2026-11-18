@@ -35,7 +35,7 @@ APP_SRC := src/main.c src/core/app.c src/core/config.c src/core/clock.c src/core
            src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c \
            src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
 
-VERSION ?= 0.1.0
+VERSION ?= 0.1.1
 CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
 
 BUILD   := build

@@ -53,7 +53,14 @@ After installing, **QSO-Zero appears in the CardputerZero launcher** (APPLaunch)
 sudo apt install build-essential libhamlib-utils
 git clone https://github.com/CzarD0mn/QSO-Zero.git && cd QSO-Zero
 make -j4 && make test        # tests optional, ~3 min
-make deb                     # or: sudo make install-service
+make deb                     # quick local package; or: sudo make install-service
+```
+
+Release packages are built with M5Stack's own packager, the AppBuilder `scripts/pack-deb.sh`, from `packaging/meta.env`, `build.sh`, `stage.sh` and `app.desktop.in`:
+
+```sh
+git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
+bash ../CardputerZero-AppBuilder/scripts/pack-deb.sh . --output-dir build   # -> build/qso-zero_<ver>-1_<arch>.deb
 ```
 
 The user running it needs to be in the `dialout`, `audio`, `video` and `input` groups; `qso-zero-setup` adds them.
