@@ -358,7 +358,31 @@ static const char *dev_root(void);
 static void open_picker(app_t *a, int menu_item);
 static void render_picker(app_t *a, surface_t *s, int big);
 
-enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_GHOST, MI_GN80, MI_GN40, MI_GN20, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+/* Setup items. The current mode's own options come right after Mode;
+ * options for the other modes are hidden (menu_visible). */
+enum { MI_MODE,
+       MI_SUB, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_GHOST, MI_GN80, MI_GN40, MI_GN20,   /* JS8 */
+       MI_WRX, MI_WPWR, MI_WPCT,                                                              /* WSPR */
+       MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL,
+       MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+
+static int menu_visible(const app_t *a, int i)
+{
+    if (i >= MI_SUB && i <= MI_GN20) return a->mode == MODE_JS8;
+    if (i >= MI_WRX && i <= MI_WPCT) return a->mode == MODE_WSPR;
+    return 1;
+}
+
+/* next visible item from `from` in direction dir (wraps) */
+static int menu_step(const app_t *a, int from, int dir)
+{
+    int i = from;
+    for (int n = 0; n < MI_COUNT; ++n) {
+        i = (i + dir + MI_COUNT) % MI_COUNT;
+        if (menu_visible(a, i)) return i;
+    }
+    return MI_MODE;
+}
 
 static void menu_value(app_t *a, int i, char *out)
 {
@@ -414,10 +438,16 @@ static void menu_value(app_t *a, int i, char *out)
     }
 }
 
-static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "GHOSTNET", "  80m  3.575", "  40m  7.107", "  20m 14.107", "Callsign", "Grid", "Radio", "CAT port", "Audio in", "Audio out", "TX audio level",
-                                            "JS8 auto-reply", "JS8 heartbeat ACK", "JS8 INFO text", "JS8 STATUS text",
-                                            "WSPR receive", "WSPR power", "WSPR TX %", "Grid from GPS", "Layout", "Tune 5 s",
-                                            "Save settings", "Quit"};
+static const char *k_menu_names[MI_COUNT] = {
+    [MI_MODE] = "Mode",
+    [MI_SUB] = "JS8 speed", [MI_AUTO] = "JS8 auto-reply", [MI_HBACK] = "JS8 heartbeat ACK",
+    [MI_INFO] = "JS8 INFO text", [MI_STATUS] = "JS8 STATUS text",
+    [MI_GHOST] = "GHOSTNET", [MI_GN80] = "  80m  3.575", [MI_GN40] = "  40m  7.107", [MI_GN20] = "  20m 14.107",
+    [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
+    [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
+    [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AOUT] = "Audio out",
+    [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_LAYOUT] = "Layout", [MI_TUNE] = "Tune 5 s",
+    [MI_SAVE] = "Save settings", [MI_QUIT] = "Quit"};
 
 static void render_menu(app_t *a, surface_t *s, int sc_large)
 {
@@ -430,11 +460,16 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
     gfx_hgrad(s, 0, big ? 26 : 12, s->w, 1, C_MAGENTA, C_CYAN);
     int y0 = big ? 36 : 15, rowh = big ? 20 : 11, sc = big ? 2 : 1;
     int vis = (s->h - y0 - 12) / rowh;
-    int first = a->menu_sel - vis + 1;
+    if (!menu_visible(a, a->menu_sel)) a->menu_sel = MI_MODE;   /* mode changed under it */
+    int rows[MI_COUNT], nrows = 0, selrow = 0;
+    for (int i = 0; i < MI_COUNT; ++i)
+        if (menu_visible(a, i)) { if (i == a->menu_sel) selrow = nrows; rows[nrows++] = i; }
+    int first = selrow - vis + 1;
     if (first < 0) first = 0;
     char v[64];
-    for (int i = first; i < MI_COUNT && i < first + vis; ++i) {
-        int y = y0 + (i - first) * rowh;
+    for (int r = first; r < nrows && r < first + vis; ++r) {
+        int i = rows[r];
+        int y = y0 + (r - first) * rowh;
         if (i == a->menu_sel) { gfx_fill(s, 0, y - 1, s->w, rowh - 1, C_PANEL2); gfx_fill(s, 0, y - 1, 3 * sc, rowh - 1, C_MAGENTA); }
         uint16_t nc = i == a->menu_sel ? C_TEXT : i == MI_GHOST ? C_MAGENTA : C_DIM;
         gfx_text(s, 8 * sc, y, k_menu_names[i], nc, sc);
@@ -748,8 +783,8 @@ void ui_key(app_t *a, const keyev_t *k)
     if (a->screen == 1) {
         switch (k->key) {
         case K_ESC: a->screen = 0; break;
-        case K_UP: a->menu_sel = (a->menu_sel + MI_COUNT - 1) % MI_COUNT; break;
-        case K_DOWN: a->menu_sel = (a->menu_sel + 1) % MI_COUNT; break;
+        case K_UP: a->menu_sel = menu_step(a, a->menu_sel, -1); break;
+        case K_DOWN: a->menu_sel = menu_step(a, a->menu_sel, 1); break;
         case K_LEFT: menu_change(a, -1); break;
         case K_RIGHT: menu_change(a, 1); break;
         case K_ENTER: menu_enter(a); break;

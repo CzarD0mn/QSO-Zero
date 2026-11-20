@@ -82,6 +82,14 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 
 Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
+### Setup menu
+
+ESC opens Setup. Options for the current mode come right under **Mode**, and options for the other modes are hidden:
+* **JS8:** JS8 speed, auto-reply, heartbeat ACK, INFO and STATUS text, and the GHOSTNET section
+* **WSPR:** WSPR receive, power and TX %
+
+Change the Mode line (←/→) and the list updates. Everything else (band, auto frequency, callsign, radio, ports, audio and so on) is always shown.
+
 ### GHOSTNET
 
 Setup has a **GHOSTNET** section for running JS8 on the GHOSTNET frequencies (dial frequency, USB-D):

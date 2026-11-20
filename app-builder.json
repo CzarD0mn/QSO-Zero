@@ -1,6 +1,6 @@
 {
   "package_name": "qso-zero",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "app_name": "QSO-Zero",
   "bin_name": "qso-zero",
   "description": "FT8, JS8 and WSPR terminal for QRP radios on the Cardputer Zero",
