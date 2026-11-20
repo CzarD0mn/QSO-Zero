@@ -53,9 +53,27 @@ int band_from_freq(int64_t hz)
     return -1;
 }
 
+/* GHOSTNET JS8 frequencies (dial, USB-D), by band_table() index */
+static const struct { int band; int64_t hz; } k_ghostnet[] = {
+    {1, 3575000},     /* 80 m */
+    {3, 7107000},     /* 40 m */
+    {5, 14107000},    /* 20 m */
+};
+#define GHOSTNET_BANDS ((1u << 1) | (1u << 3) | (1u << 5))
+
+int64_t ghostnet_freq(int band)
+{
+    for (size_t i = 0; i < sizeof k_ghostnet / sizeof *k_ghostnet; ++i)
+        if (k_ghostnet[i].band == band) return k_ghostnet[i].hz;
+    return 0;
+}
+
+static int in_ghostnet(const app_t *a) { return a->mode == MODE_JS8 && a->cfg.ghostnet; }
+
 static int64_t mode_freq(const app_t *a, int band)
 {
     const band_t *b = &k_bands[band];
+    if (in_ghostnet(a) && ghostnet_freq(band)) return ghostnet_freq(band);
     return a->mode == MODE_FT8 ? b->ft8 : a->mode == MODE_JS8 ? b->js8 : b->wspr;
 }
 
@@ -77,7 +95,9 @@ static unsigned parse_bands(const char *list)
 unsigned app_bands(const app_t *a)
 {
     unsigned m = a->band_mask & ~a->band_rejected;
-    return m ? m : a->band_mask;
+    if (!m) m = a->band_mask;
+    if (in_ghostnet(a) && (m & GHOSTNET_BANDS)) m &= GHOSTNET_BANDS;   /* band keys cycle 80/40/20 */
+    return m;
 }
 
 const char *mode_name(op_mode_t m)
@@ -280,6 +300,31 @@ void app_step_band(app_t *a, int dir)
             m &= ~a->band_rejected;                   /* refused: keep going to the next one */
         }
     }
+}
+
+void app_ghostnet_band(app_t *a, int band)
+{
+    if (!ghostnet_freq(band)) return;
+    if (a->tx_active) { app_status(a, "can't change band while transmitting"); return; }
+    a->cfg.ghostnet = 1;
+    a->mode = MODE_JS8;
+    app_set_band(a, band);                        /* explicit: tunes even with auto QSY off */
+    if (a->band == band) app_status(a, "GHOSTNET %s %.3f MHz USB-D", k_bands[band].name, ghostnet_freq(band) / 1e6);
+}
+
+void app_set_ghostnet(app_t *a, int on)
+{
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    if (!on) {
+        a->cfg.ghostnet = 0;
+        if (a->mode == MODE_JS8 && (a->cfg.auto_qsy || !(g_hw && a->rig_ok))) app_set_band(a, a->band);
+        app_status(a, "GHOSTNET off");
+        return;
+    }
+    /* stay on 80/40/20 if already there, otherwise go to 40 m (or what the radio has) */
+    int b = ghostnet_freq(a->band) ? a->band : 3;
+    if (!(a->band_mask & (1u << b))) b = (a->band_mask & (1u << 5)) ? 5 : 1;
+    app_ghostnet_band(a, b);
 }
 
 void app_set_mode(app_t *a, op_mode_t m)
@@ -941,6 +986,14 @@ static int handle_command(app_t *a, char *cmd)
     else if (!strcmp(cmd, "/port")) app_use_rig_device(a, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);
     else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
+    else if (!strcmp(cmd, "/ghost") || !strcmp(cmd, "/ghostnet")) {
+        int bn = atoi(arg);
+        if (!strncasecmp(arg, "off", 3)) app_set_ghostnet(a, 0);
+        else if (bn == 80) app_ghostnet_band(a, 1);
+        else if (bn == 40) app_ghostnet_band(a, 3);
+        else if (bn == 20) app_ghostnet_band(a, 5);
+        else app_set_ghostnet(a, 1);
+    }
     else if (!strcmp(cmd, "/qsy")) {
         a->cfg.auto_qsy = !strncasecmp(arg, "on", 2);
         app_status(a, "auto frequency %s", a->cfg.auto_qsy ? "ON" : "off");

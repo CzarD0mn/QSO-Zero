@@ -138,6 +138,16 @@ int main(int argc, char **argv)
     a.screen = 2;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_tools.ppm", dir); save_ppm(c, 3, p);
+    /* GHOSTNET section, and the JS8 header with GHOSTNET on */
+    a.cfg.ghostnet = 1; a.mode = MODE_JS8; a.band = 3;
+    a.screen = 1; a.menu_sel = 6;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_menu_ghostnet.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 0;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_js8_ghostnet.ppm", dir); save_ppm(c, 3, p);
+    a.cfg.ghostnet = 0; a.mode = MODE_FT8;
+
     /* device pickers (CAT port / audio in), using QSOZERO_DEVROOT if set */
     a.screen = 1; a.menu_sel = 7;
     ui_render(&a, c);

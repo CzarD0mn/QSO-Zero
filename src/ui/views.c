@@ -229,6 +229,7 @@ static void render_compact_main(app_t *a, surface_t *s)
     /* header */
     int x = gfx_chip(s, 0, 1, mode_name(a->mode), C_MAGENTA, C_BG, 1);
     if (a->mode == MODE_JS8) x = gfx_chip(s, x + 2, 1, sub_short(a->js8_sub), C_PURPLE, C_BG, 1);
+    if (a->mode == MODE_JS8 && a->cfg.ghostnet) x = gfx_chip(s, x + 2, 1, "GN", C_MAGENTA, C_BG, 1);
     if (a->mode == MODE_JS8 && a->cfg.js8_autoreply) x = gfx_chip(s, x + 2, 1, "A", C_MINT, C_BG, 1);
     x = gfx_text(s, x + 4, 2, bt[a->band].name, C_CYAN, 1);
     fmt_freq(a->dial_hz, buf);
@@ -274,6 +275,7 @@ static void render_large_main(app_t *a, surface_t *s)
     gfx_text(s, 40 + 3 * 12, 4, "ZERO", C_CYAN, 2);
     int x = gfx_chip(s, 128, 5, mode_name(a->mode), C_MAGENTA, C_BG, 2);
     if (a->mode == MODE_JS8) x = gfx_chip(s, x + 4, 5, sub_short(a->js8_sub), C_PURPLE, C_BG, 2);
+    if (a->mode == MODE_JS8 && a->cfg.ghostnet) x = gfx_chip(s, x + 4, 5, "GHOSTNET", C_MAGENTA, C_BG, 2);
     if (a->mode == MODE_JS8 && a->cfg.js8_autoreply) x = gfx_chip(s, x + 4, 5, "AUTO", C_MINT, C_BG, 2);
     x = gfx_text(s, x + 8, 7, bt[a->band].name, C_CYAN, 2);
     fmt_freq(a->dial_hz, buf);
@@ -356,7 +358,7 @@ static const char *dev_root(void);
 static void open_picker(app_t *a, int menu_item);
 static void render_picker(app_t *a, surface_t *s, int big);
 
-enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+enum { MI_MODE, MI_SUB, MI_BAND, MI_QSY, MI_GHOST, MI_GN80, MI_GN40, MI_GN20, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_WRX, MI_WPWR, MI_WPCT, MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static void menu_value(app_t *a, int i, char *out)
 {
@@ -393,6 +395,13 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_WPCT: sprintf(out, "%d%%", a->cfg.wspr_tx_pct); break;
     case MI_AGRID: strcpy(out, a->cfg.auto_grid ? "ON" : "off"); break;
     case MI_QSY: strcpy(out, a->cfg.auto_qsy ? "ON" : "off"); break;
+    case MI_GHOST: strcpy(out, a->cfg.ghostnet ? (a->mode == MODE_JS8 ? "ON" : "ON (in JS8)") : "off"); break;
+    case MI_GN80: case MI_GN40: case MI_GN20: {
+        int b = i == MI_GN80 ? 1 : i == MI_GN40 ? 3 : 5;
+        int here = a->cfg.ghostnet && a->mode == MODE_JS8 && a->band == b;
+        strcpy(out, !(a->band_mask & (1u << b)) ? "not on this radio" : here ? "USB-D  < tuned" : "USB-D");
+        break;
+    }
     case MI_AUTO: strcpy(out, a->cfg.js8_autoreply ? "ON" : "off"); break;
     case MI_HBACK: strcpy(out, !a->cfg.js8_autoreply ? "(needs auto)" : a->cfg.js8_hb_ack ? "ON" : "off"); break;
     case MI_INFO: snprintf(out, 64, "%.20s", a->cfg.js8_info[0] ? a->cfg.js8_info : "(none)"); break;
@@ -403,7 +412,7 @@ static void menu_value(app_t *a, int i, char *out)
     }
 }
 
-static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "Callsign", "Grid", "Radio", "CAT port", "Audio in", "Audio out", "TX audio level",
+static const char *k_menu_names[MI_COUNT] = {"Mode", "JS8 speed", "Band", "Auto frequency", "GHOSTNET", "  80m  3.575", "  40m  7.107", "  20m 14.107", "Callsign", "Grid", "Radio", "CAT port", "Audio in", "Audio out", "TX audio level",
                                             "JS8 auto-reply", "JS8 heartbeat ACK", "JS8 INFO text", "JS8 STATUS text",
                                             "WSPR receive", "WSPR power", "WSPR TX %", "Grid from GPS", "Layout", "Tune 5 s",
                                             "Save settings", "Quit"};
@@ -425,7 +434,8 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
     for (int i = first; i < MI_COUNT && i < first + vis; ++i) {
         int y = y0 + (i - first) * rowh;
         if (i == a->menu_sel) { gfx_fill(s, 0, y - 1, s->w, rowh - 1, C_PANEL2); gfx_fill(s, 0, y - 1, 3 * sc, rowh - 1, C_MAGENTA); }
-        gfx_text(s, 8 * sc, y, k_menu_names[i], i == a->menu_sel ? C_TEXT : C_DIM, sc);
+        uint16_t nc = i == a->menu_sel ? C_TEXT : i == MI_GHOST ? C_MAGENTA : C_DIM;
+        gfx_text(s, 8 * sc, y, k_menu_names[i], nc, sc);
         menu_value(a, i, v);
         int vx = s->w - gfx_text_w(v, sc) - 6 * sc;
         if (v[0]) gfx_text(s, vx, y, v, i == a->menu_sel ? C_SUN : C_CYAN, sc);
@@ -434,6 +444,8 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
                          ? "ENTER: choose from what's connected"
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
                      : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
+                     : a->menu_sel == MI_GHOST ? "JS8 on the GHOSTNET frequencies"
+                     : (a->menu_sel >= MI_GN80 && a->menu_sel <= MI_GN20) ? "ENTER: JS8 here (GHOSTNET)"
                      : a->menu_sel == MI_AUTO ? "answers SNR? GRID? INFO? STATUS? HEARING? AGN? MSG"
                      : a->menu_sel == MI_HBACK ? "ACK heartbeats, max 1 per station / 15 min"
                                                                           : "</> change  ENTER select";
@@ -505,6 +517,7 @@ static void render_help(app_t *a, surface_t *s)
         "^U tune  ^W WSPR beacon  ^T tools",
         "^L layout compact/large",
         "/band 40  /mode js8  /sub fast  /qsy on|off",
+        "/ghost 80|40|20|off  GHOSTNET JS8",
         "/freq 7.074  /call K1ABC  /grid FN42",
         "/level 40  /pwr 23  /save  /quit",
         "/auto on|off  /hback on|off",
@@ -671,6 +684,10 @@ static void menu_change(app_t *a, int dir)
     }
     case MI_WPCT: a->cfg.wspr_tx_pct = (int)fmax(0, fmin(100, a->cfg.wspr_tx_pct + dir * 10)); break;
     case MI_AGRID: a->cfg.auto_grid = !a->cfg.auto_grid; break;
+    case MI_GHOST: app_set_ghostnet(a, !a->cfg.ghostnet); break;
+    case MI_GN80: app_ghostnet_band(a, 1); break;
+    case MI_GN40: app_ghostnet_band(a, 3); break;
+    case MI_GN20: app_ghostnet_band(a, 5); break;
     case MI_QSY:
         a->cfg.auto_qsy = !a->cfg.auto_qsy;
         if (a->cfg.auto_qsy) app_set_band(a, a->band);    /* snap to the mode frequency now */

@@ -140,6 +140,10 @@ void app_step_band(app_t *a, int dir);
 /* Setup pickers: change the radio, CAT port or sound cards and reconnect
  * without restarting. NULL leaves that setting as it is. */
 void app_use_radio(app_t *a, const char *id);
+/* GHOSTNET JS8 frequencies. ghostnet_freq() is 0 for bands without one. */
+int64_t ghostnet_freq(int band);
+void app_set_ghostnet(app_t *a, int on);          /* on: JS8 on the nearest GHOSTNET band */
+void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET on this band */
 void app_use_rig_device(app_t *a, const char *dev);
 void app_use_audio(app_t *a, const char *in, const char *out);      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */

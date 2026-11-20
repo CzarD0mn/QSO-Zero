@@ -150,6 +150,23 @@ int main(void)
     CHECK(g_sets == before && a.band == 5 && a.mode == MODE_JS8, "band and mode held during TX");
     a.tx_active = 0;
 
+    printf("[9] GHOSTNET\n");
+    command(&a, "/ghost 40");
+    CHECK(a.mode == MODE_JS8 && a.band == 3 && g_vfo == 7107000, "40m GHOSTNET 7.107 (vfo %lld)", g_vfo);
+    app_step_band(&a, 1);
+    CHECK(a.band == 5 && g_vfo == 14107000, "next band skips 30m -> 20m 14.107 (band %d vfo %lld)", a.band, g_vfo);
+    app_step_band(&a, 1);
+    CHECK(a.band == 1 && g_vfo == 3575000, "wraps to 80m 3.575 (vfo %lld)", g_vfo);
+    app_set_mode(&a, MODE_FT8);
+    CHECK(g_vfo == 3573000, "FT8 still uses the normal 3.573");
+    app_set_mode(&a, MODE_JS8);
+    CHECK(g_vfo == 3575000, "back to JS8 returns to GHOSTNET 3.575");
+    g_vfo = 7120000;
+    for (int i = 0; i < 60 && g_vfo != 7107000; ++i) wait_s(0.1);
+    CHECK(g_vfo == 7107000 && a.band == 3, "VFO turned to 40m -> GHOSTNET 7.107");
+    command(&a, "/ghost off");
+    CHECK(!a.cfg.ghostnet && g_vfo == 7078000, "off -> normal JS8 7.078 (vfo %lld)", g_vfo);
+
     printf("[8] switching the CAT port and audio from Setup\n");
     app_use_rig_device(&a, "/dev/ttyUSB1");
     CHECK(a.rig_busy && !a.rig_ok, "reconnecting in the background (UI not blocked)");

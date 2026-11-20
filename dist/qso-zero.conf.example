@@ -47,3 +47,6 @@ wsprnet_host = wsprnet.org
 auto_qsy = 1
 # Limit band switching to these bands (blank = every band the radio covers)
 bands =
+
+# GHOSTNET: JS8 on 3.575 / 7.107 / 14.107 MHz USB-D instead of the usual JS8 frequencies
+ghostnet = 0
