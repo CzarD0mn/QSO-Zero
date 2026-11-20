@@ -132,15 +132,27 @@ int main(int argc, char **argv)
     snprintf(p, sizeof p, "%s/compact_exit.ppm", dir); save_ppm(c, 3, p);
     a.esc_t0 = 0;
 
-    a.screen = 1; a.menu_sel = 3;
+    a.screen = 1; a.menu_sel = 14;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu.ppm", dir); save_ppm(c, 3, p);
     a.screen = 2;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_tools.ppm", dir); save_ppm(c, 3, p);
+    /* Setup in each mode: only that mode's options are listed */
+    {
+        const char *nm[] = {"ft8", "js8", "wspr"};
+        op_mode_t md[] = {MODE_FT8, MODE_JS8, MODE_WSPR};
+        for (int k = 0; k < 3; ++k) {
+            a.mode = md[k]; a.screen = 1; a.menu_sel = 0;
+            ui_render(&a, c);
+            snprintf(p, sizeof p, "%s/compact_menu_%s.ppm", dir, nm[k]); save_ppm(c, 3, p);
+        }
+        a.mode = MODE_FT8;
+    }
+
     /* GHOSTNET section, and the JS8 header with GHOSTNET on */
     a.cfg.ghostnet = 1; a.mode = MODE_JS8; a.band = 3;
-    a.screen = 1; a.menu_sel = 6;
+    a.screen = 1; a.menu_sel = 8;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu_ghostnet.ppm", dir); save_ppm(c, 3, p);
     a.screen = 0;
@@ -149,14 +161,14 @@ int main(int argc, char **argv)
     a.cfg.ghostnet = 0; a.mode = MODE_FT8;
 
     /* device pickers (CAT port / audio in), using QSOZERO_DEVROOT if set */
-    a.screen = 1; a.menu_sel = 7;
+    a.screen = 1; a.menu_sel = 18;
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu_devices.ppm", dir); save_ppm(c, 3, p);
     keyev_t ent = {K_ENTER, 0, 0};
     ui_key(&a, &ent);
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_pick_port.ppm", dir); save_ppm(c, 3, p);
-    a.screen = 1; a.menu_sel = 8;
+    a.screen = 1; a.menu_sel = 19;
     ui_key(&a, &ent);
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_pick_audio.ppm", dir); save_ppm(c, 3, p);
