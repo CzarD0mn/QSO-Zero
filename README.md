@@ -25,7 +25,7 @@ The model IDs come from Hamlib's `riglist.h`. QMX and X6200 need Hamlib 4.6 or n
 
 ## Install on the Cardputer Zero
 
-**From a package (easiest).** Each push to `main` builds `.deb` packages for 64-bit (`arm64`) and 32-bit (`armhf`) Raspberry Pi OS. They're published on the [`packages` branch](../../tree/packages), and attached to a GitHub Release for each `vX.Y.Z` tag.
+**From a package (easiest).** Each push to `main` builds `.deb` packages for 64-bit (`arm64`) and 32-bit (`armhf`) Raspberry Pi OS. They're published on the [`packages` branch](../../tree/packages), and each new version also gets a GitHub [Release](../../releases/latest) (`vX.Y.Z`) with plain `X.Y.Z` packages to download.
 
 ```sh
 dpkg --print-architecture                      # arm64 or armhf
