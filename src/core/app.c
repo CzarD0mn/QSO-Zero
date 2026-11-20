@@ -304,6 +304,25 @@ void app_step_band(app_t *a, int dir)
     }
 }
 
+/* ---- battery ------------------------------------------------------ */
+
+void app_poll_battery(app_t *a)
+{
+    const char *root = getenv("QSOZERO_DEVROOT");
+    batt_update(root ? root : "", &a->batt, clk_mono());
+    const batt_t *b = &a->batt.now;
+    if (!b->present || b->percent < 0) return;
+    if (b->charging || b->full) { a->batt.warned = 0; return; }
+    int lvl = b->percent <= 5 ? 5 : b->percent <= 15 ? 15 : 0;
+    if (lvl && (!a->batt.warned || lvl < a->batt.warned)) {
+        a->batt.warned = lvl;
+        if (b->hours_left > 0) app_status(a, "BATTERY %d%% - about %d min left", b->percent, (int)(b->hours_left * 60));
+        else app_status(a, "BATTERY %d%% - charge soon", b->percent);
+        a->status_until = clk_mono() + 30;
+    }
+    a->dirty = 1;
+}
+
 /* ---- FT8 CQ modifier ---------------------------------------------- */
 
 int cq_mod_valid(const char *mod)
@@ -597,6 +616,7 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         app_status(a, "Welcome! Set your callsign: ESC > Callsign");
         a->status_until = clk_mono() + 60;
     }
+    app_poll_battery(a);                                 /* a low-battery warning wins */
     return 0;
 }
 
@@ -884,7 +904,7 @@ static void *tx_thread(void *arg)
 static void *misc_thread(void *arg)
 {
     app_t *a = arg;
-    double last_poll = 0;
+    double last_poll = 0, last_batt = -100;
     long last_wspr_slot = -1;
     srand((unsigned)time(NULL));
     while (!a->quit) {
@@ -914,6 +934,7 @@ static void *misc_thread(void *arg)
             }
             last_poll = clk_mono();
         }
+        if (clk_mono() - last_batt > 30.0) { app_poll_battery(a); last_batt = clk_mono(); }
         if (g_hw && a->rig_ok && a->tx_active) {
             float v;
             if (!rig_get_level("SWR", &v)) a->swr = v;

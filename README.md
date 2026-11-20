@@ -82,6 +82,15 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 
 Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
+### Battery
+
+QSO-Zero reads the Cardputer Zero's battery every 30 seconds from Linux's power-supply interface (`/sys/class/power_supply`, the supply with type "Battery"), the same source M5Stack's own apps use.
+
+* **Header:** the percentage and a small battery icon, next to the GPS/SYS clock chip. The icon is green above 50%, yellow from 21–50% and red at 20% and below. A notch in the icon means it's charging.
+* **Tools (Ctrl+T):** voltage and current (when the battery reports them), the drain rate in %/hour, and the time left (or time to full while charging). Time left comes from the battery's current reading when it has one. Otherwise it's estimated from how fast the percentage drops, which needs about 5 minutes of data ("estimating" until then).
+* **Warnings:** a status message appears at 15% and again at 5%, with the estimated minutes left.
+* **No battery:** nothing is shown when no battery is reported (on a bench supply, for example).
+
 ### Setup menu
 
 ESC opens Setup. Options for the current mode come right under **Mode**, and options for the other modes are hidden:

@@ -220,6 +220,8 @@ static void draw_input(app_t *a, surface_t *s, int x, int y, int w)
 /* compact 320x170                                                      */
 /* ------------------------------------------------------------------ */
 
+static int draw_battery(app_t *a, surface_t *s, int x_right, int y, int sc);
+
 static void render_compact_main(app_t *a, surface_t *s)
 {
     char buf[64];
@@ -237,14 +239,39 @@ static void render_compact_main(app_t *a, surface_t *s)
     fmt_utc(clk_now(), buf, 1);
     gfx_text(s, s->w - gfx_text_w(buf, 1) - 1, 2, buf, C_TEXT, 1);
     int gx = s->w - gfx_text_w(buf, 1) - 26;
-    if (a->tx_active) gfx_chip(s, gx - 18, 1, "TX", C_RED, C_BG, 1);
     gfx_chip(s, gx, 1, clk_source() == CLK_GPS ? "GPS" : "SYS", clk_locked() ? C_MINT : C_ORANGE, C_BG, 1);
+    int bl = draw_battery(a, s, gx - 1, 1, 1);
+    if (a->tx_active) gfx_chip(s, bl - 18, 1, "TX", C_RED, C_BG, 1);
     gfx_hgrad(s, 0, 11, s->w, 1, C_MAGENTA, C_CYAN);
 
     draw_waterfall(a, s, 0, 12, s->w, 42);
     draw_period_bar(a, s, 0, 55, s->w, 2);
     draw_list(a, s, 0, 59, s->w, 11, 0);
     draw_input(a, s, 0, s->h - FONT_H - 2, s->w);
+}
+
+/* Battery: "87%" + a small cell, right-aligned so it ends at x_right.
+ * Returns the left edge, or x_right if there's no battery. */
+static int draw_battery(app_t *a, surface_t *s, int x_right, int y, int sc)
+{
+    const batt_t *b = &a->batt.now;
+    if (!b->present || b->percent < 0) return x_right;
+    uint16_t c = b->charging ? C_MINT : b->percent > 50 ? C_MINT : b->percent > 20 ? C_SUN : C_RED;
+    int bw = 11 * sc, bh = 7 * sc, by = y + sc;
+    int bx = x_right - bw - sc;
+    gfx_rect(s, bx, by, bw, bh, c);
+    gfx_fill(s, bx + bw, by + 2 * sc, sc, 3 * sc, c);                    /* + terminal */
+    int fw = (bw - 2 * sc) * b->percent / 100;
+    if (fw > 0) gfx_fill(s, bx + sc, by + sc, fw, bh - 2 * sc, c);
+    if (b->charging) {                                                   /* bolt-ish mark */
+        gfx_fill(s, bx + bw / 2 - sc, by + sc, sc, bh - 2 * sc, C_BG);
+        gfx_fill(s, bx + bw / 2, by + sc, sc, bh - 2 * sc, C_BG);
+    }
+    char t[8];
+    snprintf(t, sizeof t, "%d%%", b->percent);
+    int tx = bx - gfx_text_w(t, sc) - 2 * sc;
+    gfx_text(s, tx, y + sc, t, b->percent <= 20 && !b->charging ? C_RED : C_TEXT, sc);
+    return tx;
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,6 +310,7 @@ static void render_large_main(app_t *a, surface_t *s)
     fmt_utc(clk_now(), buf, 1);
     gfx_text(s, s->w - gfx_text_w(buf, 2) - 6, 7, buf, C_TEXT, 2);
     gfx_text(s, s->w - gfx_text_w(buf, 2) - 30, 11, "UTC", C_DIM, 1);
+    draw_battery(a, s, s->w - gfx_text_w(buf, 2) - 36, 6, 2);
     gfx_hgrad(s, 0, 28, s->w, 2, C_MAGENTA, C_CYAN);
 
     /* waterfall */
@@ -539,6 +567,23 @@ static void render_tools(app_t *a, surface_t *s, int big)
         gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
     }
     y += draw_wrapped(s, 4, y, a->radio->notes, s->w / FONT_W - 1, 3, C_DIM) * FONT_H + 4;
+    {
+        const batt_t *bt = &a->batt.now;
+        if (bt->present) {
+            int n = snprintf(b, sizeof b, "BATTERY %d%%%s", bt->percent,
+                             bt->charging ? " charging" : bt->full ? " full" : "");
+            if (bt->volts > 0) n += snprintf(b + n, sizeof b - n, "  %.2f V", bt->volts);
+            if (bt->amps > 0) n += snprintf(b + n, sizeof b - n, " %.2f A", bt->amps);
+            else if (bt->watts > 0) n += snprintf(b + n, sizeof b - n, " %.1f W", bt->watts);
+            if (bt->pct_per_hour > 0) n += snprintf(b + n, sizeof b - n, " -%.0f%%/h", bt->pct_per_hour);
+            if (bt->hours_left > 0)
+                snprintf(b + n, sizeof b - n, " %dh%02d %s", (int)bt->hours_left, (int)(bt->hours_left * 60) % 60,
+                         bt->charging ? "to full" : "left");
+            else if (!bt->charging && !bt->full) snprintf(b + n, sizeof b - n, "  (estimating)");
+            gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, bt->percent > 20 || bt->charging ? C_MINT : C_RED, 1);
+            y += 12;
+        }
+    }
     gfx_text(s, 4, y, "AUDIO / DSP", C_MAGENTA, sc); y += lh;
     snprintf(b, sizeof b, "RX peak %.0f%%  last decode %.0f ms  TX level %.0f%%", audio_rx_level() * 100, a->last_decode_ms, a->cfg.tx_level * 100);
     gfx_text(s, 4, y, b, C_TEXT, 1); y += 14;

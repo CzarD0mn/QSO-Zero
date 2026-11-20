@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "config.h"
 #include "devices.h"
+#include "battery.h"
 #include "rig/radios.h"
 
 typedef enum { MODE_FT8 = 0, MODE_JS8, MODE_WSPR, MODE_COUNT } op_mode_t;
@@ -67,7 +68,8 @@ typedef struct app {
     unsigned   band_mask;     /* bands this radio covers (and config allows) */
     unsigned   band_rejected; /* bands the radio refused this session */
     int64_t    ghost_hz[11];
-    int        aprs_msgno;    /* APRS message number for the {n} ack id */  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
+    int        aprs_msgno;
+    batt_state_t batt;        /* battery, polled every 30 s */    /* APRS message number for the {n} ack id */  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
 
     /* audio ring (12 kHz) with UTC mapping */
     int16_t   *ring;
@@ -142,6 +144,7 @@ void app_step_band(app_t *a, int dir);
 /* Setup pickers: change the radio, CAT port or sound cards and reconnect
  * without restarting. NULL leaves that setting as it is. */
 void app_use_radio(app_t *a, const char *id);
+void app_poll_battery(app_t *a);              /* read now (also done every 30 s) */
 /* FT8 CQ modifier: "" or 1-4 letters A-Z or exactly 3 digits (the WSJT-X
  * 77-bit rule). Returns 0 if accepted. */
 int  app_set_cq_mod(app_t *a, const char *mod);
