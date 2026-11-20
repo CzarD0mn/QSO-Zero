@@ -70,7 +70,7 @@ int main(int argc, char **argv)
         if ((a->dirty || a->tx_active || a->esc_t0 > 0) && now - last_frame > 0.066) {
             a->dirty = 0;
             last_frame = now;
-            int use_large = a->large == 1 || (a->large == 0 && (fb.rotate ? fb.h : fb.w) >= LARGE_W);
+            int use_large = (fb.rotate ? fb.h : fb.w) >= LARGE_W;     /* automatic: large on HDMI */
             surface_t *s = use_large ? large : compact;
             ui_render(a, s);
             fb_present(&fb, s);

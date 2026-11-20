@@ -610,7 +610,6 @@ static void render_help(app_t *a, surface_t *s)
         "PGUP/DN band            ESC setup",
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
         "^U tune  ^W WSPR beacon  ^T tools",
-        "^L layout compact/large",
         "/band 40  /mode js8  /sub fast  /qsy on|off",
         "/ghost 80|40|20|off  /cqmod POTA",
         "/aprs CALL msg  /sms NUM msg  /email A msg",
@@ -833,7 +832,6 @@ void ui_key(app_t *a, const keyev_t *k)
     if (ctrl && k->key == K_CHAR) {
         switch (k->ch) {
         case 'x': app_halt_tx(a); return;
-        case 'l': a->large = a->large == 1 ? 2 : 1; return;
         case 't': a->screen = a->screen == 2 ? 0 : 2; return;
         case 'u': app_tune(a, 5); return;
         case 'w': if (a->mode != MODE_WSPR) app_set_mode(a, MODE_WSPR); app_toggle_wspr(a); return;
