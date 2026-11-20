@@ -172,6 +172,16 @@ int main(int argc, char **argv)
     ui_key(&a, &ent);
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_pick_audio.ppm", dir); save_ppm(c, 3, p);
+    /* worst-case compact header: JS8 + GHOSTNET + AUTO, transmitting, battery shown */
+    a.screen = 0; a.mode = MODE_JS8; a.cfg.ghostnet = 1; a.cfg.js8_autoreply = 1; a.tx_active = 1;
+    a.dial_hz = 14107000;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_header_busy.ppm", dir); save_ppm(c, 3, p);
+    a.tx_active = 0; a.cfg.ghostnet = 0; a.cfg.js8_autoreply = 0; a.mode = MODE_FT8;
+    a.screen = 2;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_tools_batt.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 0;
     printf("wrote previews to %s\n", dir);
     return 0;
 }
