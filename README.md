@@ -80,7 +80,23 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+L` | force compact / large layout |
 | `F1` | help |
 
-Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+
+### GHOSTNET
+
+Setup has a **GHOSTNET** section for running JS8 on the GHOSTNET frequencies (dial frequency, USB-D):
+
+| Band | GHOSTNET JS8 |
+|---|---|
+| 80 m | 3.575 MHz |
+| 40 m | 7.107 MHz |
+| 20 m | 14.107 MHz |
+
+* Press ENTER on one of the three frequencies to switch to JS8 there and tune the radio. This works even with Auto frequency off.
+* The **GHOSTNET** line switches the mode on or off. Turning it on keeps you on 80, 40 or 20 m if you're already there, otherwise it goes to 40 m. Turning it off returns to the normal JS8 frequency on the band.
+* While GHOSTNET is on and you're in JS8, the band keys cycle only 80 → 40 → 20 m. Turning the VFO onto one of those bands puts you on its GHOSTNET frequency. A **GN** chip (or **GHOSTNET** on an external display) shows in the header.
+* FT8 and WSPR keep their usual frequencies. Switching back to JS8 returns to GHOSTNET.
+* `/ghost 40` (or `80`, `20`, `off`) does the same from the keyboard, and `ghostnet = 1` in the config makes it stick. "USB-D" is the radio's data mode: USB on the QMX and Xiegus, PKTUSB (DATA-U) on the FT-891.
 
 ### Choosing the radio, CAT port and sound cards
 
@@ -162,7 +178,7 @@ Locally, the arm64 package passes czdev's own preflight checks (`.desktop` prese
 ```sh
 git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
 ../CardputerZero-AppBuilder/czdev login
-../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.3_arm64.deb
+../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.4_arm64.deb
 ```
 
 For a first release, the store wants a short video of the app running on a real device posted in the publish PR. The listing points at this repository as its source, and GPL code shared through the store should have public source, so make the repository public before publishing.

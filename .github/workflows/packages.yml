@@ -32,7 +32,7 @@ jobs:
       - name: Version
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then v="${GITHUB_REF_NAME#v}";
-          else v="0.1.3~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
+          else v="0.1.4~git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"; fi
           echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: Build, test and package (${{ matrix.arch }})
         run: |
