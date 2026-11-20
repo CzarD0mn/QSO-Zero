@@ -29,6 +29,7 @@ typedef struct {
     char log_path[160];
     int  auto_qsy;           /* move the VFO to the mode's standard frequency automatically */
     char bands[64];          /* optional band list, e.g. "40,30,20"; blank = all the radio covers */
+    char cq_mod[8];          /* FT8 CQ modifier: 1-4 letters or 3 digits (POTA, DX, ...) */
     int  ghostnet;           /* JS8 on the GHOSTNET frequencies (80/40/20 m) */
     int  js8_autoreply;      /* answer SNR?/GRID?/INFO?/STATUS?/HEARING?/AGN?/MSG */
     int  js8_hb_ack;         /* acknowledge heartbeats (needs js8_autoreply) */

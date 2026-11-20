@@ -70,9 +70,10 @@ void seq_start_cq(app_t *a)
     a->seq.st = SEQ_CQ;
     a->seq.slot_odd = 0;
     char m[40];
-    snprintf(m, sizeof m, "CQ %s %.4s", a->cfg.callsign, a->cfg.grid);
+    if (a->cfg.cq_mod[0]) snprintf(m, sizeof m, "CQ %s %s %.4s", a->cfg.cq_mod, a->cfg.callsign, a->cfg.grid);
+    else snprintf(m, sizeof m, "CQ %s %.4s", a->cfg.callsign, a->cfg.grid);
     queue_ft8(a, m);
-    app_status(a, "calling CQ (even slots)");
+    app_status(a, "calling CQ%s%s (even slots)", a->cfg.cq_mod[0] ? " " : "", a->cfg.cq_mod);
 }
 
 /* Advance the QSO from a message addressed to us by the current DX. */

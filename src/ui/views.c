@@ -361,14 +361,17 @@ static void render_picker(app_t *a, surface_t *s, int big);
 /* Setup items. The current mode's own options come right after Mode;
  * options for the other modes are hidden (menu_visible). */
 enum { MI_MODE,
+       MI_CQMOD,                                                                              /* FT8 */
        MI_SUB, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_GHOST, MI_GN80, MI_GN40, MI_GN20,   /* JS8 */
+       MI_APRS, MI_APOS, MI_AMSG, MI_ASMS, MI_AMAIL,                                          /* JS8 APRS */
        MI_WRX, MI_WPWR, MI_WPCT,                                                              /* WSPR */
        MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL,
        MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static int menu_visible(const app_t *a, int i)
 {
-    if (i >= MI_SUB && i <= MI_GN20) return a->mode == MODE_JS8;
+    if (i == MI_CQMOD) return a->mode == MODE_FT8;
+    if (i >= MI_SUB && i <= MI_AMAIL) return a->mode == MODE_JS8;
     if (i >= MI_WRX && i <= MI_WPCT) return a->mode == MODE_WSPR;
     return 1;
 }
@@ -419,6 +422,9 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_WPCT: sprintf(out, "%d%%", a->cfg.wspr_tx_pct); break;
     case MI_AGRID: strcpy(out, a->cfg.auto_grid ? "ON" : "off"); break;
     case MI_QSY: strcpy(out, a->cfg.auto_qsy ? "ON" : "off"); break;
+    case MI_CQMOD: snprintf(out, 64, "%s", a->cfg.cq_mod[0] ? a->cfg.cq_mod : "none"); break;
+    case MI_APOS: snprintf(out, 64, "GRID %s", a->cfg.grid); break;
+    case MI_AMSG: case MI_ASMS: case MI_AMAIL: strcpy(out, "ENTER"); break;
     case MI_GHOST: strcpy(out, a->cfg.ghostnet ? (a->mode == MODE_JS8 ? "ON" : "ON (in JS8)") : "off"); break;
     case MI_GN80: case MI_GN40: case MI_GN20: {
         int b = i == MI_GN80 ? 1 : i == MI_GN40 ? 3 : 5;
@@ -439,10 +445,12 @@ static void menu_value(app_t *a, int i, char *out)
 }
 
 static const char *k_menu_names[MI_COUNT] = {
-    [MI_MODE] = "Mode",
+    [MI_MODE] = "Mode", [MI_CQMOD] = "CQ modifier",
     [MI_SUB] = "JS8 speed", [MI_AUTO] = "JS8 auto-reply", [MI_HBACK] = "JS8 heartbeat ACK",
     [MI_INFO] = "JS8 INFO text", [MI_STATUS] = "JS8 STATUS text",
     [MI_GHOST] = "GHOSTNET", [MI_GN80] = "  80m  3.575", [MI_GN40] = "  40m  7.107", [MI_GN20] = "  20m 14.107",
+    [MI_APRS] = "APRS (via JS8)", [MI_APOS] = "  Send position", [MI_AMSG] = "  Message a station",
+    [MI_ASMS] = "  Text a phone (SMS)", [MI_AMAIL] = "  Email",
     [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
     [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
     [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AOUT] = "Audio out",
@@ -471,7 +479,7 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
         int i = rows[r];
         int y = y0 + (r - first) * rowh;
         if (i == a->menu_sel) { gfx_fill(s, 0, y - 1, s->w, rowh - 1, C_PANEL2); gfx_fill(s, 0, y - 1, 3 * sc, rowh - 1, C_MAGENTA); }
-        uint16_t nc = i == a->menu_sel ? C_TEXT : i == MI_GHOST ? C_MAGENTA : C_DIM;
+        uint16_t nc = i == a->menu_sel ? C_TEXT : (i == MI_GHOST || i == MI_APRS) ? C_MAGENTA : C_DIM;
         gfx_text(s, 8 * sc, y, k_menu_names[i], nc, sc);
         menu_value(a, i, v);
         int vx = s->w - gfx_text_w(v, sc) - 6 * sc;
@@ -482,6 +490,12 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
                      : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
                      : a->menu_sel == MI_GHOST ? "JS8 on the GHOSTNET frequencies"
+                     : a->menu_sel == MI_CQMOD ? "</> DX POTA SOTA QRP  ENTER: type your own"
+                     : a->menu_sel == MI_APRS ? "relayed to APRS by JS8Call stations"
+                     : a->menu_sel == MI_APOS ? "ENTER: @APRSIS GRID (your position)"
+                     : a->menu_sel == MI_AMSG ? "ENTER, then: CALL-SSID message"
+                     : a->menu_sel == MI_ASMS ? "ENTER, then: number message (opt-in needed)"
+                     : a->menu_sel == MI_AMAIL ? "ENTER, then: name@domain message"
                      : (a->menu_sel >= MI_GN80 && a->menu_sel <= MI_GN20) ? "ENTER: tune here, then the VFO is yours"
                      : a->menu_sel == MI_AUTO ? "answers SNR? GRID? INFO? STATUS? HEARING? AGN? MSG"
                      : a->menu_sel == MI_HBACK ? "ACK heartbeats, max 1 per station / 15 min"
@@ -554,7 +568,8 @@ static void render_help(app_t *a, surface_t *s)
         "^U tune  ^W WSPR beacon  ^T tools",
         "^L layout compact/large",
         "/band 40  /mode js8  /sub fast  /qsy on|off",
-        "/ghost 80|40|20|off  GHOSTNET JS8",
+        "/ghost 80|40|20|off  /cqmod POTA",
+        "/aprs CALL msg  /sms NUM msg  /email A msg",
         "/freq 7.074  /call K1ABC  /grid FN42",
         "/level 40  /pwr 23  /save  /quit",
         "/auto on|off  /hback on|off",
@@ -722,6 +737,13 @@ static void menu_change(app_t *a, int dir)
     case MI_WPCT: a->cfg.wspr_tx_pct = (int)fmax(0, fmin(100, a->cfg.wspr_tx_pct + dir * 10)); break;
     case MI_AGRID: a->cfg.auto_grid = !a->cfg.auto_grid; break;
     case MI_GHOST: app_set_ghostnet(a, !a->cfg.ghostnet); break;
+    case MI_CQMOD: {
+        static const char *pre[] = {"", "DX", "POTA", "SOTA", "QRP"};
+        int k = 0, n = (int)(sizeof pre / sizeof *pre);
+        for (int i = 0; i < n; ++i) if (!strcmp(pre[i], a->cfg.cq_mod)) k = i;
+        app_set_cq_mod(a, pre[(k + n + dir) % n]);
+        break;
+    }
     case MI_GN80: app_ghostnet_band(a, 1); break;
     case MI_GN40: app_ghostnet_band(a, 3); break;
     case MI_GN20: app_ghostnet_band(a, 5); break;
@@ -744,6 +766,12 @@ static void menu_enter(app_t *a)
     case MI_INFO: snprintf(a->input, sizeof a->input, "/info "); a->input_len = 6; a->screen = 0; break;
     case MI_STATUS: snprintf(a->input, sizeof a->input, "/status "); a->input_len = 8; a->screen = 0; break;
     case MI_TUNE: a->screen = 0; app_tune(a, 5); break;
+    case MI_CQMOD: snprintf(a->input, sizeof a->input, "/cqmod "); a->input_len = 7; a->screen = 0; break;
+    case MI_APRS: break;
+    case MI_APOS: a->screen = 0; app_aprs_position(a); break;
+    case MI_AMSG: snprintf(a->input, sizeof a->input, "/aprs "); a->input_len = 6; a->screen = 0; break;
+    case MI_ASMS: snprintf(a->input, sizeof a->input, "/sms "); a->input_len = 5; a->screen = 0; break;
+    case MI_AMAIL: snprintf(a->input, sizeof a->input, "/email "); a->input_len = 7; a->screen = 0; break;
     case MI_SAVE: app_status(a, config_save(&a->cfg, config_default_path()) ? "save failed" : "settings saved"); a->screen = 0; break;
     case MI_QUIT: a->quit = 1; break;
     default: menu_change(a, 1);

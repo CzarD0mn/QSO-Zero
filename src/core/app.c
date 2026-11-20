@@ -304,6 +304,109 @@ void app_step_band(app_t *a, int dir)
     }
 }
 
+/* ---- FT8 CQ modifier ---------------------------------------------- */
+
+int cq_mod_valid(const char *mod)
+{
+    int n = (int)strlen(mod), nd = 0, nl = 0;
+    if (n == 0) return 1;
+    for (int i = 0; i < n; ++i) {
+        if (mod[i] >= '0' && mod[i] <= '9') ++nd;
+        else if (mod[i] >= 'A' && mod[i] <= 'Z') ++nl;
+        else return 0;
+    }
+    return (nl == n && n <= 4) || (nd == 3 && n == 3);
+}
+
+int app_set_cq_mod(app_t *a, const char *mod)
+{
+    char m[16];
+    int n = 0;
+    for (const char *p = mod; *p && n < (int)sizeof m - 1; ++p)
+        if (*p != ' ') m[n++] = (char)toupper((unsigned char)*p);
+    m[n] = 0;
+    if (!strcmp(m, "NONE") || !strcmp(m, "OFF")) m[0] = 0;
+    if (!cq_mod_valid(m)) {
+        app_status(a, "CQ modifier: 1-4 letters (POTA) or 3 digits (290)");
+        return -1;
+    }
+    snprintf(a->cfg.cq_mod, sizeof a->cfg.cq_mod, "%s", m);
+    app_status(a, m[0] ? "FT8 calls CQ %s" : "FT8 calls plain CQ", m);
+    return 0;
+}
+
+/* ---- JS8 -> APRS (@APRSIS) ----------------------------------------- */
+/* JS8Call relays "@APRSIS CMD <text>" to APRS-IS as
+ *   FROM>APJ8CL,qAS,RELAY:<text>
+ * so <text> is an APRS message: ":" + addressee padded to 9 + ":" +
+ * message + "{" + number. APRS limits the message to 67 characters and
+ * does not allow | ~ { in it. */
+
+static int aprs_text_ok(app_t *a, const char *body)
+{
+    if (!a->cfg.callsign[0] || !strcmp(a->cfg.callsign, "N0CALL")) { app_status(a, "set your callsign first"); return 0; }
+    if (a->mode != MODE_JS8) { app_status(a, "APRS goes out over JS8: switch to JS8 first"); return 0; }
+    if (strlen(body) > 67) { app_status(a, "APRS message too long (%d/67)", (int)strlen(body)); return 0; }
+    if (strpbrk(body, "|~{")) { app_status(a, "APRS messages can't contain | ~ {"); return 0; }
+    return 1;
+}
+
+static int aprs_send(app_t *a, const char *addressee, const char *body)
+{
+    if (!aprs_text_ok(a, body)) return -1;
+    if (!a->aprs_msgno) a->aprs_msgno = 1 + (int)(time(NULL) / 60 % 900);   /* differs between sessions */
+    char line[160], to[16];
+    snprintf(to, sizeof to, "%s", addressee);
+    for (char *p = to; *p; ++p) *p = (char)toupper((unsigned char)*p);
+    snprintf(line, sizeof line, "@APRSIS CMD :%-9.9s:%s{%d", to, body, a->aprs_msgno);
+    a->aprs_msgno = a->aprs_msgno % 999 + 1;
+    snprintf(a->input, sizeof a->input, "%s", line);
+    app_submit_input(a);
+    return 0;
+}
+
+int app_aprs_position(app_t *a)
+{
+    char g[16];
+    snprintf(g, sizeof g, "%s", a->cfg.grid);
+    if (strlen(g) < 4) { app_status(a, "set your grid first (or Grid from GPS)"); return -1; }
+    if (!aprs_text_ok(a, "")) return -1;
+    snprintf(a->input, sizeof a->input, "@APRSIS GRID %s", g);
+    app_submit_input(a);
+    return 0;
+}
+
+int app_aprs_message(app_t *a, const char *to, const char *text)
+{
+    int c;
+    char base[16];
+    snprintf(base, sizeof base, "%s", to);
+    for (char *p = base; *p; ++p) *p = (char)toupper((unsigned char)*p);
+    char *dash = strchr(base, '-');
+    if (dash) *dash = 0;
+    if (!to[0] || strlen(to) > 9 || !js8v_is_valid_callsign(base, &c) || !text[0]) {
+        app_status(a, "usage: /aprs CALL[-SSID] message");
+        return -1;
+    }
+    return aprs_send(a, to, text);
+}
+
+int app_aprs_sms(app_t *a, const char *number, const char *text)
+{
+    if (!number[0] || !text[0]) { app_status(a, "usage: /sms NUMBER-or-alias message"); return -1; }
+    char body[160];
+    snprintf(body, sizeof body, "@%s %s", number[0] == '@' ? number + 1 : number, text);
+    return aprs_send(a, "SMS", body);
+}
+
+int app_aprs_email(app_t *a, const char *addr, const char *text)
+{
+    if (!strchr(addr, '@') || !text[0]) { app_status(a, "usage: /email name@domain message"); return -1; }
+    char body[160];
+    snprintf(body, sizeof body, "%s %s", addr, text);
+    return aprs_send(a, "EMAIL-2", body);
+}
+
 void app_ghostnet_band(app_t *a, int band)
 {
     if (!ghostnet_freq(band)) return;
@@ -995,6 +1098,20 @@ static int handle_command(app_t *a, char *cmd)
     else if (!strcmp(cmd, "/port")) app_use_rig_device(a, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);
     else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
+    else if (!strcmp(cmd, "/cqmod")) app_set_cq_mod(a, arg);
+    else if (!strcmp(cmd, "/aprspos") || !strcmp(cmd, "/aprsgrid")) app_aprs_position(a);
+    else if (!strcmp(cmd, "/aprs") || !strcmp(cmd, "/sms") || !strcmp(cmd, "/email")) {
+        char first[64] = "";
+        const char *rest = arg;
+        int n = 0;
+        while (*rest == ' ') ++rest;
+        while (*rest && *rest != ' ' && n < (int)sizeof first - 1) first[n++] = *rest++;
+        first[n] = 0;
+        while (*rest == ' ') ++rest;
+        if (!strcmp(cmd, "/aprs")) app_aprs_message(a, first, rest);
+        else if (!strcmp(cmd, "/sms")) app_aprs_sms(a, first, rest);
+        else app_aprs_email(a, first, rest);
+    }
     else if (!strcmp(cmd, "/ghost") || !strcmp(cmd, "/ghostnet")) {
         int bn = atoi(arg);
         if (!strncasecmp(arg, "off", 3)) app_set_ghostnet(a, 0);

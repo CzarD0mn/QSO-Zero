@@ -82,7 +82,7 @@ int config_load(config_t *c, const char *path)
         INT("wspr_dbm", wspr_dbm); INT("wspr_tx_pct", wspr_tx_pct); INT("js8_submode", js8_submode);
         INT("auto_qsy", auto_qsy); STR("bands", bands);
         INT("rx_offset", rx_offset); INT("tx_offset", tx_offset); STR("log_path", log_path);
-        INT("ghostnet", ghostnet); INT("js8_autoreply", js8_autoreply); INT("js8_hb_ack", js8_hb_ack);
+        INT("ghostnet", ghostnet); STR("cq_mod", cq_mod); INT("js8_autoreply", js8_autoreply); INT("js8_hb_ack", js8_hb_ack);
         STR("js8_info", js8_info); STR("js8_status", js8_status); STR("inbox_path", inbox_path);
         INT("wspr_rx", wspr_rx); INT("wsprnet_upload", wsprnet_upload); STR("wsprnet_host", wsprnet_host);
     }
@@ -110,6 +110,7 @@ int config_save(const config_t *c, const char *path)
     fprintf(f, "\ndisplay = %s\nkeyboard = %s\njsc_path = %s\n", c->display, c->keyboard, c->jsc_path);
     fprintf(f, "\nwspr_dbm = %d\nwspr_tx_pct = %d\njs8_submode = %d\nrx_offset = %d\ntx_offset = %d\nlog_path = %s\n",
             c->wspr_dbm, c->wspr_tx_pct, c->js8_submode, c->rx_offset, c->tx_offset, c->log_path);
+    fprintf(f, "\n# FT8 CQ modifier (CQ POTA ...): 1-4 letters or 3 digits, blank for plain CQ\ncq_mod = %s\n", c->cq_mod);
     fprintf(f, "\n# GHOSTNET: JS8 on 3.575 / 7.107 / 14.107 MHz USB-D instead of the usual JS8 frequencies\nghostnet = %d\n", c->ghostnet);
     fprintf(f, "\n# JS8 automatic replies (only to messages addressed to you)\njs8_autoreply = %d\njs8_hb_ack = %d\n"
                "js8_info = %s\njs8_status = %s\ninbox_path = %s\nwspr_rx = %d\n",

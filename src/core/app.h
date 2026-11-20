@@ -66,7 +66,8 @@ typedef struct app {
     int        rx_off, tx_off;
     unsigned   band_mask;     /* bands this radio covers (and config allows) */
     unsigned   band_rejected; /* bands the radio refused this session */
-    int64_t    ghost_hz[11];  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
+    int64_t    ghost_hz[11];
+    int        aprs_msgno;    /* APRS message number for the {n} ack id */  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
 
     /* audio ring (12 kHz) with UTC mapping */
     int16_t   *ring;
@@ -141,6 +142,16 @@ void app_step_band(app_t *a, int dir);
 /* Setup pickers: change the radio, CAT port or sound cards and reconnect
  * without restarting. NULL leaves that setting as it is. */
 void app_use_radio(app_t *a, const char *id);
+/* FT8 CQ modifier: "" or 1-4 letters A-Z or exactly 3 digits (the WSJT-X
+ * 77-bit rule). Returns 0 if accepted. */
+int  app_set_cq_mod(app_t *a, const char *mod);
+int  cq_mod_valid(const char *mod);
+/* JS8 -> APRS through the @APRSIS group (relayed to APRS-IS by JS8Call
+ * stations with APRS spotting on). Return 0 if queued. */
+int  app_aprs_position(app_t *a);
+int  app_aprs_message(app_t *a, const char *to, const char *text);   /* to = CALL[-SSID] */
+int  app_aprs_sms(app_t *a, const char *number, const char *text);   /* number or alias */
+int  app_aprs_email(app_t *a, const char *addr, const char *text);
 /* GHOSTNET JS8 frequencies. ghostnet_freq() is 0 for bands without one. */
 int64_t ghostnet_freq(int band);
 void app_set_ghostnet(app_t *a, int on);          /* on: JS8 on the nearest GHOSTNET band */
