@@ -66,6 +66,7 @@ typedef struct app {
     int        rx_off, tx_off;
     unsigned   band_mask;     /* bands this radio covers (and config allows) */
     unsigned   band_rejected; /* bands the radio refused this session */
+    int64_t    ghost_hz[11];  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
 
     /* audio ring (12 kHz) with UTC mapping */
     int16_t   *ring;
@@ -143,7 +144,7 @@ void app_use_radio(app_t *a, const char *id);
 /* GHOSTNET JS8 frequencies. ghostnet_freq() is 0 for bands without one. */
 int64_t ghostnet_freq(int band);
 void app_set_ghostnet(app_t *a, int on);          /* on: JS8 on the nearest GHOSTNET band */
-void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET on this band */
+void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET default frequency on this band */
 void app_use_rig_device(app_t *a, const char *dev);
 void app_use_audio(app_t *a, const char *in, const char *out);      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */
