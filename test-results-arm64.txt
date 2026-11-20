@@ -1,0 +1,119 @@
+QSO-Zero 0.1.9 tests on arm64 (aarch64-linux-gnu, QEMU)
+### test_input
+  ok    short ESC: HOLDING then ESC on release (2 events)
+  ok    held ESC 1.2 s: HOLDING then HOLD, nothing on release (2 events)
+  ok    Cardputer ` key acts as ESC
+  ok    Shift+` types '~'
+  ok    Ctrl+X (halt TX) still arrives
+PASS
+### test_varicode
+  NORMAL 1 frames                    identical                ok
+  FAST 4 frames                      identical                ok
+  FAST 4 frames                      identical                ok
+  FAST 1 frames                      identical                ok
+  TURBO 4 frames                     identical                ok
+  TURBO 4 frames                     identical                ok
+  TURBO 1 frames                     identical                ok
+  SLOW 4 frames                      identical                ok
+  SLOW 4 frames                      identical                ok
+  SLOW 1 frames                      identical                ok
+
+PASS
+### test_wspr
+K1ABC FN42 37: matches reference vector
+power snapping: 5->3 25->23 36->37
+reject N0CALL (4-letter suffix): rejected
+1-letter prefix K1JT -> ' K1JT  ': ok
+synth: 1327104 samples = 110.59 s
+PASS
+### test_wsprrx
+   -18 dB dt +0.0   1429.9 Hz drift +0  K1ABC FN42 37   
+   -20 dB dt -0.0   1574.9 Hz drift +0  KN4CRD EM73 37  
+   -22 dB dt +0.0   1465.5 Hz drift +0  G4JNT IO90 23   
+   -24 dB dt -0.1   1531.3 Hz drift +0  JA1ABC PM95 10  
+  5/5 decoded correctly, 3230 ms
+== sensitivity (1 station, 5 trials) ==
+  -22 dB: 5/5
+  -24 dB: 5/5
+  -26 dB: 5/5
+  -28 dB: 5/5
+  -30 dB: 1/5
+PASS
+### test_ft8
+   -13 dB +0.00  700.0 Hz  CQ K1ABC FN42
+   -15 dB +0.00 1200.0 Hz  W9XYZ K1ABC -12
+   -14 dB +0.00 1650.0 Hz  K1ABC W9XYZ R-08
+   -14 dB +0.00 2200.0 Hz  CQ POTA KN4CRD EM73
+  @ -12 dB: 4/4, 224 ms
+== sweep (4 signals x 5 trials) ==
+  -14 dB: 20/20
+  -16 dB: 20/20
+  -18 dB: 20/20
+  -20 dB:  1/20
+  -22 dB:  0/20
+PASS
+### test_js8
+  TURBO @ -10 dB: 4/4 decoded, 0 spurious, 707 ms
+   SLOW   -16 dB  dt -0.04   1500.0 Hz  i3=1  HELLOWORLD12 
+   SLOW   -16 dB  dt -0.04   1000.0 Hz  i3=0  N0CALLK1ABC+ 
+   SLOW   -16 dB  dt -0.04   2100.0 Hz  i3=3  CQCQCQDE4WAY 
+   SLOW   -16 dB  dt -0.04    619.8 Hz  i3=2  abcXYZ-+0987 
+  SLOW @ -10 dB: 4/4 decoded, 0 spurious, 3938 ms
+== Sensitivity sweep (1 signal, 10 trials each) ==
+  NORMAL -14:10/10 -16:10/10 -18:10/10 -20: 1/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  FAST   -14:10/10 -16: 9/10 -18: 1/10 -20: 0/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  TURBO  -14: 4/10 -16: 0/10 -18: 0/10 -20: 0/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  SLOW   -14:10/10 -16:10/10 -18:10/10 -20:10/10 -22: 6/10 -24: 0/10 -26: 0/10 -28: 0/10
+PASS
+### test_qsy
+  ok    JS8: 0 FT8, 14 JS8, 0 WSPR items reachable
+  ok    WSPR: 0 FT8, 0 JS8, 3 WSPR items reachable
+  ok    cursor on a hidden item moves to the next shown one (Band), got 19
+[8] switching the CAT port and audio from Setup
+  ok    reconnecting in the background (UI not blocked)
+  ok    back online: "QRP Labs QMX online"
+  ok    port stored in settings
+  ok    audio out switched
+  ok    radio switched live to G90 (160 m now allowed)
+  ok    no port change while transmitting
+
+all passed
+### test_devices
+  ok    playback list includes HDMI (got 5)
+  ok    output defaults to same as input
+[3] short names for the menu
+  ok    by-id -> ttyUSB0 (ttyUSB0)
+  ok    missing device -> (unplugged)
+  ok    plughw:CARD=Device -> Device
+  ok    blank -> auto
+[4] nothing plugged in
+  ok    only auto
+  ok    only auto + default
+
+all passed
+### test_modes
+  ok    SMS  -> ":SMS      :@5551234567 ARRIVED AT CAMP OK{7" (rc 0)
+  ok    mail -> ":EMAIL-2  :ME@EXAMPLE.COM ON SUMMIT W4C-CM-001{8" (rc 0)
+  ok    msg  -> ":W1AW-7   :QRV 7.078 JS8{9" (rc 0)
+  ok    position -> "KN4CRD: @APRSIS GRID EM73TU"
+[5] APRS limits
+  ok    over 67 characters refused: "APRS message too long (70/67)"
+  ok    | refused
+  ok    email without @ refused
+  ok    bad callsign refused
+  ok    refused outside JS8: "APRS goes out over JS8: switch to JS8 first"
+
+all passed
+### test_battery
+  ok    plugged in: charging, estimate restarts
+  ok    USB online + not full counts as charging
+  ok    full
+[5] no capacity file: derived from charge
+  ok    500/2000 mAh -> 25% (got 25)
+[6] low-battery warning in the app
+  ok    read at start-up
+  ok    warns: "BATTERY 14% - about 42 min left"
+  ok    doesn't repeat at the same level
+  ok    warns again at 5%: "BATTERY 4% - about 11 min left"
+
+all passed
