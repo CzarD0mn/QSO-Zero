@@ -2,3 +2,4 @@ build/
 *.o
 *.d
 *.ppm
+build-arm64/

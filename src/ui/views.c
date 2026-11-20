@@ -394,7 +394,7 @@ enum { MI_MODE,
        MI_APRS, MI_APOS, MI_AMSG, MI_ASMS, MI_AMAIL,                                          /* JS8 APRS */
        MI_WRX, MI_WPWR, MI_WPCT,                                                              /* WSPR */
        MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_TXL,
-       MI_AGRID, MI_LAYOUT, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
+       MI_AGRID, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static int menu_visible(const app_t *a, int i)
 {
@@ -467,7 +467,6 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_INFO: snprintf(out, 64, "%.20s", a->cfg.js8_info[0] ? a->cfg.js8_info : "(none)"); break;
     case MI_STATUS: snprintf(out, 64, "%.20s", a->cfg.js8_status[0] ? a->cfg.js8_status : "(none)"); break;
     case MI_WRX: strcpy(out, a->cfg.wspr_rx ? "ON" : "off"); break;
-    case MI_LAYOUT: strcpy(out, a->large == 0 ? "auto" : a->large == 1 ? "large" : "compact"); break;
     default: out[0] = 0;
     }
 }
@@ -482,7 +481,7 @@ static const char *k_menu_names[MI_COUNT] = {
     [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
     [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
     [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AOUT] = "Audio out",
-    [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_LAYOUT] = "Layout", [MI_TUNE] = "Tune 5 s",
+    [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_TUNE] = "Tune 5 s",
     [MI_SAVE] = "Save settings", [MI_QUIT] = "Quit"};
 
 static void render_menu(app_t *a, surface_t *s, int sc_large)
@@ -799,7 +798,6 @@ static void menu_change(app_t *a, int dir)
     case MI_AUTO: a->cfg.js8_autoreply = !a->cfg.js8_autoreply; break;
     case MI_HBACK: a->cfg.js8_hb_ack = !a->cfg.js8_hb_ack; break;
     case MI_WRX: a->cfg.wspr_rx = !a->cfg.wspr_rx; break;
-    case MI_LAYOUT: a->large = (a->large + 3 + dir) % 3; break;
     }
 }
 
