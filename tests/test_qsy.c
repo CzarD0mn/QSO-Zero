@@ -181,23 +181,25 @@ int main(void)
 
     printf("[10] Setup lists only the current mode's options\n");
     {
-        /* item numbers 1-9 are JS8 options, 10-12 WSPR (see views.c) */
+        /* item 1 is FT8's (CQ modifier), 2-15 JS8's (incl. GHOSTNET + APRS), 16-18 WSPR's (see views.c) */
         op_mode_t md[] = {MODE_FT8, MODE_JS8, MODE_WSPR};
-        int want_js8[] = {0, 9, 0}, want_wspr[] = {0, 0, 3};
+        int want_ft8[] = {1, 0, 0}, want_js8[] = {0, 14, 0}, want_wspr[] = {0, 0, 3};
         for (int k = 0; k < 3; ++k) {
             a.mode = md[k]; a.screen = 1; a.menu_sel = 0;
-            int seen[64] = {0}, js8 = 0, wspr = 0;
+            int seen[64] = {0}, ft8 = 0, js8 = 0, wspr = 0;
             keyev_t dn = {K_DOWN, 0, 0};
-            for (int n = 0; n < 40; ++n) { ui_key(&a, &dn); seen[a.menu_sel] = 1; }
-            for (int i = 1; i <= 9; ++i) js8 += seen[i];
-            for (int i = 10; i <= 12; ++i) wspr += seen[i];
-            CHECK(js8 == want_js8[k] && wspr == want_wspr[k], "%s: %d JS8 items, %d WSPR items reachable", mode_name(md[k]), js8, wspr);
+            for (int n = 0; n < 50; ++n) { ui_key(&a, &dn); seen[a.menu_sel] = 1; }
+            ft8 = seen[1];
+            for (int i = 2; i <= 15; ++i) js8 += seen[i];
+            for (int i = 16; i <= 18; ++i) wspr += seen[i];
+            CHECK(ft8 == want_ft8[k] && js8 == want_js8[k] && wspr == want_wspr[k],
+                  "%s: %d FT8, %d JS8, %d WSPR items reachable", mode_name(md[k]), ft8, js8, wspr);
         }
         a.mode = MODE_JS8; a.screen = 1; a.menu_sel = 3;      /* on a JS8 item... */
         a.mode = MODE_FT8;                                    /* ...then the mode changes */
         keyev_t dn = {K_DOWN, 0, 0};
         ui_key(&a, &dn);
-        CHECK(a.menu_sel == 13, "cursor on a hidden item moves to the next shown one (Band), got %d", a.menu_sel);
+        CHECK(a.menu_sel == 19, "cursor on a hidden item moves to the next shown one (Band), got %d", a.menu_sel);
         a.screen = 0; a.mode = MODE_JS8;
     }
 

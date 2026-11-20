@@ -80,15 +80,45 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+L` | force compact / large layout |
 | `F1` | help |
 
-Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
 ### Setup menu
 
 ESC opens Setup. Options for the current mode come right under **Mode**, and options for the other modes are hidden:
-* **JS8:** JS8 speed, auto-reply, heartbeat ACK, INFO and STATUS text, and the GHOSTNET section
+* **JS8:** JS8 speed, auto-reply, heartbeat ACK, INFO and STATUS text, and the GHOSTNET and APRS sections
+* **FT8:** CQ modifier
 * **WSPR:** WSPR receive, power and TX %
 
 Change the Mode line (←/→) and the list updates. Everything else (band, auto frequency, callsign, radio, ports, audio and so on) is always shown.
+
+### FT8 CQ modifier (CQ POTA, SOTA, QRP, DX)
+
+Setup › **CQ modifier** (FT8 only). Use ←/→ to step through none, DX, POTA, SOTA and QRP, or press ENTER to type your own (`/cqmod WWFF`). Ctrl+Q then calls `CQ POTA KN4CRD EM73`, and the auto-sequencer runs the QSO as usual.
+
+FT8 allows a modifier of **1 to 4 letters (A–Z) or exactly 3 digits** (`CQ 290`, used for calling on a frequency). The limit isn't about the 15-second timing. FT8 always sends exactly 77 bits, and the modifier rides inside the 28-bit field that normally holds the first callsign, which only has room for those forms. Anything else (5 letters, letters mixed with digits, `/`) is refused with a message, because it can't go out as a standard CQ.
+
+### APRS over JS8 (Setup › APRS, JS8 only)
+
+JS8 can get messages and position reports into the APRS network from places with no APRS coverage. You send to the **@APRSIS** group. Any JS8Call station that hears you and has APRS reporting turned on relays it to APRS-IS (as `YOURCALL>APJ8CL,qAS,RELAYCALL:…`).
+
+| Setup item | Command | Sends |
+|---|---|---|
+| Send position | `/aprspos` | `@APRSIS GRID EM73TU`, your grid (use Grid from GPS for 6 characters) |
+| Message a station | `/aprs W1AW-7 QRV 7.078` | `@APRSIS CMD :W1AW-7   :QRV 7.078{12` |
+| Text a phone (SMS) | `/sms 5551234567 Arrived OK` | `@APRSIS CMD :SMS      :@5551234567 ARRIVED OK{13` |
+| Email | `/email me@example.com On summit` | `@APRSIS CMD :EMAIL-2  :ME@EXAMPLE.COM ON SUMMIT{14` |
+
+QSO-Zero formats these the way APRS needs them:
+* the addressee is padded to exactly 9 characters
+* each message gets a `{number}`
+* the message is limited to 67 characters, with no `|` `~` `{`
+* JS8's 16-bit checksum is added, so a relay checks the message before passing it on. Corrupted copies are dropped.
+
+Things to know:
+* **Someone has to relay it.** It only reaches APRS if a JS8Call station with APRS spotting on decodes it. There's no acknowledgement back over JS8, so check aprs.fi or ask for a reply.
+* **SMS** goes through the NA7Q **SMS** gateway (the old SMSGTE is gone). The phone number must be opted in at aprs.wiki first. You can set up an alias there so your number isn't sent over the air (`/sms MIKE …`).
+* **Email** goes through **EMAIL-2**. It's meant for interactive use, not unattended or automatic messages.
+* **Upper case:** JS8 sends upper case only, so texts and emails arrive in capitals.
 
 ### GHOSTNET
 
