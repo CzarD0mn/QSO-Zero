@@ -399,7 +399,9 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_GN80: case MI_GN40: case MI_GN20: {
         int b = i == MI_GN80 ? 1 : i == MI_GN40 ? 3 : 5;
         int here = a->cfg.ghostnet && a->mode == MODE_JS8 && a->band == b;
-        strcpy(out, !(a->band_mask & (1u << b)) ? "not on this radio" : here ? "USB-D  < tuned" : "USB-D");
+        if (!(a->band_mask & (1u << b))) strcpy(out, "not on this radio");
+        else if (here && a->dial_hz != ghostnet_freq(b)) sprintf(out, "now %.3f  < tuned", a->dial_hz / 1e6);
+        else strcpy(out, here ? "USB-D  < tuned" : "USB-D");
         break;
     }
     case MI_AUTO: strcpy(out, a->cfg.js8_autoreply ? "ON" : "off"); break;
@@ -445,7 +447,7 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
                      : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
                      : a->menu_sel == MI_GHOST ? "JS8 on the GHOSTNET frequencies"
-                     : (a->menu_sel >= MI_GN80 && a->menu_sel <= MI_GN20) ? "ENTER: JS8 here (GHOSTNET)"
+                     : (a->menu_sel >= MI_GN80 && a->menu_sel <= MI_GN20) ? "ENTER: tune here, then the VFO is yours"
                      : a->menu_sel == MI_AUTO ? "answers SNR? GRID? INFO? STATUS? HEARING? AGN? MSG"
                      : a->menu_sel == MI_HBACK ? "ACK heartbeats, max 1 per station / 15 min"
                                                                           : "</> change  ENTER select";

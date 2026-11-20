@@ -73,7 +73,9 @@ static int in_ghostnet(const app_t *a) { return a->mode == MODE_JS8 && a->cfg.gh
 static int64_t mode_freq(const app_t *a, int band)
 {
     const band_t *b = &k_bands[band];
-    if (in_ghostnet(a) && ghostnet_freq(band)) return ghostnet_freq(band);
+    /* GHOSTNET isn't locked: nets move off frequency to dodge QRM, so use
+     * wherever the operator last tuned on this band, else the net default */
+    if (in_ghostnet(a) && ghostnet_freq(band)) return a->ghost_hz[band] ? a->ghost_hz[band] : ghostnet_freq(band);
     return a->mode == MODE_FT8 ? b->ft8 : a->mode == MODE_JS8 ? b->js8 : b->wspr;
 }
 
@@ -308,6 +310,7 @@ void app_ghostnet_band(app_t *a, int band)
     if (a->tx_active) { app_status(a, "can't change band while transmitting"); return; }
     a->cfg.ghostnet = 1;
     a->mode = MODE_JS8;
+    a->ghost_hz[band] = 0;                        /* chosen from the menu: the net default */
     app_set_band(a, band);                        /* explicit: tunes even with auto QSY off */
     if (a->band == band) app_status(a, "GHOSTNET %s %.3f MHz USB-D", k_bands[band].name, ghostnet_freq(band) / 1e6);
 }
@@ -793,10 +796,16 @@ static void *misc_thread(void *arg)
                 /* VFO turned onto another band: follow it, and (auto) jump to
                  * this mode's frequency there. Tuning within a band is left alone. */
                 int b = band_from_freq(f);
+                if (b >= 0 && b == a->band && in_ghostnet(a) && ghostnet_freq(b))
+                    a->ghost_hz[b] = f;                  /* GHOSTNET: remember the net's moved frequency */
                 if (b >= 0 && b != a->band && !a->tx_active) {
                     a->band_rejected &= ~(1u << b);      /* the radio is clearly on it */
                     a->band_mask |= 1u << b;
-                    if (a->cfg.auto_qsy) app_set_band(a, b);
+                    if (in_ghostnet(a)) {                /* GHOSTNET: follow the band, leave the VFO */
+                        a->band = b;
+                        if (ghostnet_freq(b)) a->ghost_hz[b] = f;
+                        app_status(a, "radio moved to %s", k_bands[b].name);
+                    } else if (a->cfg.auto_qsy) app_set_band(a, b);
                     else { a->band = b; app_status(a, "radio moved to %s", k_bands[b].name); }
                 }
             }

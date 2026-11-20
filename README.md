@@ -94,7 +94,9 @@ Setup has a **GHOSTNET** section for running JS8 on the GHOSTNET frequencies (di
 
 * Press ENTER on one of the three frequencies to switch to JS8 there and tune the radio. This works even with Auto frequency off.
 * The **GHOSTNET** line switches the mode on or off. Turning it on keeps you on 80, 40 or 20 m if you're already there, otherwise it goes to 40 m. Turning it off returns to the normal JS8 frequency on the band.
-* While GHOSTNET is on and you're in JS8, the band keys cycle only 80 → 40 → 20 m. Turning the VFO onto one of those bands puts you on its GHOSTNET frequency. A **GN** chip (or **GHOSTNET** on an external display) shows in the header.
+* **GHOSTNET isn't locked like the other modes.** Choosing it tunes to the net frequency, then the VFO is yours. Nets sometimes move off frequency to avoid interference, so you can tune anywhere and QSO-Zero won't pull you back. Turning the VFO onto another band also doesn't retune.
+* QSO-Zero remembers where you tuned on each band. If you switch to FT8 and back, or step bands, you return to where the net was. Setup shows "now 7.110" when you're off the default. Choosing a GHOSTNET frequency in Setup again (or `/ghost 40`) resets to the default.
+* While GHOSTNET is on and you're in JS8, the band keys cycle only 80 → 40 → 20 m. A **GN** chip (or **GHOSTNET** on an external display) shows in the header.
 * FT8 and WSPR keep their usual frequencies. Switching back to JS8 returns to GHOSTNET.
 * `/ghost 40` (or `80`, `20`, `off`) does the same from the keyboard, and `ghostnet = 1` in the config makes it stick. "USB-D" is the radio's data mode: USB on the QMX and Xiegus, PKTUSB (DATA-U) on the FT-891.
 
@@ -178,7 +180,7 @@ Locally, the arm64 package passes czdev's own preflight checks (`.desktop` prese
 ```sh
 git clone https://github.com/m5stack/CardputerZero-AppBuilder ../CardputerZero-AppBuilder
 ../CardputerZero-AppBuilder/czdev login
-../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.4_arm64.deb
+../CardputerZero-AppBuilder/czdev publish --deb qso-zero_0.1.5_arm64.deb
 ```
 
 For a first release, the store wants a short video of the app running on a real device posted in the publish PR. The listing points at this repository as its source, and GPL code shared through the store should have public source, so make the repository public before publishing.

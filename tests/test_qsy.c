@@ -161,9 +161,19 @@ int main(void)
     CHECK(g_vfo == 3573000, "FT8 still uses the normal 3.573");
     app_set_mode(&a, MODE_JS8);
     CHECK(g_vfo == 3575000, "back to JS8 returns to GHOSTNET 3.575");
-    g_vfo = 7120000;
-    for (int i = 0; i < 60 && g_vfo != 7107000; ++i) wait_s(0.1);
-    CHECK(g_vfo == 7107000 && a.band == 3, "VFO turned to 40m -> GHOSTNET 7.107");
+    g_vfo = 7120000;                            /* net moved: operator turns to 40m, 7.120 */
+    for (int i = 0; i < 60 && a.band != 3; ++i) wait_s(0.1);
+    wait_s(2.5);
+    CHECK(a.band == 3 && g_vfo == 7120000, "VFO onto 40m: band follows, VFO left on 7.120 (vfo %lld)", g_vfo);
+    g_vfo = 7110500;                            /* fine-tune within the band */
+    wait_s(4.5);
+    CHECK(g_vfo == 7110500, "fine-tuning left alone");
+    app_set_mode(&a, MODE_FT8);
+    CHECK(g_vfo == 7074000, "FT8 goes to 7.074");
+    app_set_mode(&a, MODE_JS8);
+    CHECK(g_vfo == 7110500, "back to JS8 returns to where the net was (7.1105, vfo %lld)", g_vfo);
+    command(&a, "/ghost 40");
+    CHECK(g_vfo == 7107000, "choosing GHOSTNET 40m again resets to 7.107");
     command(&a, "/ghost off");
     CHECK(!a.cfg.ghostnet && g_vfo == 7078000, "off -> normal JS8 7.078 (vfo %lld)", g_vfo);
 
