@@ -77,7 +77,6 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+U` | tune carrier 5 s |
 | `Ctrl+W` | WSPR beacon on/off |
 | `Ctrl+T` | tools (GPS/time, rig, audio) |
-| `Ctrl+L` | force compact / large layout |
 | `F1` | help |
 
 Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
