@@ -432,7 +432,12 @@ static void menu_value(app_t *a, int i, char *out)
         char n[48];
         dev_short_name(dev_root(), a->cfg.rig_device, n, sizeof n);
         if (a->cfg.rig_device[0]) snprintf(out, 64, "%s", n);
-        else snprintf(out, 64, "auto (%s)", a->radio->serial_default + 5);
+        else {
+            char port[160], sn[48];
+            app_rig_port(a, port, sizeof port);
+            dev_short_name(dev_root(), port, sn, sizeof sn);
+            snprintf(out, 64, "auto (%s)", sn);
+        }
         break;
     }
     case MI_AIN: case MI_AOUT: {
@@ -565,7 +570,9 @@ static void render_tools(app_t *a, surface_t *s, int big)
     }
     {
         char p[48];
-        dev_short_name(dev_root(), a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default, p, sizeof p);
+        char port[160];
+        app_rig_port(a, port, sizeof port);
+        dev_short_name(dev_root(), port, p, sizeof p);
         snprintf(b, sizeof b, "CAT %s   audio in %s  out %s", p, a->audio_in_dev[0] ? a->audio_in_dev : "-", a->audio_out_dev[0] ? a->audio_out_dev : "-");
         gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
     }
@@ -699,7 +706,12 @@ static void fill_picker(app_t *a)
         break;
     }
     case 1:
-        snprintf(d, sizeof d, "%s default: %s", a->radio->name, a->radio->serial_default);
+        {
+            char port[160], sn[48];
+            app_rig_port(a, port, sizeof port);
+            dev_short_name(dev_root(), port, sn, sizeof sn);
+            snprintf(d, sizeof d, "finds the %s's port (now: %s)", a->radio->name, sn);
+        }
         a->pick_n = dev_serial_list(dev_root(), d, a->pick, DEV_MAX);
         break;
     case 2: case 3: {

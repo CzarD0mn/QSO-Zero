@@ -73,6 +73,25 @@ int main(void)
     CHECK(find(o, n, "/dev/serial0") < 0 && find(o, n, "/dev/tty1") < 0, "GPS UART and consoles not offered for CAT");
     CHECK(q < q1 && q1 < u, "sorted by name");
 
+    printf("[1b] automatic CAT port\n");
+    {
+        char r3[] = "/tmp/qsoz-serXXXXXX", q[300], v3[160];
+        if (!mkdtemp(r3)) return 1;
+        snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id && cd %s/dev && touch ttyACM0 ttyACM1 ttyS0 serial0 && cd serial/by-id && "
+                 "ln -s ../../ttyACM0 usb-1a86_USB_Dual_Serial_56F3067297-if00 && ln -s ../../ttyACM1 usb-1a86_USB_Dual_Serial_56F3067297-if02", r3, r3);
+        if (system(q)) return 1;
+        /* the X6200 on the user's Cardputer Zero: CH342 dual serial, CAT on if00 */
+        CHECK(!dev_serial_auto(r3, "1a86|USB_Dual_Serial|CH34|CP210", "/dev/ttyACM0", v3, sizeof v3)
+              && strstr(v3, "usb-1a86_USB_Dual_Serial_56F3067297-if00"), "X6200 -> %s", v3);
+        char sn[48];
+        dev_short_name(r3, v3, sn, sizeof sn);
+        CHECK(!strcmp(sn, "ttyACM0"), "shown as ttyACM0");
+        CHECK(!dev_serial_auto(r3, "CP210", "/dev/ttyUSB0", v3, sizeof v3) && (dev_short_name(r3, v3, sn, sizeof sn), !strcmp(sn, "ttyACM0")),
+              "no match and default missing -> first USB serial port (%s), not the GPS UART", v3);
+        CHECK(!dev_serial_auto(r3, "nothing", "/dev/ttyACM1", v3, sizeof v3) && !strcmp(v3, "/dev/ttyACM1"), "existing default kept (%s)", v3);
+        snprintf(q, sizeof q, "rm -rf %s", r3); if (system(q)) {}
+    }
+
     printf("[2] sound devices, split by direction\n");
     n = dev_audio_list(root, 1, "auto", o, DEV_MAX);
     CHECK(n == 4, "Audio in: auto + QMX, Device, ES8388Audio (got %d)", n);
