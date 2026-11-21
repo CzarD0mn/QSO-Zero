@@ -1,7 +1,9 @@
 #include "audio.h"
 #include "core/clock.h"
+#include "core/log.h"
 #include <ctype.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -28,6 +30,7 @@ static struct {
     int (*close)(snd_pcm_t *);
     const char *(*strerror)(int);
     long (*delay)(snd_pcm_t *, long *);
+    int (*wait)(snd_pcm_t *, int);
 } A;
 
 static snd_pcm_t *g_in, *g_out;
@@ -38,7 +41,9 @@ static audio_rx_cb g_cb;
 static void *g_user;
 static char g_err[160];
 static volatile float g_level;
-static volatile long g_frames, g_errors;
+static volatile long g_frames, g_errors, g_reopens;
+static char g_in_dev[96];
+static int g_thread_on;
 static double g_rate_t0;
 static long g_rate_f0;
 static volatile double g_rate;
@@ -48,6 +53,7 @@ void audio_rx_stats(audio_rx_stats_t *o)
 {
     o->rate = g_in ? g_rate : 0;
     o->errors = g_errors;
+    o->reopens = g_reopens;
     snprintf(o->last_error, sizeof o->last_error, "%s", g_rx_err);
 }
 
@@ -72,6 +78,7 @@ static int load_alsa(void)
     SYM(close, "snd_pcm_close");
     SYM(strerror, "snd_strerror");
     SYM(delay, "snd_pcm_delay");
+    SYM(wait, "snd_pcm_wait");
 #undef SYM
     return 0;
 }
@@ -128,7 +135,35 @@ int decim4_run(decim4_t *d, const int16_t *in, int n, int16_t *out)
     return no;
 }
 
-/* ---- capture thread ---- */
+/* ---- capture ---- */
+
+static void sleep_ms(int ms) { struct timespec ts = {ms / 1000, (ms % 1000) * 1000000L}; nanosleep(&ts, NULL); }
+
+/* Open + configure, retrying: some USB codecs (seen: the C-Media chip in the
+ * Xiegu X6200 on the Cardputer Zero) intermittently fail to start a stream
+ * with USB error -71 ("cannot set freq 48000"); a retry usually works. */
+#define SND_PCM_NONBLOCK 1
+static int open_pcm(snd_pcm_t **pcm, const char *dev, int stream, int mode, unsigned latency_us, int tries)
+{
+    int e = -1;
+    for (int t = 0; t < tries; ++t) {
+        if (t) sleep_ms(300);
+        const char *what = stream == SND_PCM_STREAM_CAPTURE ? "input" : "output";
+        if ((e = A.open(pcm, dev, stream, mode)) < 0) {
+            qlog("audio", "%s %s: open failed (try %d/%d): %s", what, dev, t + 1, tries, A.strerror(e));
+            *pcm = NULL;
+            continue;
+        }
+        if ((e = A.set_params(*pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, AUDIO_HW_RATE, 1, latency_us)) < 0) {
+            qlog("audio", "%s %s: 48 kHz mono 16-bit setup failed (try %d/%d): %s", what, dev, t + 1, tries, A.strerror(e));
+            A.close(*pcm); *pcm = NULL;
+            continue;
+        }
+        if (t || stream == SND_PCM_STREAM_CAPTURE) qlog("audio", "%s %s open (48 kHz mono)%s", what, dev, t ? " after retrying" : "");
+        return 0;
+    }
+    return e;
+}
 
 static void *rx_thread(void *arg)
 {
@@ -138,22 +173,45 @@ static void *rx_thread(void *arg)
     decim4_t d;
     decim4_init(&d);
     float peak = 0;
-    int peak_n = 0;
+    int peak_n = 0, consec = 0;
+    double last_ok = clk_mono();
     while (g_run) {
-        long r = A.readi(g_in, buf, CHUNK);
-        double t_end = clk_now();
-        if (r < 0) {
-            ++g_errors;
-            snprintf(g_rx_err, sizeof g_rx_err, "%s", A.strerror((int)r));
-            if (A.recover(g_in, (int)r, 1) < 0) { struct timespec ts = {0, 50000000}; nanosleep(&ts, NULL); }
-            continue;
+        if (!g_in) {                                        /* reopening after a stall */
+            int e = open_pcm(&g_in, g_in_dev, SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK, 100000, 3);
+            if (e < 0) { snprintf(g_rx_err, sizeof g_rx_err, "reopen: %s", A.strerror(e)); sleep_ms(1500); continue; }
+            decim4_init(&d);
+            last_ok = clk_mono();
+            consec = 0;
         }
-        g_frames += r;
-        double tm = clk_mono();
+        int w = A.wait(g_in, 500);
+        long r = w < 0 ? w : A.readi(g_in, buf, CHUNK);
+        double t_end = clk_now(), tm = clk_mono();
+        if (r == -EAGAIN || r == 0) r = 0;
+        else if (r < 0) {
+            ++g_errors; ++consec;
+            snprintf(g_rx_err, sizeof g_rx_err, "%s", A.strerror((int)r));
+            if (g_errors <= 10 || g_errors % 500 == 0) qlog("audio", "input read error #%ld: %s", g_errors, g_rx_err);
+            if (A.recover(g_in, (int)r, 1) < 0) sleep_ms(50);
+        } else {
+            consec = 0;
+            last_ok = tm;
+            g_frames += r;
+        }
         if (tm - g_rate_t0 >= 2.0) {                       /* samples/s over ~2 s */
             g_rate = g_rate_t0 > 0 ? (g_frames - g_rate_f0) / (tm - g_rate_t0) : 0;
             g_rate_t0 = tm; g_rate_f0 = g_frames;
         }
+        /* watchdog: nothing for 3 s, or errors in a row -> close and reopen */
+        if (consec >= 5 || tm - last_ok > 3.0) {
+            qlog("audio", "input %s: %s - restarting it (restart #%ld)", g_in_dev,
+                 consec >= 5 ? "errors in a row" : "no samples for 3 s", g_reopens + 1);
+            A.close(g_in);
+            g_in = NULL;
+            ++g_reopens;
+            g_level = 0;
+            continue;
+        }
+        if (r <= 0) continue;
         for (long i = 0; i < r; ++i) {
             float a = fabsf(buf[i] / 32768.0f);
             if (a > peak) peak = a;
@@ -172,31 +230,25 @@ int audio_open(const char *in_dev, const char *out_dev, audio_rx_cb cb, void *us
 {
     snprintf(g_out_dev, sizeof g_out_dev, "%s", out_dev);
     if (load_alsa()) return -1;
-    int e;
-    if ((e = A.open(&g_in, in_dev, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
+    snprintf(g_in_dev, sizeof g_in_dev, "%s", in_dev);
+    int e = open_pcm(&g_in, in_dev, SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK, 100000, 5);
+    if (e < 0) {
         snprintf(g_err, sizeof g_err, "capture %s: %s", in_dev, A.strerror(e));
-        return -1;
-    }
-    if ((e = A.set_params(g_in, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, AUDIO_HW_RATE, 1, 100000)) < 0) {
-        snprintf(g_err, sizeof g_err, "capture params: %s", A.strerror(e));
-        A.close(g_in); g_in = NULL;
         return -1;
     }
     g_cb = cb;
     g_user = user;
-    g_frames = g_errors = 0; g_rate = 0; g_rate_t0 = 0; g_rate_f0 = 0; g_rx_err[0] = 0;
+    g_frames = g_errors = g_reopens = 0; g_rate = 0; g_rate_t0 = 0; g_rate_f0 = 0; g_rx_err[0] = 0;
     g_run = 1;
-    pthread_create(&g_thr, NULL, rx_thread, NULL);
+    g_thread_on = pthread_create(&g_thr, NULL, rx_thread, NULL) == 0;
     return 0;
 }
 
 void audio_close(void)
 {
-    if (!g_in) return;
     g_run = 0;
-    pthread_join(g_thr, NULL);
-    A.close(g_in);
-    g_in = NULL;
+    if (g_thread_on) { pthread_join(g_thr, NULL); g_thread_on = 0; }
+    if (g_in) { A.close(g_in); g_in = NULL; }
 }
 
 void audio_set_output(const char *out_dev) { snprintf(g_out_dev, sizeof g_out_dev, "%s", out_dev); }
@@ -205,13 +257,8 @@ int audio_play(const float *buf, size_t n, float gain)
 {
     if (load_alsa()) return -1;
     int e;
-    if ((e = A.open(&g_out, g_out_dev, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+    if ((e = open_pcm(&g_out, g_out_dev, SND_PCM_STREAM_PLAYBACK, 0, 60000, 5)) < 0) {
         snprintf(g_err, sizeof g_err, "playback %s: %s", g_out_dev, A.strerror(e));
-        return -1;
-    }
-    if ((e = A.set_params(g_out, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, AUDIO_HW_RATE, 1, 60000)) < 0) {
-        snprintf(g_err, sizeof g_err, "playback params: %s", A.strerror(e));
-        A.close(g_out); g_out = NULL;
         return -1;
     }
     g_abort = 0;

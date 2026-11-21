@@ -60,7 +60,7 @@ jobs:
             make -j"$(nproc)" VERSION="$VERSION"
             out=build/test-results-$(dpkg --print-architecture).txt
             echo "QSO-Zero $VERSION tests on $(dpkg --print-architecture) ($(gcc -dumpmachine), QEMU)" > $out
-            for t in input varicode wspr wsprrx ft8 js8 qsy devices modes battery mixer; do
+            for t in input varicode wspr wsprrx ft8 js8 qsy devices modes battery mixer log; do
               make -s build/test_$t VERSION="$VERSION"
               echo "### test_$t" >> $out
               if build/test_$t > build/t.log 2>&1; then tail -12 build/t.log >> $out

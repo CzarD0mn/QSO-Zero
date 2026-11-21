@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include "audio/audio.h"
 #include "core/clock.h"
+#include "core/log.h"
 #include "dsp/ft8w.h"
 #include "dsp/js8.h"
 #include "dsp/js8_varicode.h"
@@ -121,6 +122,7 @@ void app_status(app_t *a, const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(a->status, sizeof a->status, fmt, ap);
     va_end(ap);
+    qlog("status", "%s", a->status);
     a->status_until = clk_mono() + 6.0;
     a->dirty = 1;
 }
@@ -256,6 +258,7 @@ static int do_qsy(app_t *a, int band, int64_t hz)
     }
     rig_set_mode(a->radio->data_mode, 0);
     a->dial_hz = hz;
+    qlog("rig", "QSY %s %.6f MHz %s %s", k_bands[band].name, hz / 1e6, mode_name(a->mode), a->radio->data_mode);
     app_status(a, "QSY %s %s MHz %s", k_bands[band].name, f, mode_name(a->mode));
     return 0;
 }
@@ -494,12 +497,14 @@ static void rig_connect(app_t *a)
     if (!strcmp(a->cfg.ptt, "rts")) rc.ptt = PTT_RTS;
     if (!strcmp(a->cfg.ptt, "dtr")) rc.ptt = PTT_DTR;
     snprintf(rc.ptt_device, sizeof rc.ptt_device, "%s", a->cfg.ptt_device);
+    qlog("rig", "%s: connecting on %s%s", a->radio->name, rc.serial, a->cfg.rig_device[0] ? "" : " (auto)");
     if (rig_open(&rc) != 0) { app_status(a, "RIG %s: %s", rc.serial, rig_error()); a->dirty = 1; return; }
     int64_t f = rig_get_freq();
     int b = band_from_freq(f);
     if (f > 0) a->dial_hz = f;
     if (b >= 0 && (a->band_mask & (1u << b))) a->band = b;
     a->rig_ok = 1;
+    qlog("rig", "online, VFO %.6f MHz", f / 1e6);
     a->dirty = 1;
 }
 
@@ -525,6 +530,12 @@ static void apply_levels(app_t *a)
     else mixer_get(a->audio_in_dev, 1, &a->mix_in);
     if (a->cfg.audio_out_level >= 0) mixer_set(a->audio_out_dev, 0, a->cfg.audio_out_level, &a->mix_out);
     else mixer_get(a->audio_out_dev, 0, &a->mix_out);
+    for (int k = 0; k < 2; ++k) {
+        const mixer_level_t *m = k ? &a->mix_out : &a->mix_in;
+        if (m->ok) qlog("audio", "%s level: %s %d%%%s%s", k ? "out" : "in", m->control, m->percent, m->muted ? " (MUTED)" : "",
+                        (k ? a->cfg.audio_out_level : a->cfg.audio_in_level) >= 0 ? " (from settings)" : "");
+        else qlog("audio", "%s level: n/a (%s)", k ? "out" : "in", m->error);
+    }
 }
 
 /* Pick the input (recording) and output (playback) devices: the saved
@@ -534,6 +545,15 @@ static void audio_connect(app_t *a)
 {
     const char *root = dev_root_env();
     char in[96] = "", out[96] = "", card[40], note[96] = "";
+    {
+        dev_opt_t o[DEV_MAX];
+        for (int cap = 1; cap >= 0; --cap) {
+            int n = dev_audio_list(root, cap, "", o, DEV_MAX);
+            char l[400] = "";
+            for (int i = 1; i < n; ++i) snprintf(l + strlen(l), sizeof l - strlen(l), "%s%s [%s]", i > 1 ? ", " : "", o[i].value, o[i].desc);
+            qlog("audio", "%s devices: %s", cap ? "input" : "output", n > 1 ? l : "none");
+        }
+    }
     if (a->cfg.audio_in[0] && dev_audio_present(root, a->cfg.audio_in, 1)) snprintf(in, sizeof in, "%s", a->cfg.audio_in);
     else {
         if (a->cfg.audio_in[0]) snprintf(note, sizeof note, "audio in %s not found, using auto. ", a->cfg.audio_in);
@@ -545,6 +565,8 @@ static void audio_connect(app_t *a)
         if (a->cfg.audio_out[0]) snprintf(note + strlen(note), sizeof note - strlen(note), "audio out %s not found, using auto. ", a->cfg.audio_out);
         dev_audio_auto(root, a->radio->audio_hint, 0, card, out, sizeof out);   /* same radio, its playback side */
     }
+    qlog("audio", "using input %s%s, output %s%s", in[0] ? in : "(none)", a->cfg.audio_in[0] ? "" : " (auto)",
+         out[0] ? out : "(none)", a->cfg.audio_out[0] ? "" : " (auto)");
     audio_close();
     a->audio_ok = 0;
     snprintf(a->audio_in_dev, sizeof a->audio_in_dev, "%s", in);
@@ -688,11 +710,16 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         a->status_until = clk_mono() + 60;
     }
     app_poll_battery(a);                                 /* a low-battery warning wins */
+    qlog("config", "callsign %s grid %s  radio %s  CAT %s  audio in %s out %s  levels %d/%d  GPS %s  auto QSY %d  GHOSTNET %d  CQ mod '%s'",
+         a->cfg.callsign, a->cfg.grid, a->radio->id, a->cfg.rig_device[0] ? a->cfg.rig_device : "auto",
+         a->cfg.audio_in[0] ? a->cfg.audio_in : "auto", a->cfg.audio_out[0] ? a->cfg.audio_out : "auto",
+         a->cfg.audio_in_level, a->cfg.audio_out_level, a->cfg.gps_device, a->cfg.auto_qsy, a->cfg.ghostnet, a->cfg.cq_mod);
     return 0;
 }
 
 void app_shutdown(app_t *a)
 {
+    qlog("exit", "shutting down");
     a->quit = 1;
     app_stop_threads(a);
     if (g_hw) {
@@ -924,6 +951,9 @@ static void *tx_thread(void *arg)
             pthread_mutex_unlock(&a->lock);
             continue;
         }
+        qlog("tx", "%s at %.6f MHz + %d Hz: \"%s\"", t.kind == TXK_TUNE ? "TUNE" : t.kind == TXK_WSPR ? "WSPR" : t.kind == TXK_JS8 ? "JS8" : "FT8",
+             a->dial_hz / 1e6, a->tx_off, t.text);
+        if (g_hw && !a->rig_ok) qlog("tx", "radio not connected: no PTT");
         if (g_hw && a->rig_ok && rig_ptt(1)) { app_status(a, "PTT failed: %s", rig_error()); free(audio); goto pop; }
         sleep_until(a, start);
         if (t.kind == TXK_WSPR) a->wspr_tx_slot = floor(start / 120.0) * 120.0;
@@ -943,10 +973,13 @@ static void *tx_thread(void *arg)
             app_add_line(a, &l);
             pthread_mutex_unlock(&a->lock);
         }
-        if (g_hw && a->audio_ok) {
+        if (g_hw && a->audio_out_dev[0]) {          /* plays even if the input failed to open */
+            double t0 = clk_mono();
             int rc = audio_play(audio, n, a->cfg.tx_level);
             if (rc < 0) app_status(a, "TX audio: %s", audio_error());
+            else qlog("tx", "audio %.1f s on %s at %.0f%% drive%s", clk_mono() - t0, a->audio_out_dev, a->cfg.tx_level * 100, rc == 1 ? " (stopped)" : "");
         } else {
+            if (g_hw) qlog("tx", "no audio output device: nothing sent");
             /* no hardware: simulate the airtime */
             double end = clk_now() + n / (double)AUDIO_HW_RATE;
             while (!a->quit && a->tx_enabled && clk_now() < end) {
@@ -957,6 +990,7 @@ static void *tx_thread(void *arg)
         }
         if (g_hw && a->rig_ok) rig_ptt(0);
         a->tx_active = 0;
+        qlog("tx", "done");
         a->tx_progress = 0;
         free(audio);
     pop:
@@ -975,7 +1009,7 @@ static void *tx_thread(void *arg)
 static void *misc_thread(void *arg)
 {
     app_t *a = arg;
-    double last_poll = 0, last_batt = -100;
+    double last_poll = 0, last_batt = -100, last_health = 0;
     long last_wspr_slot = -1;
     srand((unsigned)time(NULL));
     while (!a->quit) {
@@ -1006,6 +1040,16 @@ static void *misc_thread(void *arg)
             last_poll = clk_mono();
         }
         if (clk_mono() - last_batt > 30.0) { app_poll_battery(a); last_batt = clk_mono(); }
+        if (g_hw && clk_mono() - last_health > 60.0) {          /* once a minute: how things are going */
+            last_health = clk_mono();
+            audio_rx_stats_t st;
+            audio_rx_stats(&st);
+            const batt_t *bt = &a->batt.now;
+            qlog("health", "%s %.6f MHz  rig %s  input %s %.0f Hz peak %.0f%% errors %ld restarts %ld  clock %s%s  battery %d%%",
+                 mode_name(a->mode), a->dial_hz / 1e6, a->rig_ok ? "online" : "OFFLINE",
+                 a->audio_ok ? "open" : "CLOSED", st.rate, audio_rx_level() * 100, st.errors, st.reopens,
+                 clk_source() == CLK_GPS ? "GPS" : "system", clk_locked() ? " locked" : "", bt->present ? bt->percent : -1);
+        }
         if (g_hw && a->rig_ok && a->tx_active) {
             float v;
             if (!rig_get_level("SWR", &v)) a->swr = v;

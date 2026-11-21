@@ -10,6 +10,7 @@
 #include "dsp/js8.h"
 #include "dsp/wspr.h"
 #include "audio/audio.h"
+#include "core/log.h"
 #include "gps/gps.h"
 #include "rig/rigctl.h"
 #include "theme.h"
@@ -565,7 +566,7 @@ static void render_tools(app_t *a, surface_t *s, int big)
              clk_locked() ? "LOCKED" : "unlocked", clk_offset());
     gfx_text(s, 4, y, b, clk_locked() ? C_MINT : C_ORANGE, 1); y += 10;
     snprintf(b, sizeof b, "fix %s  sats %d  %.4f %.4f  %s", g.fix ? "yes" : "no", g.sats, g.lat, g.lon, g.grid[0] ? g.grid : "------");
-    gfx_text(s, 4, y, b, C_TEXT, 1); y += 14;
+    gfx_text(s, 4, y, b, C_TEXT, 1); y += 12;
     gfx_text(s, 4, y, "RADIO", C_MAGENTA, sc); y += lh;
     snprintf(b, sizeof b, "%s  hamlib %d  %s", a->radio->name, a->radio->hamlib_model, a->rig_ok ? "online" : rig_error());
     gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, a->rig_ok ? C_MINT : C_ORANGE, 1); y += 10;
@@ -586,7 +587,7 @@ static void render_tools(app_t *a, surface_t *s, int big)
         snprintf(b, sizeof b, "CAT %s   audio in %s  out %s", p, a->audio_in_dev[0] ? a->audio_in_dev : "-", a->audio_out_dev[0] ? a->audio_out_dev : "-");
         gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_TEXT, 1); y += 10;
     }
-    y += draw_wrapped(s, 4, y, a->radio->notes, s->w / FONT_W - 1, 3, C_DIM) * FONT_H + 4;
+    if (s->h > 200) y += draw_wrapped(s, 4, y, a->radio->notes, s->w / FONT_W - 1, 3, C_DIM) * FONT_H + 4;   /* room on HDMI only */
     {
         const batt_t *bt = &a->batt.now;
         if (bt->present) {
@@ -617,8 +618,10 @@ static void render_tools(app_t *a, surface_t *s, int big)
             col = C_RED;
         } else if (audio_rx_level() < 0.0005f)
         { snprintf(b, sizeof b, "input %.0f Hz OK but SILENT: check the radio's USB audio out", st.rate); col = C_ORANGE; }
-        else snprintf(b, sizeof b, "input %.0f Hz, errors %ld", st.rate, st.errors);
-        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, col, 1); y += 14;
+        else snprintf(b, sizeof b, "input %.0f Hz, errors %ld, restarts %ld", st.rate, st.errors, st.reopens);
+        if (st.rate < 1000 && st.reopens && a->audio_ok)
+            snprintf(b + strlen(b), sizeof b - strlen(b), " (restarts %ld)", st.reopens);
+        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, col, 1); y += 12;
     }
     {
         uplink_stats_t u;
@@ -629,6 +632,12 @@ static void render_tools(app_t *a, surface_t *s, int big)
         gfx_text(s, 4, y, b, u.online ? C_MINT : C_DIM, 1); y += 10;
         if (u.last_error[0]) { gfx_text_n(s, 4, y, u.last_error, s->w / FONT_W - 1, C_ORANGE, 1); y += 10; }
         y += 4;
+    }
+    if (log_path()[0]) {
+        snprintf(b, sizeof b, "log: %s", log_path());
+        const char *home = getenv("HOME");
+        if (home && !strncmp(log_path(), home, strlen(home))) snprintf(b, sizeof b, "log: ~%s", log_path() + strlen(home));
+        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_DIM, 1); y += 10;
     }
     gfx_text(s, 4, y, "U tune 5s   W WSPR beacon   X halt TX   +/- TX level", C_CYAN, 1);
 }

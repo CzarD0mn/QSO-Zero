@@ -1,4 +1,5 @@
 #include "uplink.h"
+#include "core/log.h"
 #include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -242,6 +243,7 @@ static void cycle(void)
     g_st.last_check = clk_now();
     if (!online) g_st.dropped += n;
     pthread_mutex_unlock(&g_lock);
+    qlog("net", "%s %s, %d WSPR spot%s %s", g_host, online ? "reachable" : "unreachable", n, n == 1 ? "" : "s", online ? "to send" : "dropped");
     if (!online || !n) return;
 
     const char *rcall = g_rcall(), *rgrid = g_rgrid();
@@ -260,6 +262,7 @@ static void cycle(void)
     g_st.failed += failed;
     g_st.tls_available = g_ctx != NULL;
     pthread_mutex_unlock(&g_lock);
+    qlog("net", "wsprnet: %d by HTTPS, %d by HTTP, %d failed%s%s", https, http, failed, g_st.last_error[0] ? ": " : "", g_st.last_error);
 }
 
 static void *thread_fn(void *arg)

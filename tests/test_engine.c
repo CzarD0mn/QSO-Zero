@@ -290,6 +290,8 @@ static void autoreply(app_t *a)
 static void wspr_cycle(app_t *a)
 {
     printf("[5] WSPR receive cycle through the audio ring and decode thread\n");
+    srand(5);   /* same noise every run: the -25 dB spot is near the decode limit, earlier real-time
+                   sections use a varying amount of rand() */
     double now = clk_now(), start = floor(now / 120) * 120;
     if (now - start > 100) start += 120;       /* too late in this cycle, use the next */
     a->nlines = 0;

@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <grp.h>
+#include <pwd.h>
+#include <unistd.h>
+#include "core/log.h"
 #include <time.h>
 #include "core/app.h"
 #include "core/clock.h"
@@ -35,6 +39,22 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--version")) { printf("qso-zero %s\n", QSOZERO_VERSION); return 0; }
         else { usage(); return 2; }
     }
+    log_open(NULL);
+    {
+        char gl[256] = "";
+        gid_t gs[32];
+        int ng = getgroups(32, gs);
+        for (int i = 0; i < ng; ++i) {
+            struct group *g = getgrgid(gs[i]);
+            snprintf(gl + strlen(gl), sizeof gl - strlen(gl), "%s%s", i ? "," : "", g ? g->gr_name : "?");
+        }
+        struct passwd *pw = getpwuid(getuid());
+        qlog("start", "QSO-Zero %s  user %s (uid %d)  groups %s", QSOZERO_VERSION, pw ? pw->pw_name : "?", (int)getuid(), gl);
+        char args[256] = "";
+        for (int i = 1; i < argc; ++i) snprintf(args + strlen(args), sizeof args - strlen(args), " %s", argv[i]);
+        qlog("start", "args:%s  config %s  hardware %s  fb from launcher %s", args[0] ? args : " (none)", cfg ? cfg : config_default_path(),
+             hw ? "on" : "off (--nohw)", getenv("APPLAUNCH_LINUX_FBDEV_DEVICE") ? getenv("APPLAUNCH_LINUX_FBDEV_DEVICE") : "-");
+    }
     static app_t app;
     app_t *a = &app;
     app_init(a, cfg ? cfg : config_default_path(), hw);
@@ -42,10 +62,15 @@ int main(int argc, char **argv)
     fb_t fb;
     if (fb_open(&fb, fbdev ? fbdev : a->cfg.display)) {
         fprintf(stderr, "qso-zero: no framebuffer (is the LCD/HDMI fb enabled?)\n");
+        qlog("display", "no framebuffer (%s)", fbdev ? fbdev : a->cfg.display);
         app_shutdown(a);
         return 1;
     }
-    if (input_open(a->cfg.keyboard)) fprintf(stderr, "qso-zero: no keyboard found (check /dev/input permissions)\n");
+    qlog("display", "framebuffer %dx%d%s%s", fb.w, fb.h, fb.is_hdmi ? " HDMI" : " LCD", fb.rotate ? " rotated" : "");
+    if (input_open(a->cfg.keyboard)) {
+        fprintf(stderr, "qso-zero: no keyboard found (check /dev/input permissions)\n");
+        qlog("input", "no keyboard found (check /dev/input permissions / input group)");
+    } else qlog("input", "keyboard open");
 
     surface_t *compact = surf_new(320, 170), *large = surf_new(LARGE_W, LARGE_H);
     app_start_threads(a);
@@ -63,7 +88,7 @@ int main(int argc, char **argv)
             int h = fb_hdmi_connected();
             if (h != was_hdmi) {
                 fb_close(&fb);
-                if (fb_open(&fb, "auto") == 0) { was_hdmi = fb.is_hdmi; a->dirty = 1; }
+                if (fb_open(&fb, "auto") == 0) { was_hdmi = fb.is_hdmi; a->dirty = 1; qlog("display", "HDMI %s: now %dx%d", h ? "connected" : "removed", fb.w, fb.h); }
             }
         }
         /* redraw on change, at most ~15 fps (keeps the 1 GHz A53 mostly idle) */
@@ -76,9 +101,11 @@ int main(int argc, char **argv)
             fb_present(&fb, s);
         }
     }
+    qlog("exit", "quit from the app");
     app_shutdown(a);
     fb_close(&fb);
     input_close();
+    log_close();
     surf_free(compact);
     surf_free(large);
     return 0;

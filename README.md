@@ -157,6 +157,7 @@ Setup (ESC) has four pickers: **Radio**, **CAT port**, **Audio in** and **Audio 
 * If a saved device isn't plugged in at startup, QSO-Zero uses auto and tells you.
 * **In level / Out level** (under Audio in and Audio out) set the sound card's own recording and playback levels, the same controls `alsamixer` shows (on the X6100/X6200 and Digirig, "Mic" and "Speaker"). Use ←/→ to change them in 5% steps. The first press on a muted control turns it on. They're saved with **Save settings** and reapplied every time the audio connects, so there's no need for `alsactl store` or root. **TX audio level** is QSO-Zero's own transmit drive, applied on top of Out level. Commands: `/inlevel 60`, `/outlevel 45`.
 * **Permissions:** sound devices and their levels need the `audio` group, and CAT needs `dialout`. Installing with `sudo apt install` adds the user who ran it to `dialout`, `audio`, `video` and `input` (reboot to apply). `qso-zero-setup` does the same for any other user. A level that can't be changed shows **n/a**, and the hint line says why.
+* **Unreliable USB audio:** some radios' USB sound chips (the X6200's C-Media chip on the Cardputer Zero, for example) sometimes refuse to start with USB error -71. QSO-Zero retries the open, and restarts the input if samples stop arriving for 3 seconds. Tools shows the input rate, errors and restart count.
 * **Setup › Rescan audio** (or `/rescan`) looks for sound devices again and reconnects. Use it after plugging the radio in while QSO-Zero is running.
 * The Tools screen (Ctrl+T) shows the port and cards in use. The same settings are `rig_device`, `audio_in` and `audio_out` in the config file.
 
@@ -190,6 +191,25 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 * **During transmit** the frequency never changes, and any queued messages are cleared on a band change.
 * **Turning it off:** use ESC › **Auto frequency**, `/qsy off`, or `auto_qsy = 0` in the config. With it off, mode changes leave the VFO alone and the band display just follows the radio. Picking a band explicitly still tunes the radio.
 * **Limiting the band list:** set `bands = 40,30,20` in the config, for example.
+
+## Log file (for troubleshooting)
+
+QSO-Zero writes what it's doing to **`~/.cache/qso-zero/qso-zero.log`**. Each start begins a new file, and the previous run is kept as `qso-zero.log.1`. Tools shows the path.
+
+```sh
+qso-zero-setup --log        # the last 150 lines
+qso-zero-setup --log all    # everything, including the previous run
+```
+
+It records:
+* **Startup:** version, user and groups, config, screen and keyboard.
+* **Radio:** the CAT port and Hamlib model tried, whether the radio answered, each frequency change, and PTT failures.
+* **Audio:** the sound devices found, which input and output were picked, every failed open or retry with ALSA's reason, input restarts, and the In/Out levels.
+* **Transmissions:** what, where, how long the audio played, and on which device.
+* **Other:** GPS, wsprnet results, every status message, and once a minute a health line (rig, input samples/s, peak, errors, clock, battery).
+* **Exit:** how the app ended (quit, signal or crash).
+
+Send the output of `qso-zero-setup --log all` when reporting a problem.
 
 ## wsprnet upload
 

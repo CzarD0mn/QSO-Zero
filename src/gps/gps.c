@@ -1,4 +1,5 @@
 #include "gps.h"
+#include "core/log.h"
 #include "core/clock.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -159,7 +160,8 @@ int gps_start(const char *dev, int baud, int latency_ms)
 {
     g_latency = latency_ms / 1000.0;
     g_fd = open_serial(dev, baud);
-    if (g_fd < 0) return -1;
+    if (g_fd < 0) { qlog("gps", "cannot open %s at %d baud", dev, baud); return -1; }
+    qlog("gps", "reading %s at %d baud", dev, baud);
     g_run = 1;
     if (pthread_create(&g_thr, NULL, gps_thread, NULL)) { close(g_fd); g_fd = -1; return -1; }
     return 0;
