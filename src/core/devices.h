@@ -16,10 +16,21 @@ typedef struct {
  * /dev/ttyUSB# / ttyACM# it points to), then any other ttyUSB / ttyACM. */
 int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int max);
 
-/* ALSA cards with a capture (capture=1) or playback (capture=0) device.
- * "auto"/"same as input" first, then "default", then each card as
- * plughw:CARD=<id>. */
+/* Sound devices of one direction (capture=1: things that record, for
+ * Audio in; capture=0: things that play, for Audio out), one entry per
+ * ALSA PCM device as plughw:CARD=<id>,DEV=<n>. "auto" first, then USB
+ * devices, then built-in / HDMI. */
 int dev_audio_list(const char *root, int capture, const char *auto_desc, dev_opt_t *o, int max);
+
+/* Automatic choice: the best USB sound device of that direction (radio
+ * codecs and the Digirig are USB). hints ('|'-separated) and prefer_card
+ * (a card id, e.g. the input's, for the output) raise the score. Never the
+ * built-in codec or HDMI. Returns 0 and fills out, or -1 if none. */
+int dev_audio_auto(const char *root, const char *hints, int capture, const char *prefer_card,
+                   char *out, int outsz);
+
+/* Is this configured device (plughw:CARD=X[,DEV=n]) plugged in? */
+int dev_audio_present(const char *root, const char *value, int capture);
 
 /* Short display name for a config value: by-id path -> ttyUSB0,
  * plughw:CARD=QMX -> QMX, "" -> auto. */

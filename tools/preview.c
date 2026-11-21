@@ -182,6 +182,11 @@ int main(int argc, char **argv)
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_tools_batt.ppm", dir); save_ppm(c, 3, p);
     a.screen = 0;
+    a.screen = 1; a.menu_sel = 26;
+    { keyev_t e2 = {K_ENTER, 0, 0}; ui_key(&a, &e2); }
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_pick_aout.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 0;
     printf("wrote previews to %s\n", dir);
     return 0;
 }
