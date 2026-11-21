@@ -464,6 +464,13 @@ void app_set_mode(app_t *a, op_mode_t m)
 
 /* ---- hardware connections (startup and the Setup pickers) ---------- */
 
+void app_rig_port(const app_t *a, char *out, int outsz)
+{
+    const char *r = getenv("QSOZERO_DEVROOT");
+    if (a->cfg.rig_device[0]) { snprintf(out, outsz, "%s", a->cfg.rig_device); return; }
+    dev_serial_auto(r ? r : "", a->radio->serial_hint, a->radio->serial_default, out, outsz);
+}
+
 static void apply_band_mask(app_t *a)
 {
     a->band_mask = a->radio->bands ? a->radio->bands : BANDS_ALL;
@@ -481,7 +488,7 @@ static void rig_connect(app_t *a)
     a->rig_ok = 0;
     rig_close();
     rig_config_t rc = {.profile = a->radio, .baud = a->cfg.rig_baud, .spawn = a->cfg.spawn_rigctld, .port = 4532};
-    snprintf(rc.serial, sizeof rc.serial, "%s", a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default);
+    app_rig_port(a, rc.serial, sizeof rc.serial);
     rc.ptt = a->radio->ptt;
     if (!strcmp(a->cfg.ptt, "cat")) rc.ptt = PTT_CAT;
     if (!strcmp(a->cfg.ptt, "rts")) rc.ptt = PTT_RTS;
@@ -579,8 +586,9 @@ static void rig_reconnect(app_t *a)
     if (!hw_change_ok(a)) return;
     a->rig_busy = 1;
     a->rig_ok = 0;
-    app_status(a, "connecting to %s on %s...", a->radio->name,
-               a->cfg.rig_device[0] ? a->cfg.rig_device : a->radio->serial_default);
+    char port[160];
+    app_rig_port(a, port, sizeof port);
+    app_status(a, "connecting to %s on %s...", a->radio->name, port);
     pthread_t t;
     if (pthread_create(&t, NULL, rig_reconnect_thread, a)) { a->rig_busy = 0; return; }
     pthread_detach(t);

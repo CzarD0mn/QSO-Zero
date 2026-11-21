@@ -16,6 +16,11 @@ typedef struct {
  * /dev/ttyUSB# / ttyACM# it points to), then any other ttyUSB / ttyACM. */
 int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int max);
 
+/* Automatic CAT port: the /dev/serial/by-id entry matching one of the
+ * '|'-separated hints (first interface, if00, preferred), else `def` if it
+ * exists, else the first ttyUSB/ttyACM. Writes the path ("" if nothing). */
+int dev_serial_auto(const char *root, const char *hints, const char *def, char *out, int outsz);
+
 /* Sound devices of one direction (capture=1: things that record, for
  * Audio in; capture=0: things that play, for Audio out), one entry per
  * ALSA PCM device as plughw:CARD=<id>,DEV=<n>. "auto" first, then USB

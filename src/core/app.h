@@ -161,7 +161,8 @@ void app_set_ghostnet(app_t *a, int on);          /* on: JS8 on the nearest GHOS
 void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET default frequency on this band */
 void app_use_rig_device(app_t *a, const char *dev);
 void app_use_audio(app_t *a, const char *in, const char *out);
-void app_rescan_audio(app_t *a);             /* look for sound devices again and reconnect */      /* next/previous band the radio covers */
+void app_rescan_audio(app_t *a);
+void app_rig_port(const app_t *a, char *out, int outsz);   /* the CAT port in use (saved or auto) */             /* look for sound devices again and reconnect */      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */
 unsigned app_bands(const app_t *a);         /* usable band bits */
 void app_status(app_t *a, const char *fmt, ...);
