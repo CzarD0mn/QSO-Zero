@@ -117,6 +117,8 @@ static int read_cards(const char *root, card_t *c, int max)
             q[strcspn(q, "\r\n")] = 0;
             char *at = strstr(q, " at usb-");
             if (at) *at = 0;
+            char *inc = strstr(q, " Electronics Inc.");             /* "C-Media Electronics Inc. USB ..." */
+            if (inc) memmove(inc, inc + 17, strlen(inc + 17) + 1);
             snprintf(k->longname, sizeof k->longname, "%s", q);
         }
         ++n;
@@ -206,13 +208,15 @@ int dev_audio_list(const char *root, int capture, const char *auto_desc, dev_opt
         ep_value(k, ep[i].dev, v, sizeof v);
         int multi = 0;
         for (int j = 0; j < ne; ++j) if (j != i && ep[j].card == ep[i].card) multi = 1;
-        if (multi) snprintf(l, sizeof l, "%s,%d", k->id, ep[i].dev); else snprintf(l, sizeof l, "%s", k->id);
+        /* like other computers show it: "Microphone (USB Audio Device)" / "Speakers (USB Audio Device)" */
+        if (multi) snprintf(l, sizeof l, "%s,%d %s", k->id, ep[i].dev, capture ? "(input)" : "(output)");
+        else snprintf(l, sizeof l, "%s %s", k->id, capture ? "(input)" : "(output)");
         /* device name, minus driver noise like "(null)-" and repeats of the card name */
         snprintf(pn, sizeof pn, "%s", !strncmp(ep[i].pname, "(null)-", 7) ? ep[i].pname + 7 : ep[i].pname);
         const char *cn = is_usb(k) && k->longname[0] ? k->longname : k->name;
         int show_pn = multi && pn[0] && !strstr(cn, pn);
-        snprintf(d, sizeof d, "%s: %s%s%s", is_usb(k) ? "USB" : is_hdmi(k) ? "HDMI" : "built-in", cn,
-                 show_pn ? " - " : "", show_pn ? pn : "");
+        snprintf(d, sizeof d, "%s %s: %s%s%s", is_usb(k) ? "USB" : is_hdmi(k) ? "HDMI" : "built-in",
+                 capture ? "in" : "out", cn, show_pn ? " - " : "", show_pn ? pn : "");
         set(&o[n++], v, l, d);
     }
     qsort(o + first, n - first, sizeof *o, cmp_dev);
