@@ -179,6 +179,22 @@ int main(void)
     command(&a, "/ghost off");
     CHECK(!a.cfg.ghostnet && g_vfo == 7078000, "off -> normal JS8 7.078 (vfo %lld)", g_vfo);
 
+    printf("[11] FT4\n");
+    a.tx_active = 0;
+    app_set_mode(&a, MODE_FT8);
+    app_set_band(&a, 5);
+    app_set_mode(&a, MODE_FT4);
+    CHECK(g_vfo == 14080000, "FT4 on 20m -> 14.080 (vfo %lld)", g_vfo);
+    app_set_band(&a, 3);
+    CHECK(g_vfo == 7047500, "FT4 on 40m -> 7.0475 (vfo %lld)", g_vfo);
+    app_step_band(&a, -1);
+    CHECK(a.band == 1 && g_vfo == 3575000, "40m -> previous skips 60m (no FT4) to 80m 3.575 (band %d)", a.band);
+    long long before4 = g_vfo;
+    app_set_band(&a, 2);
+    CHECK(g_vfo == before4 && strstr(a.status, "no FT4 frequency on 60m"), "60m: no FT4 frequency, VFO left alone (\"%s\")", a.status);
+    app_set_mode(&a, MODE_JS8);
+    app_set_band(&a, 5);
+
     printf("[10] Setup lists only the current mode's options\n");
     {
         /* item 1 is FT8's (CQ modifier), 2-15 JS8's (incl. GHOSTNET + APRS), 16-18 WSPR's (see views.c) */

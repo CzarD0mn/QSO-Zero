@@ -1,4 +1,4 @@
-/* QSO-Zero - QSO logic: FT8 auto-sequencer, JS8 message assembly, ADIF log.
+/* QSO-Zero - QSO logic: FT8/FT4 auto-sequencer, JS8 message assembly, ADIF log.
  * All functions here are called with a->lock held. */
 #include <ctype.h>
 #include <math.h>
@@ -101,12 +101,12 @@ static void advance(app_t *a, const char *third, int their_snr_of_us, int rx_snr
         snprintf(m, sizeof m, "%s %s RR73", s->dx, a->cfg.callsign);
         s->st = SEQ_RR73;
         queue_ft8(a, m);
-        adif_log(a, s->dx, s->dxgrid, "FT8", s->snr_sent, s->snr_rcvd);
+        adif_log(a, s->dx, s->dxgrid, mode_name(a->mode), s->snr_sent, s->snr_rcvd);
     } else if (!strcmp(third, "RR73") || !strcmp(third, "RRR")) {
         snprintf(m, sizeof m, "%s %s 73", s->dx, a->cfg.callsign);
         s->st = SEQ_73;
         queue_ft8(a, m);
-        adif_log(a, s->dx, s->dxgrid, "FT8", s->snr_sent, s->snr_rcvd);
+        adif_log(a, s->dx, s->dxgrid, mode_name(a->mode), s->snr_sent, s->snr_rcvd);
     } else if (!strcmp(third, "73")) {
         app_status(a, "QSO with %s complete", s->dx);
         seq_reset(a);
@@ -242,7 +242,8 @@ void adif_log(app_t *a, const char *call, const char *grid, const char *mode, in
 #define ADF(tag, v) fprintf(f, "<%s:%zu>%s ", tag, strlen(v), v)
     ADF("call", call);
     if (grid && *grid) ADF("gridsquare", grid);
-    ADF("mode", mode);
+    if (!strcmp(mode, "FT4")) { ADF("mode", "MFSK"); ADF("submode", "FT4"); }   /* ADIF 3.1: FT4 is a submode of MFSK */
+    else ADF("mode", mode);
     ADF("rst_sent", rs);
     ADF("rst_rcvd", rr);
     char d[16], h[16];

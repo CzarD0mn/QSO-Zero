@@ -16,6 +16,6 @@ double clk_age(void);                 /* seconds since last GPS sample */
 
 /* Seconds into the current T/R period of length period_s, and the UTC
  * start of that period. */
-double clk_period_pos(int period_s, double *period_start);
+double clk_period_pos(double period_s, double *period_start);
 
 #endif

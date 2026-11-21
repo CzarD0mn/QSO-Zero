@@ -73,7 +73,7 @@ clk_source_t clk_source(void) { return g_have_gps ? CLK_GPS : CLK_SYSTEM; }
 double clk_age(void) { return clk_mono() - g_last_gps_mono; }
 int clk_locked(void) { return g_have_gps && g_ns >= 3 && clk_age() < 120.0; }
 
-double clk_period_pos(int period_s, double *start)
+double clk_period_pos(double period_s, double *start)
 {
     double t = clk_now();
     double s = floor(t / period_s) * period_s;

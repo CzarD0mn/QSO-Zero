@@ -4,6 +4,7 @@
  *  3. APRS: the frames QSO-Zero queues, reassembled the way JS8Call does
  *     (concatenate, strip, check + drop the 16-bit checksum), give exactly
  *     the APRS text JS8Call relays to APRS-IS */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,6 +93,26 @@ int main(void)
     if (enc >= 0) ft8_roundtrip("CQ PARKS KN4CRD EM73", got);
     CHECK(enc < 0 || strcmp(got, "CQ PARKS KN4CRD EM73"), "5-letter CQ PARKS can't go out as typed (%s)", enc < 0 ? "encoder refuses it" : got);
 
+    printf("[2b] FT4 over the air\n");
+    {
+        const char *m4[] = {"CQ POTA KN4CRD EM73", "KN4CRD W1AW FN31", "W1AW KN4CRD -07", "KN4CRD W1AW RR73"};
+        for (int i = 0; i < 4; ++i) {
+            uint8_t t4[105];
+            int nt = ft8w_encode(FT8W_FT4, m4[i], t4);
+            int n = 75 * 1200;
+            float *f = calloc(n, sizeof(float));
+            int16_t *pcm = calloc(n, sizeof(int16_t));
+            ft8w_synth(FT8W_FT4, t4, nt, 1200, 12000, 1.0f, f + 6000);   /* on time: +0.5 s */
+            for (int k = 0; k < n; ++k) pcm[k] = (int16_t)(f[k] * 6000 + (rand() % 400 - 200));
+            ft8w_t *w = ft8w_new(FT8W_FT4, 12000, 100, 3000);
+            ft8w_decode_t d[8];
+            int nd = ft8w_decode(w, pcm, (int)(5.8 * 12000), d, 8);
+            CHECK(nt == 105 && nd >= 1 && !strcmp(d[0].text, m4[i]) && fabsf(d[0].dt) < 0.05f,
+                  "FT4 %-20s -> \"%s\" dt %+.2f", m4[i], nd ? d[0].text : "", nd ? d[0].dt : 0);
+            ft8w_free(w); free(f); free(pcm);
+        }
+    }
+
     printf("[3] the auto-sequencer's CQ\n");
     app_init(&a, "/nonexistent", 0);
     snprintf(a.cfg.callsign, sizeof a.cfg.callsign, "KN4CRD");
@@ -107,6 +128,14 @@ int main(void)
     app_call_cq(&a);
     CHECK(a.ntxq == 1 && !strcmp(a.txq[0].text, "CQ KN4CRD EM73"), "none -> plain \"%s\"", a.ntxq ? a.txq[0].text : "");
     app_halt_tx(&a); a.ntxq = 0;
+    app_set_mode(&a, MODE_FT4);
+    app_set_cq_mod(&a, "SOTA");
+    app_call_cq(&a);
+    CHECK(a.mode == MODE_FT4 && a.ntxq == 1 && !strcmp(a.txq[0].text, "CQ SOTA KN4CRD EM73"), "FT4 CQ uses the modifier too: \"%s\"", a.ntxq ? a.txq[0].text : "");
+    CHECK(mode_period(&a) == 7.5, "FT4 period 7.5 s");
+    app_halt_tx(&a); a.ntxq = 0;
+    app_set_cq_mod(&a, "none");
+    app_set_mode(&a, MODE_FT8);
 
     printf("[4] JS8 -> APRS frames, as a JS8Call relay sees them\n");
     app_set_mode(&a, MODE_JS8);

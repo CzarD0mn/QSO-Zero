@@ -10,7 +10,9 @@
 #include "audio/mixer.h"
 #include "rig/radios.h"
 
-typedef enum { MODE_FT8 = 0, MODE_JS8, MODE_WSPR, MODE_COUNT } op_mode_t;
+typedef enum { MODE_FT8 = 0, MODE_FT4, MODE_JS8, MODE_WSPR, MODE_COUNT } op_mode_t;
+/* FT8 and FT4 share messages, the auto-sequencer and the CQ modifier */
+static inline int mode_is_ft(op_mode_t m) { return m == MODE_FT8 || m == MODE_FT4; }
 
 #define LINE_CQ      0x01
 #define LINE_TOME    0x02
@@ -131,12 +133,12 @@ typedef struct app {
     volatile int quit;
 } app_t;
 
-typedef struct { const char *name; int64_t ft8, js8, wspr, lo, hi; } band_t;
+typedef struct { const char *name; int64_t ft8, js8, wspr, lo, hi, ft4; } band_t;   /* ft4 0 = none on that band */
 const band_t *band_table(int *count);
 
 const char *mode_name(op_mode_t m);
 int  grid_distance_km(const char *g1, const char *g2);
-int  mode_period(const app_t *a);
+double mode_period(const app_t *a);    /* seconds: FT8 15, FT4 7.5, JS8 by speed, WSPR 120 */
 
 int  app_init(app_t *a, const char *config_path, int hw);
 void app_shutdown(app_t *a);
