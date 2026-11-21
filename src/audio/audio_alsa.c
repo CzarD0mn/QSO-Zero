@@ -31,6 +31,7 @@ static struct {
     const char *(*strerror)(int);
     long (*delay)(snd_pcm_t *, long *);
     int (*wait)(snd_pcm_t *, int);
+    int (*start)(snd_pcm_t *);
 } A;
 
 static snd_pcm_t *g_in, *g_out;
@@ -44,6 +45,7 @@ static volatile float g_level;
 static volatile long g_frames, g_errors, g_reopens;
 static char g_in_dev[96];
 static int g_thread_on;
+static volatile int g_rx_pause, g_rx_paused;   /* TX asks RX to let go of a half-duplex USB codec */
 static double g_rate_t0;
 static long g_rate_f0;
 static volatile double g_rate;
@@ -79,6 +81,7 @@ static int load_alsa(void)
     SYM(strerror, "snd_strerror");
     SYM(delay, "snd_pcm_delay");
     SYM(wait, "snd_pcm_wait");
+    SYM(start, "snd_pcm_start");
 #undef SYM
     return 0;
 }
@@ -159,7 +162,14 @@ static int open_pcm(snd_pcm_t **pcm, const char *dev, int stream, int mode, unsi
             A.close(*pcm); *pcm = NULL;
             continue;
         }
-        if (t || stream == SND_PCM_STREAM_CAPTURE) qlog("audio", "%s %s open (48 kHz mono)%s", what, dev, t ? " after retrying" : "");
+        /* snd_pcm_set_params() sets the start threshold to the whole buffer, so a
+         * capture stream read in 20 ms pieces would never start: start it now. */
+        if (stream == SND_PCM_STREAM_CAPTURE && (e = A.start(*pcm)) < 0) {
+            qlog("audio", "%s %s: start failed (try %d/%d): %s", what, dev, t + 1, tries, A.strerror(e));
+            A.close(*pcm); *pcm = NULL;
+            continue;
+        }
+        if (t || stream == SND_PCM_STREAM_CAPTURE) qlog("audio", "%s %s open and running (48 kHz mono)%s", what, dev, t ? " after retrying" : "");
         return 0;
     }
     return e;
@@ -176,6 +186,15 @@ static void *rx_thread(void *arg)
     int peak_n = 0, consec = 0;
     double last_ok = clk_mono();
     while (g_run) {
+        if (g_rx_pause) {                                   /* transmitting on a half-duplex codec */
+            if (g_in) { A.close(g_in); g_in = NULL; }
+            g_rx_paused = 1;
+            g_level = 0;
+            sleep_ms(10);
+            last_ok = clk_mono();
+            continue;
+        }
+        g_rx_paused = 0;
         if (!g_in) {                                        /* reopening after a stall */
             int e = open_pcm(&g_in, g_in_dev, SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK, 100000, 3);
             if (e < 0) { snprintf(g_rx_err, sizeof g_rx_err, "reopen: %s", A.strerror(e)); sleep_ms(1500); continue; }
@@ -192,6 +211,7 @@ static void *rx_thread(void *arg)
             snprintf(g_rx_err, sizeof g_rx_err, "%s", A.strerror((int)r));
             if (g_errors <= 10 || g_errors % 500 == 0) qlog("audio", "input read error #%ld: %s", g_errors, g_rx_err);
             if (A.recover(g_in, (int)r, 1) < 0) sleep_ms(50);
+            else A.start(g_in);                             /* recover re-prepares; capture must be started again */
         } else {
             consec = 0;
             last_ok = tm;
@@ -257,8 +277,21 @@ int audio_play(const float *buf, size_t n, float gain)
 {
     if (load_alsa()) return -1;
     int e;
-    if ((e = open_pcm(&g_out, g_out_dev, SND_PCM_STREAM_PLAYBACK, 0, 60000, 5)) < 0) {
+    /* same 100 ms buffer as capture: USB codecs that tie the two directions
+     * together refuse a second stream with different period sizes */
+    int paused = 0;
+    e = open_pcm(&g_out, g_out_dev, SND_PCM_STREAM_PLAYBACK, 0, 100000, 2);
+    if (e == -EBUSY && g_thread_on) {
+        /* half-duplex codec (seen on the Xiegu X6200): let go of the input while transmitting */
+        qlog("audio", "output %s busy while the input is open: pausing the input for this transmission", g_out_dev);
+        g_rx_pause = 1;
+        paused = 1;
+        for (int i = 0; i < 100 && !g_rx_paused; ++i) sleep_ms(5);
+        e = open_pcm(&g_out, g_out_dev, SND_PCM_STREAM_PLAYBACK, 0, 100000, 4);
+    }
+    if (e < 0) {
         snprintf(g_err, sizeof g_err, "playback %s: %s", g_out_dev, A.strerror(e));
+        g_rx_pause = 0;
         return -1;
     }
     g_abort = 0;
@@ -276,12 +309,17 @@ int audio_play(const float *buf, size_t n, float gain)
             pcm[i] = (int16_t)lrintf(v * 32767.0f);
         }
         long w = A.writei(g_out, pcm, m);
-        if (w < 0) { if (A.recover(g_out, (int)w, 1) < 0) { rc = -1; break; } continue; }
+        if (w < 0) {
+            qlog("audio", "output write error: %s", A.strerror((int)w));
+            if (A.recover(g_out, (int)w, 1) < 0) { rc = -1; break; }
+            continue;
+        }
         pos += (size_t)w;
     }
     if (rc == 1) A.drop(g_out); else A.drain(g_out);
     A.close(g_out);
     g_out = NULL;
+    if (paused) g_rx_pause = 0;                    /* RX reopens the input */
     return rc;
 }
 

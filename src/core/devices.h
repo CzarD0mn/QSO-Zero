@@ -20,6 +20,10 @@ int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int m
  * '|'-separated hints (first interface, if00, preferred), else `def` if it
  * exists, else the first ttyUSB/ttyACM. Writes the path ("" if nothing). */
 int dev_serial_auto(const char *root, const char *hints, const char *def, char *out, int outsz);
+/* All /dev/serial/by-id ports matching the hints, most likely CAT port
+ * first (a "@ifNN" token in the hints names the radio's CAT interface).
+ * Returns how many (<= max). */
+int dev_serial_candidates(const char *root, const char *hints, char out[][160], int max);
 
 /* Sound devices of one direction (capture=1: things that record, for
  * Audio in; capture=0: things that play, for Audio out), one entry per

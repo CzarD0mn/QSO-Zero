@@ -224,7 +224,7 @@ int rig_ptt(int on)
         r = 0;
     }
     if (r == 0) g_ptt = on;
-    if (r != 0) qlog("rig", "PTT %s failed: %s", on ? "on" : "off", g_err);
+    if (r != 0 && (on || g_sock >= 0)) qlog("rig", "PTT %s failed: %s", on ? "on" : "off", g_err);
     pthread_mutex_unlock(&g_lock);
     return r;
 }

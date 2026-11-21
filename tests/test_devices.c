@@ -80,12 +80,17 @@ int main(void)
         snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id && cd %s/dev && touch ttyACM0 ttyACM1 ttyS0 serial0 && cd serial/by-id && "
                  "ln -s ../../ttyACM0 usb-1a86_USB_Dual_Serial_56F3067297-if00 && ln -s ../../ttyACM1 usb-1a86_USB_Dual_Serial_56F3067297-if02", r3, r3);
         if (system(q)) return 1;
-        /* the X6200 on the user's Cardputer Zero: CH342 dual serial, CAT on if00 */
-        CHECK(!dev_serial_auto(r3, "1a86|USB_Dual_Serial|CH34|CP210", "/dev/ttyACM0", v3, sizeof v3)
-              && strstr(v3, "usb-1a86_USB_Dual_Serial_56F3067297-if00"), "X6200 -> %s", v3);
+        /* the X6200 on the user's Cardputer Zero: CH342 dual serial; the radio answered on if02 */
+        CHECK(!dev_serial_auto(r3, "1a86|USB_Dual_Serial|CH34|CP210|@if02", "/dev/ttyACM1", v3, sizeof v3)
+              && strstr(v3, "usb-1a86_USB_Dual_Serial_56F3067297-if02"), "X6200 -> %s", v3);
         char sn[48];
         dev_short_name(r3, v3, sn, sizeof sn);
-        CHECK(!strcmp(sn, "ttyACM0"), "shown as ttyACM0");
+        CHECK(!strcmp(sn, "ttyACM1"), "shown as ttyACM1");
+        char cand[4][160];
+        int nc = dev_serial_candidates(r3, "1a86|USB_Dual_Serial|CH34|CP210|@if02", cand, 4);
+        CHECK(nc == 2 && strstr(cand[0], "-if02") && strstr(cand[1], "-if00"), "fallback order: if02, then if00 (%d)", nc);
+        nc = dev_serial_candidates(r3, "1a86", cand, 4);
+        CHECK(nc == 2 && strstr(cand[0], "-if00"), "no @ifNN: first interface first");
         CHECK(!dev_serial_auto(r3, "CP210", "/dev/ttyUSB0", v3, sizeof v3) && (dev_short_name(r3, v3, sn, sizeof sn), !strcmp(sn, "ttyACM0")),
               "no match and default missing -> first USB serial port (%s), not the GPS UART", v3);
         CHECK(!dev_serial_auto(r3, "nothing", "/dev/ttyACM1", v3, sizeof v3) && !strcmp(v3, "/dev/ttyACM1"), "existing default kept (%s)", v3);

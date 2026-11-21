@@ -498,7 +498,19 @@ static void rig_connect(app_t *a)
     if (!strcmp(a->cfg.ptt, "dtr")) rc.ptt = PTT_DTR;
     snprintf(rc.ptt_device, sizeof rc.ptt_device, "%s", a->cfg.ptt_device);
     qlog("rig", "%s: connecting on %s%s", a->radio->name, rc.serial, a->cfg.rig_device[0] ? "" : " (auto)");
-    if (rig_open(&rc) != 0) { app_status(a, "RIG %s: %s", rc.serial, rig_error()); a->dirty = 1; return; }
+    int ok = rig_open(&rc) == 0;
+    if (!ok && !a->cfg.rig_device[0]) {                   /* auto: try the radio's other serial interfaces */
+        const char *r = getenv("QSOZERO_DEVROOT");
+        char c[4][160];
+        int nc = dev_serial_candidates(r ? r : "", a->radio->serial_hint, c, 4);
+        for (int i = 0; i < nc && !ok; ++i) {
+            if (!strcmp(c[i], rc.serial)) continue;
+            qlog("rig", "no answer on %s, trying %s", rc.serial, c[i]);
+            snprintf(rc.serial, sizeof rc.serial, "%s", c[i]);
+            ok = rig_open(&rc) == 0;
+        }
+    }
+    if (!ok) { app_status(a, "RIG %s: %s", rc.serial, rig_error()); a->dirty = 1; return; }
     int64_t f = rig_get_freq();
     int b = band_from_freq(f);
     if (f > 0) a->dial_hz = f;
