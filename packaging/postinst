@@ -2,6 +2,19 @@
 set -e
 if [ "$1" = configure ]; then
     if [ -d /run/systemd/system ]; then systemctl daemon-reload || true; fi
+    # Give the user who installed it access to the radio (dialout), sound
+    # devices and their levels (audio), the screen (video) and keyboard
+    # (input). Takes effect at the next login / reboot.
+    U="${SUDO_USER:-}"
+    if [ -n "$U" ] && [ "$U" != root ] && id "$U" >/dev/null 2>&1; then
+        added=""
+        for g in dialout audio video input; do
+            if getent group "$g" >/dev/null && ! id -nG "$U" | tr ' ' '\n' | grep -qx "$g"; then
+                usermod -aG "$g" "$U" && added="$added $g"
+            fi
+        done
+        if [ -n "$added" ]; then echo "QSO-Zero: added $U to:$added (reboot to apply)"; fi
+    fi
     cat <<'MSG'
 
 QSO-Zero installed.

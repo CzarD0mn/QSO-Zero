@@ -518,6 +518,15 @@ static void card_of(const char *v, char *out, size_t sz)
     snprintf(out, sz, "%.*s", (int)strcspn(c, ","), c);
 }
 
+/* Sound card levels: apply the saved ones (no alsactl / root needed), else read. */
+static void apply_levels(app_t *a)
+{
+    if (a->cfg.audio_in_level >= 0) mixer_set(a->audio_in_dev, 1, a->cfg.audio_in_level, &a->mix_in);
+    else mixer_get(a->audio_in_dev, 1, &a->mix_in);
+    if (a->cfg.audio_out_level >= 0) mixer_set(a->audio_out_dev, 0, a->cfg.audio_out_level, &a->mix_out);
+    else mixer_get(a->audio_out_dev, 0, &a->mix_out);
+}
+
 /* Pick the input (recording) and output (playback) devices: the saved
  * choice if it's plugged in, otherwise automatic (the radio's USB sound
  * card). Then (re)open capture. */
@@ -549,6 +558,22 @@ static void audio_connect(app_t *a)
     a->audio_ok = audio_open(in, out, app_audio_in, a) == 0;
     if (!a->audio_ok) app_status(a, "%sAUDIO: %s", note, audio_error());
     else if (note[0]) app_status(a, "%s", note);
+    apply_levels(a);
+    a->dirty = 1;
+}
+
+void app_audio_level(app_t *a, int capture, int delta)
+{
+    mixer_level_t *m = capture ? &a->mix_in : &a->mix_out;
+    const char *dev = capture ? a->audio_in_dev : a->audio_out_dev;
+    if (!g_hw) { app_status(a, "hardware is off (--nohw)"); return; }
+    if (!m->ok) { app_status(a, "%s", m->error[0] ? m->error : "no level control"); return; }
+    int v = m->percent + delta;
+    if (m->muted && delta > 0) v = m->percent;                /* first press just unmutes */
+    if (mixer_set(dev, capture, v, m) == 0) {
+        if (capture) a->cfg.audio_in_level = m->percent; else a->cfg.audio_out_level = m->percent;
+        app_status(a, "%s level %d%% (%s)", capture ? "audio in" : "audio out", m->percent, m->control);
+    } else app_status(a, "%s", m->error);
     a->dirty = 1;
 }
 
@@ -1167,6 +1192,11 @@ static int handle_command(app_t *a, char *cmd)
     else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/cqmod")) app_set_cq_mod(a, arg);
     else if (!strcmp(cmd, "/rescan")) app_rescan_audio(a);
+    else if (!strcmp(cmd, "/inlevel") || !strcmp(cmd, "/outlevel")) {
+        int cap = cmd[1] == 'i';
+        mixer_level_t *m = cap ? &a->mix_in : &a->mix_out;
+        app_audio_level(a, cap, atoi(arg) - (m->ok ? m->percent : 0));
+    }
     else if (!strcmp(cmd, "/aprspos") || !strcmp(cmd, "/aprsgrid")) app_aprs_position(a);
     else if (!strcmp(cmd, "/aprs") || !strcmp(cmd, "/sms") || !strcmp(cmd, "/email")) {
         char first[64] = "";

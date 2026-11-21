@@ -27,6 +27,7 @@ typedef struct {
     int  rx_offset;          /* audio Hz */
     int  tx_offset;
     char log_path[160];
+    int  audio_in_level, audio_out_level;   /* sound card mixer %, -1 = leave as it is */
     int  auto_qsy;           /* move the VFO to the mode's standard frequency automatically */
     char bands[64];          /* optional band list, e.g. "40,30,20"; blank = all the radio covers */
     char cq_mod[8];          /* FT8 CQ modifier: 1-4 letters or 3 digits (POTA, DX, ...) */
