@@ -440,8 +440,9 @@ static void menu_value(app_t *a, int i, char *out)
         char n[48];
         dev_short_name(dev_root(), v, n, sizeof n);
         const char *cur = i == MI_AIN ? a->audio_in_dev : a->audio_out_dev;
-        if (v[0]) snprintf(out, 64, "%s", n);
-        else if (cur[0]) { dev_short_name(dev_root(), cur, n, sizeof n); snprintf(out, 64, "auto (%s)", n); }
+        const char *dir = i == MI_AIN ? "in" : "out";
+        if (v[0]) snprintf(out, 64, "%s %s", n, dir);
+        else if (cur[0]) { dev_short_name(dev_root(), cur, n, sizeof n); snprintf(out, 64, "auto (%s %s)", n, dir); }
         else snprintf(out, 64, "auto (none found)");
         break;
     }
