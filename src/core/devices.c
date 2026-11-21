@@ -82,7 +82,7 @@ int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int m
 
 /* ---- sound devices -------------------------------------------------- */
 
-typedef struct { int num; char id[32]; char driver[32]; char name[80]; } card_t;
+typedef struct { int num; char id[32]; char driver[32]; char name[80]; char longname[80]; } card_t;
 
 static int read_cards(const char *root, card_t *c, int max)
 {
@@ -111,7 +111,14 @@ static int read_cards(const char *root, card_t *c, int max)
         memcpy(k->driver, p, dl);
         snprintf(k->name, sizeof k->name, "%s", dash ? dash + 3 : k->id);
         k->name[strcspn(k->name, "\r\n")] = 0;
-        if (fgets(line2, sizeof line2, f)) {}        /* skip the long-name line */
+        if (fgets(line2, sizeof line2, f)) {          /* long name: "C-Media ... USB Audio Device at usb-..., full speed" */
+            char *q = line2;
+            while (*q == ' ') ++q;
+            q[strcspn(q, "\r\n")] = 0;
+            char *at = strstr(q, " at usb-");
+            if (at) *at = 0;
+            snprintf(k->longname, sizeof k->longname, "%s", q);
+        }
         ++n;
     }
     fclose(f);
@@ -195,13 +202,17 @@ int dev_audio_list(const char *root, int capture, const char *auto_desc, dev_opt
     for (int i = 0; i < ne && n < max; ++i) {
         const card_t *k = card_by_num(cards, nc, ep[i].card);
         if (!k) continue;
-        char v[96], l[48], d[96];
+        char v[96], l[48], d[200], pn[64];
         ep_value(k, ep[i].dev, v, sizeof v);
         int multi = 0;
         for (int j = 0; j < ne; ++j) if (j != i && ep[j].card == ep[i].card) multi = 1;
         if (multi) snprintf(l, sizeof l, "%s,%d", k->id, ep[i].dev); else snprintf(l, sizeof l, "%s", k->id);
-        snprintf(d, sizeof d, "%s: %s%s%s", is_usb(k) ? "USB" : is_hdmi(k) ? "HDMI" : "built-in", k->name,
-                 ep[i].pname[0] && strcmp(ep[i].pname, k->name) ? " - " : "", ep[i].pname[0] && strcmp(ep[i].pname, k->name) ? ep[i].pname : "");
+        /* device name, minus driver noise like "(null)-" and repeats of the card name */
+        snprintf(pn, sizeof pn, "%s", !strncmp(ep[i].pname, "(null)-", 7) ? ep[i].pname + 7 : ep[i].pname);
+        const char *cn = is_usb(k) && k->longname[0] ? k->longname : k->name;
+        int show_pn = multi && pn[0] && !strstr(cn, pn);
+        snprintf(d, sizeof d, "%s: %s%s%s", is_usb(k) ? "USB" : is_hdmi(k) ? "HDMI" : "built-in", cn,
+                 show_pn ? " - " : "", show_pn ? pn : "");
         set(&o[n++], v, l, d);
     }
     qsort(o + first, n - first, sizeof *o, cmp_dev);

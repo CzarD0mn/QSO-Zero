@@ -78,7 +78,7 @@ int main(void)
     CHECK(find(o, n, "vc4hdmi") < 0, "HDMI (playback only) is not offered as an input");
     CHECK(!strcmp(o[1].label, "QMX") || !strcmp(o[1].label, "Device"), "USB devices listed first (%s)", o[1].label);
     int c = find(o, n, "QMX"), es = find(o, n, "ES8388Audio");
-    CHECK(c > 0 && !strcmp(o[c].value, "plughw:CARD=QMX,DEV=0") && !strcmp(o[c].desc, "USB: QMX Transceiver - USB Audio"),
+    CHECK(c > 0 && !strcmp(o[c].value, "plughw:CARD=QMX,DEV=0") && !strcmp(o[c].desc, "USB: QRP Labs QMX Transceiver"),
           "QMX -> plughw:CARD=QMX,DEV=0 \"%s\"", c > 0 ? o[c].desc : "");
     CHECK(es > 0 && !strncmp(o[es].desc, "built-in:", 9), "built-in codec marked: \"%s\"", es > 0 ? o[es].desc : "");
     CHECK(!strcmp(o[0].label, "auto"), "auto first; no \"default\" / \"same as input\"");
@@ -105,6 +105,43 @@ int main(void)
     unlink(p);                                     /* no /proc/asound/pcm: use the card directories */
     md("/proc/asound/card2"); mk("/proc/asound/card2/pcm0p"); mk("/proc/asound/card2/pcm0c");
     CHECK(!dev_audio_auto(root, "QMX", 1, NULL, v, sizeof v) && !strcmp(v, "plughw:CARD=QMX,DEV=0"), "fallback to card directories: %s", v);
+
+    printf("[3b] a real Cardputer Zero + Digirig (from the device)\n");
+    {
+        char r2[] = "/tmp/qsoz-realXXXXXX", q[256];
+        if (!mkdtemp(r2)) return 1;
+        snprintf(q, sizeof q, "mkdir -p %s/proc/asound", r2); if (system(q)) {}
+        snprintf(q, sizeof q, "%s/proc/asound/cards", r2);
+        f = fopen(q, "w");
+        fputs(" 0 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n"
+              "                      vc4-hdmi\n"
+              " 1 [ES8389Audio    ]: cardputerzero-a - ES8389-Audio\n"
+              "                      ES8389-Audio\n"
+              " 2 [Device         ]: USB-Audio - USB Audio Device\n"
+              "                      C-Media Electronics Inc. USB Audio Device at usb-3f980000.usb-1.2.2, full speed\n", f);
+        fclose(f);
+        snprintf(q, sizeof q, "%s/proc/asound/pcm", r2);
+        f = fopen(q, "w");
+        fputs("00-00: MAI PCM i2s-hifi-0 : MAI PCM i2s-hifi-0 : playback 1\n"
+              "01-00: (null)-ES8389 HiFi ES8389 HiFi-0 : (null)-ES8389 HiFi ES8389 HiFi-0 : playback 1 : capture 1\n"
+              "02-00: USB Audio : USB Audio : playback 1 : capture 1\n", f);
+        fclose(f);
+        n = dev_audio_list(r2, 1, "auto", o, DEV_MAX);
+        CHECK(n == 3 && !strcmp(o[1].label, "Device") && !strcmp(o[2].label, "ES8389Audio"), "Audio in: auto, Device, ES8389Audio");
+        CHECK(!strcmp(o[1].desc, "USB: C-Media Electronics Inc. USB Audio Device"), "Digirig described: \"%s\"", o[1].desc);
+        CHECK(!strcmp(o[2].desc, "built-in: ES8389-Audio"), "no \"(null)-\" noise: \"%s\"", o[2].desc);
+        n = dev_audio_list(r2, 0, "auto", o, DEV_MAX);
+        CHECK(n == 4 && find(o, n, "vc4hdmi") == 3, "Audio out: auto, Device, ES8389Audio, vc4hdmi");
+        const char *radios[] = {"QMX|QRP", "Device|C-Media|USB Audio", "X6100|CODEC|USB Audio"};
+        int all = 1;
+        for (int k = 0; k < 3; ++k) {
+            char vi[96], vo[96];
+            all &= !dev_audio_auto(r2, radios[k], 1, NULL, vi, sizeof vi) && !strcmp(vi, "plughw:CARD=Device,DEV=0");
+            all &= !dev_audio_auto(r2, radios[k], 0, "Device", vo, sizeof vo) && !strcmp(vo, "plughw:CARD=Device,DEV=0");
+        }
+        CHECK(all, "auto = the Digirig (plughw:CARD=Device,DEV=0) for in and out, never ES8389 or HDMI");
+        snprintf(q, sizeof q, "rm -rf %s", r2); if (system(q)) {}
+    }
 
     printf("[4] short names for the menu\n");
     char s[48];
