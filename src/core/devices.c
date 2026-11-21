@@ -80,22 +80,42 @@ int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int m
     return n;
 }
 
-int dev_serial_auto(const char *root, const char *hints, const char *def, char *out, int outsz)
+int dev_serial_candidates(const char *root, const char *hints, char out[][160], int max)
 {
     dev_opt_t o[DEV_MAX];
-    int n = dev_serial_list(root, "", o, DEV_MAX), best = -1, best_score = 0;
+    int n = dev_serial_list(root, "", o, DEV_MAX), sc[DEV_MAX], idx[DEV_MAX], k = 0;
+    char pref[16] = "-if00";                                  /* CAT is usually the first interface... */
+    if (hints) {
+        const char *at = strstr(hints, "@if");                /* ...unless the profile says "@if02" */
+        if (at) snprintf(pref, sizeof pref, "-%.4s", at + 1);
+    }
     for (int i = 1; i < n; ++i) {
         if (strncmp(o[i].value, "/dev/serial/by-id/", 18)) continue;
         int score = 0;
         char h[128];
         snprintf(h, sizeof h, "%s", hints ? hints : "");
         for (char *save = NULL, *t = strtok_r(h, "|", &save); t; t = strtok_r(NULL, "|", &save))
-            if (strcasestr(o[i].value, t)) { score = 10; break; }
+            if (t[0] != '@' && strcasestr(o[i].value, t)) { score = 10; break; }
         if (!score) continue;
-        if (strstr(o[i].value, "-if00")) score += 5;                 /* CAT is the first interface */
-        if (score > best_score) { best_score = score; best = i; }
+        if (strstr(o[i].value, pref)) score += 5;
+        sc[k] = score; idx[k] = i; ++k;
     }
-    if (best > 0) { snprintf(out, outsz, "%s", o[best].value); return 0; }
+    for (int a = 0; a < k; ++a)                               /* best first */
+        for (int b = a + 1; b < k; ++b)
+            if (sc[b] > sc[a] || (sc[b] == sc[a] && strcmp(o[idx[b]].value, o[idx[a]].value) < 0)) {
+                int t = sc[a]; sc[a] = sc[b]; sc[b] = t; t = idx[a]; idx[a] = idx[b]; idx[b] = t;
+            }
+    int m = 0;
+    for (int a = 0; a < k && m < max; ++a) snprintf(out[m++], 160, "%s", o[idx[a]].value);
+    return m;
+}
+
+int dev_serial_auto(const char *root, const char *hints, const char *def, char *out, int outsz)
+{
+    dev_opt_t o[DEV_MAX];
+    int n = dev_serial_list(root, "", o, DEV_MAX);
+    char c[4][160];
+    if (dev_serial_candidates(root, hints, c, 4) > 0) { snprintf(out, outsz, "%s", c[0]); return 0; }
     char p[300];
     snprintf(p, sizeof p, "%s%s", root, def ? def : "");
     if (def && def[0] && access(p, F_OK) == 0) { snprintf(out, outsz, "%s", def); return 0; }
