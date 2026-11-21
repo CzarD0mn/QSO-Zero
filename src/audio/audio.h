@@ -26,6 +26,11 @@ void audio_tx_abort(void);
 /* Peak input level 0..1 over the last ~0.5 s (for the RX level meter). */
 float audio_rx_level(void);
 
+/* Capture health for Tools: samples/s actually arriving at 48 kHz over the
+ * last few seconds (0 = nothing coming in), and the last read error. */
+typedef struct { double rate; long errors; char last_error[80]; } audio_rx_stats_t;
+void audio_rx_stats(audio_rx_stats_t *out);
+
 /* Find an ALSA card whose /proc/asound/cards line contains any of the
  * '|'-separated hints; writes "plughw:CARD=<id>" to out. */
 int  audio_find_card(const char *hints, char *out, size_t outsz);
