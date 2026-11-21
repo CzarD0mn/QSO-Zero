@@ -182,10 +182,18 @@ int main(int argc, char **argv)
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_tools_batt.ppm", dir); save_ppm(c, 3, p);
     a.screen = 0;
-    a.screen = 1; a.menu_sel = 26;
+    a.screen = 1; a.menu_sel = 27;
     { keyev_t e2 = {K_ENTER, 0, 0}; ui_key(&a, &e2); }
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_pick_aout.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 0;
+    a.mix_in = (mixer_level_t){.ok = 1, .percent = 62, .control = "Mic"};
+    a.mix_out = (mixer_level_t){.ok = 1, .percent = 45, .muted = 1, .control = "Speaker"};
+    snprintf(a.audio_in_dev, sizeof a.audio_in_dev, "plughw:CARD=Device,DEV=0");
+    snprintf(a.audio_out_dev, sizeof a.audio_out_dev, "plughw:CARD=Device,DEV=0");
+    a.screen = 1; a.menu_sel = 26;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_menu_levels.ppm", dir); save_ppm(c, 3, p);
     a.screen = 0;
     printf("wrote previews to %s\n", dir);
     return 0;

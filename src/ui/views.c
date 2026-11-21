@@ -393,7 +393,7 @@ enum { MI_MODE,
        MI_SUB, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_GHOST, MI_GN80, MI_GN40, MI_GN20,   /* JS8 */
        MI_APRS, MI_APOS, MI_AMSG, MI_ASMS, MI_AMAIL,                                          /* JS8 APRS */
        MI_WRX, MI_WPWR, MI_WPCT,                                                              /* WSPR */
-       MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AOUT, MI_ARESCAN, MI_TXL,
+       MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AINLVL, MI_AOUT, MI_AOUTLVL, MI_ARESCAN, MI_TXL,
        MI_AGRID, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static int menu_visible(const app_t *a, int i)
@@ -457,6 +457,12 @@ static void menu_value(app_t *a, int i, char *out)
     case MI_WPCT: sprintf(out, "%d%%", a->cfg.wspr_tx_pct); break;
     case MI_AGRID: strcpy(out, a->cfg.auto_grid ? "ON" : "off"); break;
     case MI_ARESCAN: strcpy(out, a->audio_ok ? "ENTER" : "ENTER  (no audio)"); break;
+    case MI_AINLVL: case MI_AOUTLVL: {
+        const mixer_level_t *m = i == MI_AINLVL ? &a->mix_in : &a->mix_out;
+        if (!m->ok) strcpy(out, "n/a");
+        else snprintf(out, 64, "%d%%%s", m->percent, m->muted ? " MUTED" : "");
+        break;
+    }
     case MI_QSY: strcpy(out, a->cfg.auto_qsy ? "ON" : "off"); break;
     case MI_CQMOD: snprintf(out, 64, "%s", a->cfg.cq_mod[0] ? a->cfg.cq_mod : "none"); break;
     case MI_APOS: snprintf(out, 64, "GRID %s", a->cfg.grid); break;
@@ -488,7 +494,7 @@ static const char *k_menu_names[MI_COUNT] = {
     [MI_ASMS] = "  Text a phone (SMS)", [MI_AMAIL] = "  Email",
     [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
     [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
-    [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AOUT] = "Audio out", [MI_ARESCAN] = "Rescan audio",
+    [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AINLVL] = "  In level", [MI_AOUT] = "Audio out", [MI_AOUTLVL] = "  Out level", [MI_ARESCAN] = "Rescan audio",
     [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_TUNE] = "Tune 5 s",
     [MI_SAVE] = "Save settings", [MI_QUIT] = "Quit"};
 
@@ -523,6 +529,9 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
     const char *hint = (a->menu_sel == MI_RADIO || a->menu_sel == MI_PORT || a->menu_sel == MI_AIN || a->menu_sel == MI_AOUT)
                          ? "ENTER: choose from what's connected"
                      : a->menu_sel == MI_ARESCAN ? "look for sound devices again and reconnect"
+                     : a->menu_sel == MI_AINLVL ? (a->mix_in.ok ? "</> receive audio level from the radio" : a->mix_in.error)
+                     : a->menu_sel == MI_AOUTLVL ? (a->mix_out.ok ? "</> transmit audio level to the radio" : a->mix_out.error)
+                     : a->menu_sel == MI_TXL ? "QSO-Zero's own TX drive (on top of Out level)"
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
                      : a->menu_sel == MI_QSY ? "tune the radio to each mode's frequency"
                      : a->menu_sel == MI_GHOST ? "JS8 on the GHOSTNET frequencies"
@@ -816,6 +825,8 @@ static void menu_change(app_t *a, int dir)
     case MI_WPCT: a->cfg.wspr_tx_pct = (int)fmax(0, fmin(100, a->cfg.wspr_tx_pct + dir * 10)); break;
     case MI_AGRID: a->cfg.auto_grid = !a->cfg.auto_grid; break;
     case MI_GHOST: app_set_ghostnet(a, !a->cfg.ghostnet); break;
+    case MI_AINLVL: app_audio_level(a, 1, dir * 5); break;
+    case MI_AOUTLVL: app_audio_level(a, 0, dir * 5); break;
     case MI_CQMOD: {
         static const char *pre[] = {"", "DX", "POTA", "SOTA", "QRP"};
         int k = 0, n = (int)(sizeof pre / sizeof *pre);

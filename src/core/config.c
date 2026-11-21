@@ -33,6 +33,7 @@ void config_defaults(config_t *c)
     snprintf(c->inbox_path, sizeof c->inbox_path, "%s/qso-zero-inbox.txt", home);
     c->wspr_rx = 1;
     c->auto_qsy = 1;
+    c->audio_in_level = c->audio_out_level = -1;
     c->wsprnet_upload = 1;
     strcpy(c->wsprnet_host, "wsprnet.org");
 }
@@ -80,7 +81,7 @@ int config_load(config_t *c, const char *path)
         STR("gps_device", gps_device); INT("gps_baud", gps_baud); INT("gps_latency_ms", gps_latency_ms);
         STR("display", display); STR("keyboard", keyboard); STR("jsc_path", jsc_path);
         INT("wspr_dbm", wspr_dbm); INT("wspr_tx_pct", wspr_tx_pct); INT("js8_submode", js8_submode);
-        INT("auto_qsy", auto_qsy); STR("bands", bands);
+        INT("auto_qsy", auto_qsy); INT("audio_in_level", audio_in_level); INT("audio_out_level", audio_out_level); STR("bands", bands);
         INT("rx_offset", rx_offset); INT("tx_offset", tx_offset); STR("log_path", log_path);
         INT("ghostnet", ghostnet); STR("cq_mod", cq_mod); INT("js8_autoreply", js8_autoreply); INT("js8_hb_ack", js8_hb_ack);
         STR("js8_info", js8_info); STR("js8_status", js8_status); STR("inbox_path", inbox_path);
@@ -116,6 +117,8 @@ int config_save(const config_t *c, const char *path)
                "js8_info = %s\njs8_status = %s\ninbox_path = %s\nwspr_rx = %d\n",
             c->js8_autoreply, c->js8_hb_ack, c->js8_info, c->js8_status, c->inbox_path, c->wspr_rx);
     fprintf(f, "wsprnet_upload = %d\nwsprnet_host = %s\n", c->wsprnet_upload, c->wsprnet_host);
+    fprintf(f, "\n# sound card levels in %% (-1 = leave as they are); set in Setup\naudio_in_level = %d\naudio_out_level = %d\n",
+            c->audio_in_level, c->audio_out_level);
     fprintf(f, "\n# auto_qsy: tune the radio to each mode's standard frequency automatically\nauto_qsy = %d\nbands = %s\n",
             c->auto_qsy, c->bands);
     fclose(f);

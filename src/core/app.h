@@ -7,6 +7,7 @@
 #include "config.h"
 #include "devices.h"
 #include "battery.h"
+#include "audio/mixer.h"
 #include "rig/radios.h"
 
 typedef enum { MODE_FT8 = 0, MODE_JS8, MODE_WSPR, MODE_COUNT } op_mode_t;
@@ -110,6 +111,7 @@ typedef struct app {
     int        rig_ok, audio_ok, gps_ok;
     volatile int rig_busy;    /* reconnecting to the radio in the background */
     char       audio_in_dev[96], audio_out_dev[96];   /* what is actually open */
+    mixer_level_t mix_in, mix_out;                    /* their sound card levels */
     char       status[96];
     double     status_until;
     float      swr, power;
@@ -162,6 +164,7 @@ void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET default freq
 void app_use_rig_device(app_t *a, const char *dev);
 void app_use_audio(app_t *a, const char *in, const char *out);
 void app_rescan_audio(app_t *a);
+void app_audio_level(app_t *a, int capture, int delta);   /* change the sound card level by delta % */
 void app_rig_port(const app_t *a, char *out, int outsz);   /* the CAT port in use (saved or auto) */             /* look for sound devices again and reconnect */      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */
 unsigned app_bands(const app_t *a);         /* usable band bits */
