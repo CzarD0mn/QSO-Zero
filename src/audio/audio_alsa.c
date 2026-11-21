@@ -38,6 +38,18 @@ static audio_rx_cb g_cb;
 static void *g_user;
 static char g_err[160];
 static volatile float g_level;
+static volatile long g_frames, g_errors;
+static double g_rate_t0;
+static long g_rate_f0;
+static volatile double g_rate;
+static char g_rx_err[80];
+
+void audio_rx_stats(audio_rx_stats_t *o)
+{
+    o->rate = g_in ? g_rate : 0;
+    o->errors = g_errors;
+    snprintf(o->last_error, sizeof o->last_error, "%s", g_rx_err);
+}
 
 const char *audio_error(void) { return g_err; }
 float audio_rx_level(void) { return g_level; }
@@ -130,7 +142,18 @@ static void *rx_thread(void *arg)
     while (g_run) {
         long r = A.readi(g_in, buf, CHUNK);
         double t_end = clk_now();
-        if (r < 0) { A.recover(g_in, (int)r, 1); continue; }
+        if (r < 0) {
+            ++g_errors;
+            snprintf(g_rx_err, sizeof g_rx_err, "%s", A.strerror((int)r));
+            if (A.recover(g_in, (int)r, 1) < 0) { struct timespec ts = {0, 50000000}; nanosleep(&ts, NULL); }
+            continue;
+        }
+        g_frames += r;
+        double tm = clk_mono();
+        if (tm - g_rate_t0 >= 2.0) {                       /* samples/s over ~2 s */
+            g_rate = g_rate_t0 > 0 ? (g_frames - g_rate_f0) / (tm - g_rate_t0) : 0;
+            g_rate_t0 = tm; g_rate_f0 = g_frames;
+        }
         for (long i = 0; i < r; ++i) {
             float a = fabsf(buf[i] / 32768.0f);
             if (a > peak) peak = a;
@@ -161,6 +184,7 @@ int audio_open(const char *in_dev, const char *out_dev, audio_rx_cb cb, void *us
     }
     g_cb = cb;
     g_user = user;
+    g_frames = g_errors = 0; g_rate = 0; g_rate_t0 = 0; g_rate_f0 = 0; g_rx_err[0] = 0;
     g_run = 1;
     pthread_create(&g_thr, NULL, rx_thread, NULL);
     return 0;

@@ -9,6 +9,7 @@
 #include "core/clock.h"
 #include "dsp/js8.h"
 #include "dsp/wspr.h"
+#include "audio/audio.h"
 #include "gps/gps.h"
 #include "rig/rigctl.h"
 #include "theme.h"
@@ -605,7 +606,20 @@ static void render_tools(app_t *a, surface_t *s, int big)
     }
     gfx_text(s, 4, y, "AUDIO / DSP", C_MAGENTA, sc); y += lh;
     snprintf(b, sizeof b, "RX peak %.0f%%  last decode %.0f ms  TX level %.0f%%", audio_rx_level() * 100, a->last_decode_ms, a->cfg.tx_level * 100);
-    gfx_text(s, 4, y, b, C_TEXT, 1); y += 14;
+    gfx_text(s, 4, y, b, C_TEXT, 1); y += 10;
+    {
+        audio_rx_stats_t st;
+        audio_rx_stats(&st);
+        uint16_t col = C_MINT;
+        if (!a->audio_ok) { snprintf(b, sizeof b, "input not open"); col = C_ORANGE; }
+        else if (st.rate < 1000) {
+            snprintf(b, sizeof b, "NO SAMPLES from %s%s%s", a->audio_in_dev, st.last_error[0] ? ": " : "", st.last_error);
+            col = C_RED;
+        } else if (audio_rx_level() < 0.0005f)
+        { snprintf(b, sizeof b, "input %.0f Hz OK but SILENT: check the radio's USB audio out", st.rate); col = C_ORANGE; }
+        else snprintf(b, sizeof b, "input %.0f Hz, errors %ld", st.rate, st.errors);
+        gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, col, 1); y += 14;
+    }
     {
         uplink_stats_t u;
         uplink_get(&u);
