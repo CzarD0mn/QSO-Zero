@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* QSO-Zero - serial port and sound card discovery for the Setup pickers. */
 #include "core/devices.h"
 
@@ -79,54 +80,178 @@ int dev_serial_list(const char *root, const char *auto_desc, dev_opt_t *o, int m
     return n;
 }
 
-/* does /proc/asound/card<N> have a pcm*c (capture) or pcm*p (playback) device? */
-static int card_has(const char *root, int num, char kind)
+/* ---- sound devices -------------------------------------------------- */
+
+typedef struct { int num; char id[32]; char driver[32]; char name[80]; } card_t;
+
+static int read_cards(const char *root, card_t *c, int max)
 {
-    char dir[300];
-    snprintf(dir, sizeof dir, "%s/proc/asound/card%d", root, num);
-    DIR *d = opendir(dir);
-    if (!d) return 0;
-    int found = 0;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        size_t L = strlen(e->d_name);
-        if (!strncmp(e->d_name, "pcm", 3) && L > 3 && e->d_name[L - 1] == kind) { found = 1; break; }
+    char path[300], line[256], line2[256];
+    snprintf(path, sizeof path, "%s/proc/asound/cards", root);
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    int n = 0;
+    while (n < max && fgets(line, sizeof line, f)) {
+        /* " 1 [QMX            ]: USB-Audio - QMX Transceiver" + a long-name line */
+        char *lb = strchr(line, '['), *rb = lb ? strchr(lb, ']') : NULL;
+        if (!lb || !rb) continue;
+        card_t *k = &c[n];
+        memset(k, 0, sizeof *k);
+        k->num = atoi(line);
+        size_t L = (size_t)(rb - lb - 1);
+        if (L >= sizeof k->id) L = sizeof k->id - 1;
+        memcpy(k->id, lb + 1, L);
+        while (L && k->id[L - 1] == ' ') k->id[--L] = 0;
+        const char *p = rb + 1;
+        if (*p == ':') ++p;
+        while (*p == ' ') ++p;
+        const char *dash = strstr(p, " - ");
+        size_t dl = dash ? (size_t)(dash - p) : strcspn(p, "\r\n");
+        if (dl >= sizeof k->driver) dl = sizeof k->driver - 1;
+        memcpy(k->driver, p, dl);
+        snprintf(k->name, sizeof k->name, "%s", dash ? dash + 3 : k->id);
+        k->name[strcspn(k->name, "\r\n")] = 0;
+        if (fgets(line2, sizeof line2, f)) {}        /* skip the long-name line */
+        ++n;
     }
-    closedir(d);
-    return found;
+    fclose(f);
+    return n;
+}
+
+static int is_usb(const card_t *k) { return !strcmp(k->driver, "USB-Audio"); }
+static int is_hdmi(const card_t *k) { return strcasestr(k->id, "hdmi") || strcasestr(k->name, "hdmi"); }
+
+/* pcm endpoints of one direction: from /proc/asound/pcm
+ * ("01-00: USB Audio : USB Audio : playback 1 : capture 1"), else from the
+ * card directories (pcm0c / pcm0p). */
+typedef struct { int card, dev; char pname[64]; } ep_t;
+
+static int read_endpoints(const char *root, int capture, ep_t *e, int max, const card_t *cards, int nc)
+{
+    char path[300], line[256];
+    int n = 0;
+    snprintf(path, sizeof path, "%s/proc/asound/pcm", root);
+    FILE *f = fopen(path, "r");
+    if (f) {
+        while (n < max && fgets(line, sizeof line, f)) {
+            int c, d;
+            if (sscanf(line, "%d-%d:", &c, &d) != 2) continue;
+            if (!strstr(line, capture ? "capture" : "playback")) continue;
+            char *a = strstr(line, ": ");
+            char *b = a ? strstr(a + 2, " : ") : NULL;      /* after the id field */
+            char *z = b ? strstr(b + 3, " : ") : NULL;      /* end of the name field */
+            e[n].card = c; e[n].dev = d; e[n].pname[0] = 0;
+            if (b && z) snprintf(e[n].pname, sizeof e[n].pname, "%.*s", (int)(z - b - 3), b + 3);
+            ++n;
+        }
+        fclose(f);
+        return n;
+    }
+    for (int i = 0; i < nc && n < max; ++i) {
+        snprintf(path, sizeof path, "%s/proc/asound/card%d", root, cards[i].num);
+        DIR *d = opendir(path);
+        if (!d) continue;
+        struct dirent *de;
+        while ((de = readdir(d)) && n < max) {
+            size_t L = strlen(de->d_name);
+            if (strncmp(de->d_name, "pcm", 3) || L < 5 || de->d_name[L - 1] != (capture ? 'c' : 'p')) continue;
+            e[n].card = cards[i].num; e[n].dev = atoi(de->d_name + 3); e[n].pname[0] = 0;
+            ++n;
+        }
+        closedir(d);
+    }
+    return n;
+}
+
+static const card_t *card_by_num(const card_t *c, int nc, int num)
+{
+    for (int i = 0; i < nc; ++i) if (c[i].num == num) return &c[i];
+    return NULL;
+}
+
+static void ep_value(const card_t *k, int dev, char *out, size_t sz)
+{
+    snprintf(out, sz, "plughw:CARD=%s,DEV=%d", k->id, dev);
+}
+
+static int cmp_dev(const void *x, const void *y)    /* USB first, then by label */
+{
+    const dev_opt_t *a = x, *b = y;
+    int ua = !strncmp(a->desc, "USB", 3), ub = !strncmp(b->desc, "USB", 3);
+    if (ua != ub) return ub - ua;
+    return strcmp(a->label, b->label);
 }
 
 int dev_audio_list(const char *root, int capture, const char *auto_desc, dev_opt_t *o, int max)
 {
     int n = 0;
-    if (max < 2) return 0;
-    set(&o[n++], "", capture ? "auto" : "same as input", auto_desc);
-    set(&o[n++], "default", "default", "system default device");
-    char path[300], line[256];
-    snprintf(path, sizeof path, "%s/proc/asound/cards", root);
-    FILE *f = fopen(path, "r");
-    if (!f) return n;
-    while (fgets(line, sizeof line, f) && n < max) {
-        /* " 1 [QMX            ]: USB-Audio - QMX" */
-        char *lb = strchr(line, '['), *rb = lb ? strchr(lb, ']') : NULL;
-        if (!lb || !rb) continue;
-        int num = atoi(line);
-        char id[32];
-        size_t L = (size_t)(rb - lb - 1);
-        if (L >= sizeof id) L = sizeof id - 1;
-        memcpy(id, lb + 1, L);
-        id[L] = 0;
-        while (L && id[L - 1] == ' ') id[--L] = 0;
-        if (!card_has(root, num, capture ? 'c' : 'p')) continue;
-        char *name = strstr(rb, " - ");
-        name = name ? name + 3 : rb + 2;
-        name[strcspn(name, "\r\n")] = 0;
-        char v[64];
-        snprintf(v, sizeof v, "plughw:CARD=%s", id);
-        set(&o[n++], v, id, name);
+    if (max < 1) return 0;
+    set(&o[n++], "", "auto", auto_desc);
+    card_t cards[16];
+    ep_t ep[48];
+    int nc = read_cards(root, cards, 16);
+    int ne = read_endpoints(root, capture, ep, 48, cards, nc);
+    int first = n;
+    for (int i = 0; i < ne && n < max; ++i) {
+        const card_t *k = card_by_num(cards, nc, ep[i].card);
+        if (!k) continue;
+        char v[96], l[48], d[96];
+        ep_value(k, ep[i].dev, v, sizeof v);
+        int multi = 0;
+        for (int j = 0; j < ne; ++j) if (j != i && ep[j].card == ep[i].card) multi = 1;
+        if (multi) snprintf(l, sizeof l, "%s,%d", k->id, ep[i].dev); else snprintf(l, sizeof l, "%s", k->id);
+        snprintf(d, sizeof d, "%s: %s%s%s", is_usb(k) ? "USB" : is_hdmi(k) ? "HDMI" : "built-in", k->name,
+                 ep[i].pname[0] && strcmp(ep[i].pname, k->name) ? " - " : "", ep[i].pname[0] && strcmp(ep[i].pname, k->name) ? ep[i].pname : "");
+        set(&o[n++], v, l, d);
     }
-    fclose(f);
+    qsort(o + first, n - first, sizeof *o, cmp_dev);
     return n;
+}
+
+int dev_audio_auto(const char *root, const char *hints, int capture, const char *prefer_card,
+                   char *out, int outsz)
+{
+    card_t cards[16];
+    ep_t ep[48];
+    int nc = read_cards(root, cards, 16);
+    int ne = read_endpoints(root, capture, ep, 48, cards, nc);
+    int best = -1, best_score = 0;
+    for (int i = 0; i < ne; ++i) {
+        const card_t *k = card_by_num(cards, nc, ep[i].card);
+        if (!k || is_hdmi(k) || !is_usb(k)) continue;       /* a radio is a USB sound card */
+        int score = 100 - ep[i].dev;
+        if (hints && *hints) {
+            char h[128];
+            snprintf(h, sizeof h, "%s", hints);
+            for (char *save = NULL, *t = strtok_r(h, "|", &save); t; t = strtok_r(NULL, "|", &save))
+                if (strcasestr(k->id, t) || strcasestr(k->name, t)) { score += 50; break; }
+        }
+        if (prefer_card && *prefer_card && !strcmp(k->id, prefer_card)) score += 200;   /* same radio codec */
+        if (score > best_score) { best_score = score; best = i; }
+    }
+    if (best < 0) { out[0] = 0; return -1; }
+    ep_value(card_by_num(cards, nc, ep[best].card), ep[best].dev, out, (size_t)outsz);
+    return 0;
+}
+
+int dev_audio_present(const char *root, const char *value, int capture)
+{
+    if (!value[0]) return 1;
+    if (strncmp(value, "plughw:CARD=", 12) && strncmp(value, "hw:CARD=", 8)) return 1;   /* can't tell: let ALSA try */
+    const char *id = strstr(value, "CARD=") + 5;
+    char want[40];
+    snprintf(want, sizeof want, "%.*s", (int)strcspn(id, ","), id);
+    const char *dv = strstr(value, "DEV=");
+    int dev = dv ? atoi(dv + 4) : -1;
+    card_t cards[16];
+    ep_t ep[48];
+    int nc = read_cards(root, cards, 16);
+    int ne = read_endpoints(root, capture, ep, 48, cards, nc);
+    for (int i = 0; i < ne; ++i) {
+        const card_t *k = card_by_num(cards, nc, ep[i].card);
+        if (k && !strcmp(k->id, want) && (dev < 0 || dev == ep[i].dev)) return 1;
+    }
+    return 0;
 }
 
 void dev_short_name(const char *root, const char *value, char *out, int outsz)
@@ -139,6 +264,12 @@ void dev_short_name(const char *root, const char *value, char *out, int outsz)
         return;
     }
     if (!strncmp(value, "/dev/", 5)) { snprintf(out, outsz, "%s", value + 5); return; }
-    if (!strncmp(value, "plughw:CARD=", 12)) { snprintf(out, outsz, "%s", value + 12); return; }
+    if (!strncmp(value, "plughw:CARD=", 12)) {
+        const char *c = strstr(value, ",DEV=");
+        if (c && atoi(c + 5) == 0) snprintf(out, outsz, "%.*s", (int)(c - value - 12), value + 12);
+        else if (c) snprintf(out, outsz, "%.*s,%d", (int)(c - value - 12), value + 12, atoi(c + 5));
+        else snprintf(out, outsz, "%s", value + 12);
+        return;
+    }
     snprintf(out, outsz, "%s", value);
 }

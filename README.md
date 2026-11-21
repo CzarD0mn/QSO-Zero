@@ -148,11 +148,14 @@ Setup has a **GHOSTNET** section for running JS8 on the GHOSTNET frequencies (di
 
 ### Choosing the radio, CAT port and sound cards
 
-Setup (ESC) has four pickers: **Radio**, **CAT port**, **Audio in** and **Audio out**. Press ENTER on one to see what's plugged in right now. Use ↑/↓ to choose, ENTER to use it, R to rescan after plugging something in, then **Save settings** to keep the choice. Changes take effect straight away without restarting. The radio reconnects in the background, and you can't make changes while transmitting.
+Setup (ESC) has four pickers: **Radio**, **CAT port**, **Audio in** and **Audio out**. Press ENTER on one to see what's plugged in right now. Use ↑/↓ to choose and ENTER to use it. The **<< Rescan >>** row at the top (or R) looks again after you plug something in. Then use **Save settings** to keep the choice. Changes take effect straight away without restarting. The radio reconnects in the background, and you can't make changes while transmitting.
 
 * **CAT port** lists every `/dev/ttyUSB#` and `/dev/ttyACM#` with what it is (for example, *Silicon Labs CP2102N…* for a Digirig, *QRP Labs QMX* for a QMX). QSO-Zero saves your choice by its USB ID (`/dev/serial/by-id/…`), so it keeps finding the right radio even if the `ttyUSB` numbers change between boots. **auto** uses the radio's usual port.
-* **Audio in** lists the sound cards that can record, as `plughw:CARD=<name>`. **auto** picks the card that matches the radio (QMX, C-Media for the Digirig, and so on).
-* **Audio out** lists the cards that can play, including HDMI. **same as input** is the default and is right for every supported radio.
+* **Audio in** lists only devices that can **record** (radio receive audio comes in here). **Audio out** lists only devices that can **play** (transmit audio goes out here). Each entry is one ALSA device, `plughw:CARD=<name>,DEV=<n>`, with USB devices first, then the built-in codec (ES8388) and HDMI (output only).
+* **auto** (the default for both) picks the radio's **USB** sound card: the QMX's own codec, or the C-Media codec in the Digirig for the G90 and FT-891. It never picks the Cardputer Zero's built-in codec or HDMI. With no USB sound card plugged in, it says so instead of falling back to the built-in audio.
+* A radio's USB codec appears in both lists, as its record side under Audio in and its play side under Audio out. That's how every supported radio works, and auto pairs them up.
+* If a saved device isn't plugged in at startup, QSO-Zero uses auto and tells you.
+* **Setup › Rescan audio** (or `/rescan`) looks for sound devices again and reconnects. Use it after plugging the radio in while QSO-Zero is running.
 * The Tools screen (Ctrl+T) shows the port and cards in use. The same settings are `rig_device`, `audio_in` and `audio_out` in the config file.
 
 ### Automatic frequency (auto QSY)

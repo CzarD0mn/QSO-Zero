@@ -40,18 +40,24 @@ int main(void)
     if (symlink("../../ttyUSB0", l)) return 1;
     snprintf(l, sizeof l, "%s/dev/serial/by-id/usb-QRP_Labs_QMX_Transceiver_0001-if00", root);
     if (symlink("../../ttyACM0", l)) return 1;
+    /* a Cardputer Zero with a QMX and a Digirig plugged in */
     md("/proc"); md("/proc/asound");
     FILE *f;
     char p[256];
     snprintf(p, sizeof p, "%s/proc/asound/cards", root);
     f = fopen(p, "w");
-    fputs(" 0 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n                      vc4-hdmi\n"
-          " 1 [Device         ]: USB-Audio - USB Audio Device\n                      C-Media Electronics Inc. USB Audio Device at usb-...\n"
-          " 2 [QMX            ]: USB-Audio - QMX Transceiver\n                      QRP Labs QMX Transceiver at usb-...\n", f);
+    fputs(" 0 [ES8388Audio    ]: simple-card - ES8388-Audio\n                      ES8388-Audio\n"
+          " 1 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n                      vc4-hdmi\n"
+          " 2 [QMX            ]: USB-Audio - QMX Transceiver\n                      QRP Labs QMX Transceiver at usb-...\n"
+          " 3 [Device         ]: USB-Audio - USB Audio Device\n                      C-Media Electronics Inc. USB Audio Device at usb-...\n", f);
     fclose(f);
-    md("/proc/asound/card0"); mk("/proc/asound/card0/pcm0p");
-    md("/proc/asound/card1"); mk("/proc/asound/card1/pcm0p"); mk("/proc/asound/card1/pcm0c");
-    md("/proc/asound/card2"); mk("/proc/asound/card2/pcm0p"); mk("/proc/asound/card2/pcm0c");
+    snprintf(p, sizeof p, "%s/proc/asound/pcm", root);
+    f = fopen(p, "w");
+    fputs("00-00: ES8388 HiFi es8388-hifi-0 : ES8388 HiFi es8388-hifi-0 : playback 1 : capture 1\n"
+          "01-00: MAI PCM i2s-hifi-0 : MAI PCM i2s-hifi-0 : playback 1\n"
+          "02-00: USB Audio : USB Audio : playback 1 : capture 1\n"
+          "03-00: USB Audio : USB Audio : playback 1 : capture 1\n", f);
+    fclose(f);
 
     dev_opt_t o[DEV_MAX];
     printf("[1] serial ports\n");
@@ -66,33 +72,59 @@ int main(void)
     CHECK(find(o, n, "/dev/serial0") < 0 && find(o, n, "/dev/tty1") < 0, "GPS UART and consoles not offered for CAT");
     CHECK(q < q1 && q1 < u, "sorted by name");
 
-    printf("[2] sound cards\n");
-    n = dev_audio_list(root, 1, "match radio", o, DEV_MAX);
-    CHECK(n == 4, "capture: auto, default, Device, QMX (got %d)", n);
-    CHECK(find(o, n, "vc4hdmi") < 0, "HDMI (playback only) not offered for input");
-    int c = find(o, n, "QMX");
-    CHECK(c > 0 && !strcmp(o[c].value, "plughw:CARD=QMX") && !strcmp(o[c].desc, "QMX Transceiver"), "QMX -> plughw:CARD=QMX \"%s\"", c > 0 ? o[c].desc : "");
-    n = dev_audio_list(root, 0, "same", o, DEV_MAX);
-    CHECK(n == 5 && find(o, n, "vc4hdmi") > 0, "playback list includes HDMI (got %d)", n);
-    CHECK(!strcmp(o[0].label, "same as input"), "output defaults to same as input");
+    printf("[2] sound devices, split by direction\n");
+    n = dev_audio_list(root, 1, "auto", o, DEV_MAX);
+    CHECK(n == 4, "Audio in: auto + QMX, Device, ES8388Audio (got %d)", n);
+    CHECK(find(o, n, "vc4hdmi") < 0, "HDMI (playback only) is not offered as an input");
+    CHECK(!strcmp(o[1].label, "QMX") || !strcmp(o[1].label, "Device"), "USB devices listed first (%s)", o[1].label);
+    int c = find(o, n, "QMX"), es = find(o, n, "ES8388Audio");
+    CHECK(c > 0 && !strcmp(o[c].value, "plughw:CARD=QMX,DEV=0") && !strcmp(o[c].desc, "USB: QMX Transceiver - USB Audio"),
+          "QMX -> plughw:CARD=QMX,DEV=0 \"%s\"", c > 0 ? o[c].desc : "");
+    CHECK(es > 0 && !strncmp(o[es].desc, "built-in:", 9), "built-in codec marked: \"%s\"", es > 0 ? o[es].desc : "");
+    CHECK(!strcmp(o[0].label, "auto"), "auto first; no \"default\" / \"same as input\"");
+    n = dev_audio_list(root, 0, "auto", o, DEV_MAX);
+    CHECK(n == 5 && find(o, n, "vc4hdmi") > 0, "Audio out: auto + QMX, Device, ES8388Audio, HDMI (got %d)", n);
 
-    printf("[3] short names for the menu\n");
+    printf("[3] automatic choice\n");
+    char v[96];
+    CHECK(!dev_audio_auto(root, "QMX|QRP", 1, NULL, v, sizeof v) && !strcmp(v, "plughw:CARD=QMX,DEV=0"), "QMX radio: in = %s", v);
+    CHECK(!dev_audio_auto(root, "QMX|QRP", 0, "QMX", v, sizeof v) && !strcmp(v, "plughw:CARD=QMX,DEV=0"), "QMX radio: out = %s", v);
+    CHECK(!dev_audio_auto(root, "Device|C-Media|USB Audio", 1, NULL, v, sizeof v) && !strcmp(v, "plughw:CARD=Device,DEV=0"), "G90/FT-891 (Digirig): in = %s", v);
+    CHECK(!dev_audio_auto(root, "nothing-matches", 1, NULL, v, sizeof v) && (strstr(v, "CARD=QMX") || strstr(v, "CARD=Device")),
+          "no hint match: still a USB card, never the built-in (%s)", v);
+    CHECK(dev_audio_present(root, "plughw:CARD=QMX,DEV=0", 1) && !dev_audio_present(root, "plughw:CARD=Gone,DEV=0", 1),
+          "unplugged saved device detected");
+    CHECK(!dev_audio_present(root, "plughw:CARD=vc4hdmi,DEV=0", 1), "HDMI is not an input");
+    /* radio unplugged: only built-in + HDMI */
+    snprintf(p, sizeof p, "%s/proc/asound/pcm", root);
+    f = fopen(p, "w");
+    fputs("00-00: ES8388 HiFi es8388-hifi-0 : ES8388 HiFi es8388-hifi-0 : playback 1 : capture 1\n"
+          "01-00: MAI PCM i2s-hifi-0 : MAI PCM i2s-hifi-0 : playback 1\n", f);
+    fclose(f);
+    CHECK(dev_audio_auto(root, "QMX|QRP", 1, NULL, v, sizeof v) != 0, "no USB sound card -> auto finds nothing (not the built-in)");
+    unlink(p);                                     /* no /proc/asound/pcm: use the card directories */
+    md("/proc/asound/card2"); mk("/proc/asound/card2/pcm0p"); mk("/proc/asound/card2/pcm0c");
+    CHECK(!dev_audio_auto(root, "QMX", 1, NULL, v, sizeof v) && !strcmp(v, "plughw:CARD=QMX,DEV=0"), "fallback to card directories: %s", v);
+
+    printf("[4] short names for the menu\n");
     char s[48];
     snprintf(l, sizeof l, "/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_a1b2-if00-port0");
     dev_short_name(root, l, s, sizeof s);
     CHECK(!strcmp(s, "ttyUSB0"), "by-id -> ttyUSB0 (%s)", s);
     dev_short_name(root, "/dev/serial/by-id/usb-gone-if00", s, sizeof s);
     CHECK(!strcmp(s, "(unplugged)"), "missing device -> (unplugged)");
-    dev_short_name(root, "plughw:CARD=Device", s, sizeof s);
-    CHECK(!strcmp(s, "Device"), "plughw:CARD=Device -> Device");
+    dev_short_name(root, "plughw:CARD=Device,DEV=0", s, sizeof s);
+    CHECK(!strcmp(s, "Device"), "plughw:CARD=Device,DEV=0 -> Device");
+    dev_short_name(root, "plughw:CARD=X6100,DEV=1", s, sizeof s);
+    CHECK(!strcmp(s, "X6100,1"), "DEV=1 -> X6100,1");
     dev_short_name(root, "", s, sizeof s);
     CHECK(!strcmp(s, "auto"), "blank -> auto");
 
-    printf("[4] nothing plugged in\n");
+    printf("[5] nothing plugged in\n");
     n = dev_serial_list("/nonexistent", "x", o, DEV_MAX);
     CHECK(n == 1, "only auto");
     n = dev_audio_list("/nonexistent", 1, "x", o, DEV_MAX);
-    CHECK(n == 2, "only auto + default");
+    CHECK(n == 1, "only auto");
 
     char cmd[128];
     snprintf(cmd, sizeof cmd, "rm -rf %s", root);

@@ -496,19 +496,61 @@ static void rig_connect(app_t *a)
     a->dirty = 1;
 }
 
+static const char *dev_root_env(void)
+{
+    const char *r = getenv("QSOZERO_DEVROOT");
+    return r ? r : "";
+}
+
+/* card id out of plughw:CARD=<id>[,DEV=n] */
+static void card_of(const char *v, char *out, size_t sz)
+{
+    const char *c = strstr(v, "CARD=");
+    if (!c) { out[0] = 0; return; }
+    c += 5;
+    snprintf(out, sz, "%.*s", (int)strcspn(c, ","), c);
+}
+
+/* Pick the input (recording) and output (playback) devices: the saved
+ * choice if it's plugged in, otherwise automatic (the radio's USB sound
+ * card). Then (re)open capture. */
 static void audio_connect(app_t *a)
 {
-    char in[96], out[96];
-    snprintf(in, sizeof in, "%s", a->cfg.audio_in);
-    snprintf(out, sizeof out, "%s", a->cfg.audio_out);
-    if (!in[0] && audio_find_card(a->radio->audio_hint, in, sizeof in)) snprintf(in, sizeof in, "default");
-    if (!out[0]) snprintf(out, sizeof out, "%s", in);
+    const char *root = dev_root_env();
+    char in[96] = "", out[96] = "", card[40], note[96] = "";
+    if (a->cfg.audio_in[0] && dev_audio_present(root, a->cfg.audio_in, 1)) snprintf(in, sizeof in, "%s", a->cfg.audio_in);
+    else {
+        if (a->cfg.audio_in[0]) snprintf(note, sizeof note, "audio in %s not found, using auto. ", a->cfg.audio_in);
+        dev_audio_auto(root, a->radio->audio_hint, 1, NULL, in, sizeof in);
+    }
+    card_of(in, card, sizeof card);
+    if (a->cfg.audio_out[0] && dev_audio_present(root, a->cfg.audio_out, 0)) snprintf(out, sizeof out, "%s", a->cfg.audio_out);
+    else {
+        if (a->cfg.audio_out[0]) snprintf(note + strlen(note), sizeof note - strlen(note), "audio out %s not found, using auto. ", a->cfg.audio_out);
+        dev_audio_auto(root, a->radio->audio_hint, 0, card, out, sizeof out);   /* same radio, its playback side */
+    }
     audio_close();
-    a->audio_ok = audio_open(in, out, app_audio_in, a) == 0;
+    a->audio_ok = 0;
     snprintf(a->audio_in_dev, sizeof a->audio_in_dev, "%s", in);
     snprintf(a->audio_out_dev, sizeof a->audio_out_dev, "%s", out);
-    if (!a->audio_ok) app_status(a, "AUDIO: %s", audio_error());
+    if (!in[0] || !out[0]) {
+        audio_set_output(out);
+        app_status(a, "%sno radio sound card found: plug it in, then Setup > Rescan audio", note);
+        a->dirty = 1;
+        return;
+    }
+    a->audio_ok = audio_open(in, out, app_audio_in, a) == 0;
+    if (!a->audio_ok) app_status(a, "%sAUDIO: %s", note, audio_error());
+    else if (note[0]) app_status(a, "%s", note);
     a->dirty = 1;
+}
+
+void app_rescan_audio(app_t *a)
+{
+    if (!g_hw) { app_status(a, "hardware is off (--nohw)"); return; }
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    audio_connect(a);
+    if (a->audio_ok) app_status(a, "audio in %s, out %s", a->audio_in_dev, a->audio_out_dev);
 }
 
 static void *rig_reconnect_thread(void *arg)
@@ -570,11 +612,7 @@ void app_use_audio(app_t *a, const char *in, const char *out)
     if (in) snprintf(a->cfg.audio_in, sizeof a->cfg.audio_in, "%s", in);
     if (out) snprintf(a->cfg.audio_out, sizeof a->cfg.audio_out, "%s", out);
     if (!hw_change_ok(a)) return;
-    if (in) audio_connect(a);                            /* reopen capture */
-    else {                                               /* output only: used from the next TX */
-        snprintf(a->audio_out_dev, sizeof a->audio_out_dev, "%s", a->cfg.audio_out[0] ? a->cfg.audio_out : a->audio_in_dev);
-        audio_set_output(a->audio_out_dev);
-    }
+    audio_connect(a);                                    /* resolves auto and reopens */
     if (a->audio_ok) app_status(a, "audio in %s, out %s", a->audio_in_dev, a->audio_out_dev);
 }
 
@@ -1120,6 +1158,7 @@ static int handle_command(app_t *a, char *cmd)
     else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);
     else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/cqmod")) app_set_cq_mod(a, arg);
+    else if (!strcmp(cmd, "/rescan")) app_rescan_audio(a);
     else if (!strcmp(cmd, "/aprspos") || !strcmp(cmd, "/aprsgrid")) app_aprs_position(a);
     else if (!strcmp(cmd, "/aprs") || !strcmp(cmd, "/sms") || !strcmp(cmd, "/email")) {
         char first[64] = "";

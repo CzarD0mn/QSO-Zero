@@ -209,8 +209,41 @@ int main(void)
     for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
     CHECK(!a.rig_busy && a.rig_ok, "back online: \"%s\"", a.status);
     CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyUSB1"), "port stored in settings");
-    app_use_audio(&a, NULL, "plughw:CARD=Device");
-    CHECK(!strcmp(a.audio_out_dev, "plughw:CARD=Device") && !strcmp(a.cfg.audio_out, "plughw:CARD=Device"), "audio out switched");
+    {
+        /* fake sound cards: a QMX and a Digirig; the built-in codec must never be auto-picked */
+        char r[] = "/tmp/qsoz-sndXXXXXX", p[256];
+        if (!mkdtemp(r)) return 1;
+        snprintf(p, sizeof p, "mkdir -p %s/proc/asound", r); if (system(p)) {}
+        snprintf(p, sizeof p, "%s/proc/asound/cards", r);
+        FILE *f = fopen(p, "w");
+        fputs(" 0 [ES8388Audio    ]: simple-card - ES8388-Audio\n  x\n"
+              " 2 [QMX            ]: USB-Audio - QMX Transceiver\n  x\n"
+              " 3 [Device         ]: USB-Audio - USB Audio Device\n  x\n", f);
+        fclose(f);
+        snprintf(p, sizeof p, "%s/proc/asound/pcm", r);
+        f = fopen(p, "w");
+        fputs("00-00: ES8388 : ES8388 : playback 1 : capture 1\n02-00: USB Audio : USB Audio : playback 1 : capture 1\n"
+              "03-00: USB Audio : USB Audio : playback 1 : capture 1\n", f);
+        fclose(f);
+        setenv("QSOZERO_DEVROOT", r, 1);
+        a.cfg.audio_in[0] = a.cfg.audio_out[0] = 0;
+        app_rescan_audio(&a);                   /* radio is the QMX here */
+        CHECK(!strcmp(a.audio_in_dev, "plughw:CARD=QMX,DEV=0") && !strcmp(a.audio_out_dev, "plughw:CARD=QMX,DEV=0"),
+              "rescan: auto picks the QMX for in and out (%s / %s)", a.audio_in_dev, a.audio_out_dev);
+        app_use_audio(&a, NULL, "plughw:CARD=Device,DEV=0");
+        CHECK(!strcmp(a.audio_out_dev, "plughw:CARD=Device,DEV=0") && !strcmp(a.cfg.audio_out, "plughw:CARD=Device,DEV=0"),
+              "audio out switched to the Digirig");
+        app_use_audio(&a, "plughw:CARD=Gone,DEV=0", NULL);
+        CHECK(!strcmp(a.audio_in_dev, "plughw:CARD=QMX,DEV=0") && strstr(a.status, "not found"),
+              "unplugged input falls back to auto: \"%s\"", a.status);
+        snprintf(p, sizeof p, "%s/proc/asound/pcm", r);
+        f = fopen(p, "w"); fputs("00-00: ES8388 : ES8388 : playback 1 : capture 1\n", f); fclose(f);
+        a.cfg.audio_in[0] = a.cfg.audio_out[0] = 0;
+        app_rescan_audio(&a);
+        CHECK(!a.audio_in_dev[0] && strstr(a.status, "no radio sound card"), "radio unplugged: says so, doesn't use the built-in: \"%s\"", a.status);
+        unsetenv("QSOZERO_DEVROOT");
+        snprintf(p, sizeof p, "rm -rf %s", r); if (system(p)) {}
+    }
     app_use_radio(&a, "g90");
     for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
     CHECK(a.rig_ok && a.radio && !strcmp(a.radio->id, "g90") && (a.band_mask & 1u), "radio switched live to G90 (160 m now allowed)");
