@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "core/app.h"
+#include "core/log.h"
 #include "core/clock.h"
 #include "ui/gfx.h"
 #include "ui/views.h"
@@ -56,6 +57,8 @@ int main(int argc, char **argv)
 {
     const char *dir = argc > 1 ? argv[1] : ".";
     static app_t a;
+    setenv("HOME", "/home/cwalker", 1);
+    log_open("/tmp/qsoz-preview.log");
     app_init(&a, "/nonexistent", 0);
     snprintf(a.cfg.callsign, sizeof a.cfg.callsign, "KN4CRD");
     snprintf(a.cfg.grid, sizeof a.cfg.grid, "EM73tu");

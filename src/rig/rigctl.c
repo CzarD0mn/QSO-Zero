@@ -1,4 +1,5 @@
 #include "rigctl.h"
+#include "core/log.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -136,6 +137,8 @@ static int rig_cmd(const char *cmd, char *reply, size_t rsz)
 
 static int try_model(int model, const rig_config_t *c)
 {
+    qlog("rig", "trying Hamlib model %d on %s at %d baud (%s rigctld, PTT %s)", model, c->serial, c->baud ? c->baud : c->profile->baud,
+         c->spawn ? "starting" : "existing", c->ptt == PTT_CAT ? "CAT" : c->ptt == PTT_RTS ? "RTS" : c->ptt == PTT_DTR ? "DTR" : "?");
     if (c->spawn) {
         g_child = spawn_rigctld(model, c);
         if (g_child < 0) return -1;
@@ -145,17 +148,20 @@ static int try_model(int model, const rig_config_t *c)
         if (c->spawn && waitpid(g_child, NULL, WNOHANG) == g_child) {
             g_child = -1;
             snprintf(g_err, sizeof g_err, "rigctld exited (model %d, %s)", model, c->serial);
+            qlog("rig", "%s - wrong port, port busy, or no permission?", g_err);
             return -1;
         }
         g_sock = tcp_connect(c->port ? c->port : 4532);
         if (g_sock >= 0) break;
     }
-    if (g_sock < 0) { snprintf(g_err, sizeof g_err, "cannot reach rigctld"); kill_child(); return -1; }
+    if (g_sock < 0) { snprintf(g_err, sizeof g_err, "cannot reach rigctld"); qlog("rig", "%s", g_err); kill_child(); return -1; }
     char f[64];
     if (rig_cmd("f", f, sizeof f) != 0) {      /* prove the radio answers */
+        qlog("rig", "radio did not answer: %s", g_err);
         close(g_sock); g_sock = -1; kill_child();
         return -1;
     }
+    qlog("rig", "radio answered, VFO %s Hz", f);
     return 0;
 }
 
@@ -218,6 +224,7 @@ int rig_ptt(int on)
         r = 0;
     }
     if (r == 0) g_ptt = on;
+    if (r != 0) qlog("rig", "PTT %s failed: %s", on ? "on" : "off", g_err);
     pthread_mutex_unlock(&g_lock);
     return r;
 }
@@ -257,6 +264,7 @@ static void emergency_unkey(void)
 
 static void on_signal(int sig)
 {
+    qlog("exit", "signal %d (%s)", sig, sig == SIGSEGV ? "crash" : sig == SIGABRT ? "abort" : sig == SIGTERM ? "terminated" : sig == SIGINT ? "interrupt" : "hangup");
     emergency_unkey();
     if (g_child > 0) kill(g_child, SIGTERM);
     signal(sig, SIG_DFL);

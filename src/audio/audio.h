@@ -28,7 +28,7 @@ float audio_rx_level(void);
 
 /* Capture health for Tools: samples/s actually arriving at 48 kHz over the
  * last few seconds (0 = nothing coming in), and the last read error. */
-typedef struct { double rate; long errors; char last_error[80]; } audio_rx_stats_t;
+typedef struct { double rate; long errors, reopens; char last_error[80]; } audio_rx_stats_t;
 void audio_rx_stats(audio_rx_stats_t *out);
 
 /* Find an ALSA card whose /proc/asound/cards line contains any of the
