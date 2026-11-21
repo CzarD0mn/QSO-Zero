@@ -145,7 +145,8 @@ int ft8w_decode(ft8w_t *w, const int16_t *audio, int n, ft8w_decode_t *out, int 
         o->freq = (w->mon.min_bin + cand[i].freq_offset + (float)cand[i].freq_sub / wf->freq_osr) / w->mon.symbol_period;
         /* ft8_lib's STFT frames lag the signal by 0.14 s (measured: an on-time
          * signal at +0.5 s reads 0.64 s); report DT the way WSJT-X does */
-        o->dt = (cand[i].time_offset + (float)cand[i].time_sub / wf->time_osr) * w->mon.symbol_period - 0.64f;
+        /* (FT4's shorter frames lag less: an on-time signal reads 0.55 s) */
+        o->dt = (cand[i].time_offset + (float)cand[i].time_sub / wf->time_osr) * w->mon.symbol_period - (w->proto == FT8W_FT4 ? 0.55f : 0.64f);
         uint8_t tones[FT4_NN > FT8_NN ? FT4_NN : FT8_NN];
         int nt;
         if (w->proto == FT8W_FT4) { ft4_encode(msg.payload, tones); nt = FT4_NN; }

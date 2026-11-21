@@ -51,6 +51,7 @@ static uint16_t line_color(const rxline_t *l)
 static int band_bw(const app_t *a)
 {
     if (a->mode == MODE_FT8) return 50;
+    if (a->mode == MODE_FT4) return 83;
     if (a->mode == MODE_WSPR) return 6;
     return (int)js8_submode_info((js8_submode_t)a->js8_sub)->bandwidth;
 }
@@ -104,7 +105,7 @@ static void draw_waterfall(app_t *a, surface_t *s, int x, int y, int w, int h)
 
 static void draw_period_bar(app_t *a, surface_t *s, int x, int y, int w, int h)
 {
-    int P = mode_period(a);
+    double P = mode_period(a);
     double pos = clk_period_pos(P, NULL);
     int fill = (int)(pos / P * w);
     gfx_fill(s, x, y, w, h, C_PANEL);
@@ -208,7 +209,7 @@ static void draw_input(app_t *a, surface_t *s, int x, int y, int w)
         xx = gfx_text_n(s, xx, y + 2, t, cols, C_TEXT, 1);
         if (((int)(clk_mono() * 2)) & 1) gfx_fill(s, xx, y + 1, 5, 8, C_CYAN);
         if (!a->input_len) {
-            const char *hint = a->mode == MODE_FT8 ? "ENT reply  ^Q CQ  TAB mode  ESC setup"
+            const char *hint = mode_is_ft(a->mode) ? "ENT reply  ^Q CQ  TAB mode  ESC setup"
                              : a->mode == MODE_JS8 ? "type msg  ^E HB  ^Q CQ  ESC setup"
                                                    : "^W beacon  ^U tune  ESC setup";
             gfx_text_n(s, xx + 8, y + 2, hint, cols - 3, C_FAINT, 1);
@@ -351,7 +352,7 @@ static void render_large_main(app_t *a, surface_t *s)
     meter(s, px + 6, py + 78, pw - 12, "SWR", a->tx_active ? (a->swr - 1) / 2 : 0, a->swr > 2 ? C_RED : C_CYAN, a->tx_active ? buf : "--");
 
     const char *seqn[] = {"idle", "calling CQ", "calling", "sent report", "sent R-report", "sent RR73", "sent 73"};
-    if (a->mode == MODE_FT8 && a->seq.st != SEQ_IDLE)
+    if (mode_is_ft(a->mode) && a->seq.st != SEQ_IDLE)
         snprintf(buf, sizeof buf, "QSO %s: %s (try %d)", a->seq.dx[0] ? a->seq.dx : "-", seqn[a->seq.st], a->seq.tries);
     else if (a->mode == MODE_WSPR)
         snprintf(buf, sizeof buf, "WSPR beacon %s  %d dBm  %d%%", a->wspr_beacon ? "ON" : "off", wspr_valid_dbm(a->cfg.wspr_dbm), a->cfg.wspr_tx_pct);
@@ -400,7 +401,7 @@ enum { MI_MODE,
 
 static int menu_visible(const app_t *a, int i)
 {
-    if (i == MI_CQMOD) return a->mode == MODE_FT8;
+    if (i == MI_CQMOD) return mode_is_ft(a->mode);
     if (i >= MI_SUB && i <= MI_AMAIL) return a->mode == MODE_JS8;
     if (i >= MI_WRX && i <= MI_WPCT) return a->mode == MODE_WSPR;
     return 1;
@@ -649,7 +650,7 @@ static void render_help(app_t *a, surface_t *s)
         "KEYS            hold ESC: exit",
         "ENTER   send / reply to selected",
         "UP/DN   select decode   L/R move RX+TX",
-        "TAB     next mode (FT8 JS8 WSPR)",
+        "TAB     next mode (FT8 FT4 JS8 WSPR)",
         "PGUP/DN band            ESC setup",
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
         "^U tune  ^W WSPR beacon  ^T tools",

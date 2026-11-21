@@ -25,20 +25,21 @@
 #define WF_NFFT 1280
 
 /* Standard dial frequencies (USB) per mode, and the band edges used to work
- * out which band the radio's VFO is on. FT8/WSPR: WSJT-X defaults; JS8:
- * JS8Call defaults. Edges cover all three IARU regions. */
+ * out which band the radio's VFO is on. FT8/FT4/WSPR: WSJT-X defaults
+ * (no FT4 on 160 or 60 m); JS8: JS8Call defaults. Edges cover all three
+ * IARU regions. Columns: FT8, JS8, WSPR, low edge, high edge, FT4. */
 static const band_t k_bands[] = {
-    {"160m",  1840000,  1842000,  1836600,  1800000,  2000000},
-    {"80m",   3573000,  3578000,  3568600,  3500000,  4000000},
-    {"60m",   5357000,  5357000,  5287200,  5250000,  5450000},
-    {"40m",   7074000,  7078000,  7038600,  7000000,  7300000},
-    {"30m",  10136000, 10130000, 10138700, 10100000, 10150000},
-    {"20m",  14074000, 14078000, 14095600, 14000000, 14350000},
-    {"17m",  18100000, 18104000, 18104600, 18068000, 18168000},
-    {"15m",  21074000, 21078000, 21094600, 21000000, 21450000},
-    {"12m",  24915000, 24922000, 24924600, 24890000, 24990000},
-    {"10m",  28074000, 28078000, 28124600, 28000000, 29700000},
-    {"6m",   50313000, 50318000, 50293000, 50000000, 54000000},
+    {"160m",  1840000,  1842000,  1836600,  1800000,  2000000,         0},
+    {"80m",   3573000,  3578000,  3568600,  3500000,  4000000,   3575000},
+    {"60m",   5357000,  5357000,  5287200,  5250000,  5450000,         0},
+    {"40m",   7074000,  7078000,  7038600,  7000000,  7300000,   7047500},
+    {"30m",  10136000, 10130000, 10138700, 10100000, 10150000,  10140000},
+    {"20m",  14074000, 14078000, 14095600, 14000000, 14350000,  14080000},
+    {"17m",  18100000, 18104000, 18104600, 18068000, 18168000,  18104000},
+    {"15m",  21074000, 21078000, 21094600, 21000000, 21450000,  21140000},
+    {"12m",  24915000, 24922000, 24924600, 24890000, 24990000,  24919000},
+    {"10m",  28074000, 28078000, 28124600, 28000000, 29700000,  28180000},
+    {"6m",   50313000, 50318000, 50293000, 50000000, 54000000,  50318000},
 };
 
 const band_t *band_table(int *count)
@@ -77,7 +78,7 @@ static int64_t mode_freq(const app_t *a, int band)
     /* GHOSTNET isn't locked: nets move off frequency to dodge QRM, so use
      * wherever the operator last tuned on this band, else the net default */
     if (in_ghostnet(a) && ghostnet_freq(band)) return a->ghost_hz[band] ? a->ghost_hz[band] : ghostnet_freq(band);
-    return a->mode == MODE_FT8 ? b->ft8 : a->mode == MODE_JS8 ? b->js8 : b->wspr;
+    return a->mode == MODE_FT8 ? b->ft8 : a->mode == MODE_FT4 ? b->ft4 : a->mode == MODE_JS8 ? b->js8 : b->wspr;
 }
 
 /* config "bands = 40,30,20" (with or without the m) -> bit mask; 0 = no limit */
@@ -100,18 +101,24 @@ unsigned app_bands(const app_t *a)
     unsigned m = a->band_mask & ~a->band_rejected;
     if (!m) m = a->band_mask;
     if (in_ghostnet(a) && (m & GHOSTNET_BANDS)) m &= GHOSTNET_BANDS;   /* band keys cycle 80/40/20 */
+    if (a->mode == MODE_FT4) {                                          /* no FT4 on 160 / 60 m */
+        unsigned f = 0;
+        for (int i = 0; i < (int)(sizeof k_bands / sizeof *k_bands); ++i) if (k_bands[i].ft4) f |= 1u << i;
+        if (m & f) m &= f;
+    }
     return m;
 }
 
 const char *mode_name(op_mode_t m)
 {
-    static const char *n[] = {"FT8", "JS8", "WSPR"};
+    static const char *n[] = {"FT8", "FT4", "JS8", "WSPR"};
     return m < MODE_COUNT ? n[m] : "?";
 }
 
-int mode_period(const app_t *a)
+double mode_period(const app_t *a)
 {
     if (a->mode == MODE_FT8) return 15;
+    if (a->mode == MODE_FT4) return 7.5;
     if (a->mode == MODE_WSPR) return WSPR_PERIOD_S;
     return js8_submode_info((js8_submode_t)a->js8_sub)->period_s;
 }
@@ -279,6 +286,12 @@ void app_set_band(app_t *a, int band)
     if (a->tx_active) { app_status(a, "can't change band while transmitting"); return; }
     if (!(a->band_mask & (1u << band))) {
         app_status(a, "%s doesn't cover %s", a->radio->name, k_bands[band].name);
+        return;
+    }
+    if (a->mode == MODE_FT4 && !k_bands[band].ft4) {
+        a->band = band;                                   /* follow the radio, but there's no FT4 spot to tune to */
+        app_status(a, "no FT4 frequency on %s", k_bands[band].name);
+        a->dirty = 1;
         return;
     }
     clear_tx_for_qsy(a);
@@ -761,13 +774,13 @@ static void sleep_until(app_t *a, double utc)
 static void *decode_thread(void *arg)
 {
     app_t *a = arg;
-    ft8w_t *ft8 = ft8w_new(FT8W_FT8, 12000, 100, 3000);
+    ft8w_t *ft8 = ft8w_new(FT8W_FT8, 12000, 100, 3000), *ft4 = ft8w_new(FT8W_FT4, 12000, 100, 3000);
     js8_decoder_t *js8 = NULL;
     int js8_sub = -1;
     int16_t *buf = malloc(sizeof(int16_t) * WSPRRX_SAMPLES);   /* largest window: WSPR 114 s */
     while (!a->quit) {
         op_mode_t mode = a->mode;
-        int P = mode_period(a);
+        double P = mode_period(a);
         if (mode == MODE_WSPR) {
             /* receive cycle: even minute .. +114 s, decode at +115 s */
             double start = floor(clk_now() / 120.0) * 120.0;
@@ -811,6 +824,7 @@ static void *decode_thread(void *arg)
          * because the reply must start within ~2 s of the next slot. */
         double ready;
         if (mode == MODE_FT8) ready = 14.0;
+        else if (mode == MODE_FT4) ready = 5.9;        /* 0.5 s + 105 x 48 ms = 5.54 s, + margin */
         else {
             const js8_submode_info_t *in = js8_submode_info((js8_submode_t)a->js8_sub);
             ready = in->start_delay_ms / 1000.0 + 79.0 * in->symbol_samples / 12000.0 + 0.35;
@@ -822,15 +836,15 @@ static void *decode_thread(void *arg)
         a->decoding = 1;
         a->dirty = 1;
         double t0 = clk_mono();
-        if (mode == MODE_FT8) {
+        if (mode_is_ft(mode)) {
             int n = (int)((ready - 0.1) * 12000);
             if (ring_extract(a, start, n, buf) == 0) {
                 ft8w_decode_t d[60];
-                int nd = ft8w_decode(ft8, buf, n, d, 60);
-                int odd = ((long long)(start / 15)) & 1;
+                int nd = ft8w_decode(mode == MODE_FT4 ? ft4 : ft8, buf, n, d, 60);
+                int odd = ((long long)llround(start / P)) & 1;
                 pthread_mutex_lock(&a->lock);
                 for (int i = 0; i < nd; ++i) {
-                    rxline_t l = {.utc = start, .snr = d[i].snr, .dt = d[i].dt, .freq = d[i].freq, .mode = MODE_FT8, .slot_odd = odd};
+                    rxline_t l = {.utc = start, .snr = d[i].snr, .dt = d[i].dt, .freq = d[i].freq, .mode = mode, .slot_odd = odd};
                     snprintf(l.text, sizeof l.text, "%s", d[i].text);
                     if (!strncmp(l.text, "CQ ", 3)) l.flags |= LINE_CQ;
                     size_t cl = strlen(a->cfg.callsign);
@@ -862,6 +876,7 @@ static void *decode_thread(void *arg)
         a->dirty = 1;
     }
     ft8w_free(ft8);
+    ft8w_free(ft4);
     js8_decoder_free(js8);
     free(buf);
     return NULL;
@@ -878,18 +893,19 @@ static double next_tx_start(app_t *a, const txitem_t *t, double now)
         double s = ceil((now - 1.0) / 120.0) * 120.0 + 1.0;
         return s;
     }
-    if (t->kind == TXK_FT8) {
-        double s = floor(now / 15) * 15;
-        int idx = (int)((long long)(s / 15) & 1);
+    if (t->kind == TXK_FT8) {                      /* FT8 (15 s) or FT4 (7.5 s): the current mode */
+        double P = a->mode == MODE_FT4 ? 7.5 : 15.0, late = a->mode == MODE_FT4 ? 1.0 : 2.0;
+        double s = floor(now / P) * P;
+        int idx = (int)((long long)llround(s / P) & 1);
         double pos = now - s;
-        /* late start is fine up to ~2 s (decoders search DT +/-2.5 s) */
-        if ((t->slot_odd < 0 || idx == t->slot_odd) && pos < 2.0) return pos < 0.5 ? s + 0.5 : now + 0.05;
+        /* late start is fine up to ~2 s FT8 / ~1 s FT4 (the decoders' DT search range) */
+        if ((t->slot_odd < 0 || idx == t->slot_odd) && pos < late) return pos < 0.5 ? s + 0.5 : now + 0.05;
         for (int k = 1; k <= 2; ++k) {
-            double c = s + 15 * k;
-            int ci = (int)((long long)(c / 15) & 1);
+            double c = s + P * k;
+            int ci = (int)((long long)llround(c / P) & 1);
             if (t->slot_odd < 0 || ci == t->slot_odd) return c + 0.5;
         }
-        return s + 15.5;
+        return s + P + 0.5;
     }
     /* JS8 */
     const js8_submode_info_t *in = js8_submode_info((js8_submode_t)a->js8_sub);
@@ -905,10 +921,11 @@ static float *build_audio(app_t *a, const txitem_t *t, size_t *n)
     float *buf = NULL;
     if (t->kind == TXK_FT8) {
         uint8_t tones[105];
-        int nt = ft8w_encode(FT8W_FT8, t->text, tones);
+        ft8w_proto_t pr = a->mode == MODE_FT4 ? FT8W_FT4 : FT8W_FT8;
+        int nt = ft8w_encode(pr, t->text, tones);
         if (nt < 0) return NULL;
         buf = malloc(sizeof(float) * (size_t)(nt * 0.16 * R + R));
-        *n = ft8w_synth(FT8W_FT8, tones, nt, f0, R, 1.0f, buf);
+        *n = ft8w_synth(pr, tones, nt, f0, R, 1.0f, buf);
     } else if (t->kind == TXK_JS8) {
         uint8_t tones[79];
         if (js8_encode((js8_submode_t)a->js8_sub, t->bits, t->text, tones)) return NULL;
@@ -1149,7 +1166,7 @@ void app_toggle_wspr(app_t *a)
 
 void app_call_cq(app_t *a)
 {
-    if (a->mode == MODE_FT8) { pthread_mutex_lock(&a->lock); seq_start_cq(a); pthread_mutex_unlock(&a->lock); }
+    if (mode_is_ft(a->mode)) { pthread_mutex_lock(&a->lock); seq_start_cq(a); pthread_mutex_unlock(&a->lock); }
     else if (a->mode == MODE_JS8) {
         snprintf(a->input, sizeof a->input, "CQ CQ CQ %.4s", a->cfg.grid);
         app_submit_input(a);
@@ -1206,6 +1223,7 @@ static int handle_command(app_t *a, char *cmd)
         app_status(a, "bands: 160 80 60 40 30 20 17 15 12 10 6");
     } else if (!strcmp(cmd, "/mode") || !strcmp(cmd, "/m")) {
         if (!strncasecmp(arg, "ft8", 3)) app_set_mode(a, MODE_FT8);
+        else if (!strncasecmp(arg, "ft4", 3)) app_set_mode(a, MODE_FT4);
         else if (!strncasecmp(arg, "js8", 3)) app_set_mode(a, MODE_JS8);
         else if (!strncasecmp(arg, "wspr", 4)) app_set_mode(a, MODE_WSPR);
     } else if (!strcmp(cmd, "/sub")) {
@@ -1297,9 +1315,9 @@ void app_submit_input(app_t *a)
     if (!*s) { app_reply_selected(a); return; }
     if (*s == '/') { handle_command(a, s); return; }
     for (char *p = s; *p; ++p) *p = (char)toupper((unsigned char)*p);
-    if (a->mode == MODE_FT8) {
+    if (mode_is_ft(a->mode)) {
         uint8_t tones[105];
-        if (ft8w_encode(FT8W_FT8, s, tones) < 0) { app_status(a, "not a valid FT8 message"); return; }
+        if (ft8w_encode(a->mode == MODE_FT4 ? FT8W_FT4 : FT8W_FT8, s, tones) < 0) { app_status(a, "not a valid %s message", mode_name(a->mode)); return; }
         pthread_mutex_lock(&a->lock);
         if (a->ntxq < MAX_TXQ) a->txq[a->ntxq++] = (txitem_t){.kind = TXK_FT8, .slot_odd = a->seq.st != SEQ_IDLE ? a->seq.slot_odd : 0};
         snprintf(a->txq[a->ntxq - 1].text, sizeof a->txq[0].text, "%s", s);
@@ -1317,7 +1335,7 @@ void app_reply_selected(app_t *a)
     if (a->sel < 0 || a->sel >= a->nlines) return;
     rxline_t l = a->lines[a->sel];
     if (l.flags & (LINE_TX | LINE_SYS)) return;
-    if (a->mode == MODE_FT8) {
+    if (mode_is_ft(a->mode)) {
         pthread_mutex_lock(&a->lock);
         seq_start_reply(a, &l);
         pthread_mutex_unlock(&a->lock);

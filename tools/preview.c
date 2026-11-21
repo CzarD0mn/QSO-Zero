@@ -198,6 +198,13 @@ int main(int argc, char **argv)
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu_levels.ppm", dir); save_ppm(c, 3, p);
     a.screen = 0;
+    a.mode = MODE_FT4; a.dial_hz = 14080000; a.band = 5; a.screen = 0;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_ft4.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 1; a.menu_sel = 0;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_menu_ft4.ppm", dir); save_ppm(c, 3, p);
+    a.mode = MODE_FT8; a.screen = 0;
     printf("wrote previews to %s\n", dir);
     return 0;
 }

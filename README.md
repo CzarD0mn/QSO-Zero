@@ -1,8 +1,9 @@
 # QSO-Zero
 
-A lightweight FT8 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, built for field ops with QRP radios. Plain C, no Qt, no X, no SDL: it draws straight to the Linux framebuffer and runs as a single ~200 KB binary.
+A lightweight FT8 / FT4 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, built for field ops with QRP radios. Plain C, no Qt, no X, no SDL: it draws straight to the Linux framebuffer and runs as a single ~200 KB binary.
 
 * **FT8**: decode, encode and auto-sequence (CQ → report → R-report → RR73 → 73), ADIF logging
+* **FT4**: the same messages and auto-sequencer on 7.5-second cycles, at the WSJT-X FT4 frequencies, logged as MFSK/FT4 in ADIF
 * **JS8**: native C port of the JS8Call modem and message layer. All four speeds (Normal/Fast/Turbo/Slow), heartbeats, CQ, directed commands, compound calls, Huffman and JSC-compressed free text, multi-frame messages
 * **JS8 auto-replies** (off by default, a toggle in Setup): answers `SNR?`, `GRID?`, `INFO?`, `STATUS?`, `HEARING?`, `AGN?`, stores checksummed `MSG`s in an inbox file and ACKs them, and optionally ACKs heartbeats. Wording matches JS8Call's own replies
 * **WSPR**: receive (a port of the WSJT-X `wsprd` decoder: sync search, Fano decoding, signal subtraction) with distance to each spotter, plus a type-1 beacon transmitter with %-of-slots scheduling
@@ -68,7 +69,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Enter` on empty line | reply to the selected decode |
 | `↑` `↓` (or `Ctrl` + `;` `.`) | select decode |
 | `←` `→` (or `Ctrl` + `,` `/`) | move RX/TX offset 10 Hz (Shift: 100 Hz) |
-| `Tab` | FT8 → JS8 → WSPR |
+| `Tab` | FT8 → FT4 → JS8 → WSPR |
 | `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band (skips bands the radio can't do) |
 | `Esc` or `` ` `` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
 | `Ctrl+Q` | CQ |
@@ -79,7 +80,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Ctrl+T` | tools (GPS/time, rig, audio) |
 | `F1` | help |
 
-Commands: `/band 40`, `/mode js8`, `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands: `/band 40`, `/mode js8` (ft8, ft4, js8, wspr), `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
 ### Battery
 
@@ -166,19 +167,19 @@ Setup (ESC) has four pickers: **Radio**, **CAT port**, **Audio in** and **Audio 
 
 QSO-Zero drives the radio's VFO to the usual frequency for the current mode on each band (FT8 and WSPR: the WSJT-X defaults; JS8: the JS8Call defaults).
 
-| Band | FT8 | JS8 | WSPR (dial) |
-|---|---|---|---|
-| 160 m | 1.840 | 1.842 | 1.8366 |
-| 80 m | 3.573 | 3.578 | 3.5686 |
-| 60 m | 5.357 | 5.357 | 5.2872 |
-| 40 m | 7.074 | 7.078 | 7.0386 |
-| 30 m | 10.136 | 10.130 | 10.1387 |
-| 20 m | 14.074 | 14.078 | 14.0956 |
-| 17 m | 18.100 | 18.104 | 18.1046 |
-| 15 m | 21.074 | 21.078 | 21.0946 |
-| 12 m | 24.915 | 24.922 | 24.9246 |
-| 10 m | 28.074 | 28.078 | 28.1246 |
-| 6 m | 50.313 | 50.318 | 50.293 |
+| Band | FT8 | FT4 | JS8 | WSPR (dial) |
+|---|---|---|---|---|
+| 160 m | 1.840 | — | 1.842 | 1.8366 |
+| 80 m | 3.573 | 3.575 | 3.578 | 3.5686 |
+| 60 m | 5.357 | — | 5.357 | 5.2872 |
+| 40 m | 7.074 | 7.0475 | 7.078 | 7.0386 |
+| 30 m | 10.136 | 10.140 | 10.130 | 10.1387 |
+| 20 m | 14.074 | 14.080 | 14.078 | 14.0956 |
+| 17 m | 18.100 | 18.104 | 18.104 | 18.1046 |
+| 15 m | 21.074 | 21.140 | 21.078 | 21.0946 |
+| 12 m | 24.915 | 24.919 | 24.922 | 24.9246 |
+| 10 m | 28.074 | 28.180 | 28.078 | 28.1246 |
+| 6 m | 50.313 | 50.318 | 50.318 | 50.293 |
 
 * **At start-up** it reads the radio and stays on the band the radio is already on, rather than always starting on 20 m.
 * **Changing mode or band** retunes the radio and sets USB (PKTUSB on the FT-891).
@@ -192,6 +193,10 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 * **During transmit** the frequency never changes, and any queued messages are cleared on a band change.
 * **Turning it off:** use ESC › **Auto frequency**, `/qsy off`, or `auto_qsy = 0` in the config. With it off, mode changes leave the VFO alone and the band display just follows the radio. Picking a band explicitly still tunes the radio.
 * **Limiting the band list:** set `bands = 40,30,20` in the config, for example.
+
+## Decode speed check
+
+`qso-zero --bench` builds a busy band for each mode: 20 FT8 signals, 15 FT4, 8 for each JS8 speed and 8 WSPR. It times the same decoder calls the app makes, and compares the slowest of 3 runs with the time available before a reply would have to start. The available time is 1.5 s for FT8 and 2.1 s for FT4 (decoding starts as soon as the last symbol is in), 1.7 to 4.4 s for JS8 depending on speed, and 6 s for WSPR. Run it on the Cardputer Zero. **OK** means well within the time, **TIGHT** fits with little margin, and **TOO SLOW** means replies would go out late.
 
 ## Log file (for troubleshooting)
 
