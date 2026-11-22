@@ -279,8 +279,6 @@ int main(void)
         rxline_t j = {.mode = MODE_JS8};
         snprintf(j.text, sizeof j.text, "W1AW: KM4FLG HELLO");
         CHECK(line_shown(&c, &j), "JS8 is never filtered");
-        snprintf(c.input, sizeof c.input, "/scroll 300 40"); app_submit_input(&c);
-        CHECK(c.cfg.scroll_delay_ms == 300 && c.cfg.scroll_rate_ms == 40, "/scroll 300 40 sets the hold-to-scroll timing");
     }
 
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);

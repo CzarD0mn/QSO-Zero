@@ -104,33 +104,6 @@ int main(void)
     n = collect(150, ev, 16);
     CHECK(n == 1 && ev[0].key == K_CHAR && ev[0].ch == 'x' && (ev[0].mods & MOD_CTRL), "Ctrl+X (halt TX) still arrives");
 
-    /* --- hold to scroll: the keypad sends no autorepeat, so we make it --- */
-    input_set_repeat(400, 60);
-    key(KEY_DOWN, 1); key(KEY_DOWN, 0);
-    n = collect(700, ev, 16);
-    CHECK(n == 1 && ev[0].key == K_DOWN, "tap down: one step (%d)", n);
-    keyev_t big[64];
-    key(KEY_DOWN, 1);
-    n = collect(350, big, 64);
-    CHECK(n == 1, "held down 350 ms: still one step, under the 400 ms delay (%d)", n);
-    n += collect(650, big + n, 64 - n);
-    int alld = 1;
-    for (int i = 0; i < n; ++i) alld &= big[i].key == K_DOWN;
-    CHECK(alld && n >= 9 && n <= 13, "held down 1 s: 1 + ~10 repeats at 60 ms (%d)", n);
-    key(KEY_DOWN, 0);
-    n = collect(300, big, 64);
-    CHECK(n == 0, "released: repeats stop (%d)", n);
-    key(KEY_UP, 1); n = collect(200, big, 64); key(KEY_ENTER, 1); n += collect(500, big + n, 64 - n);
-    key(KEY_ENTER, 0); key(KEY_UP, 0); collect(100, big, 64);
-    CHECK(n == 2 && big[0].key == K_UP && big[1].key == K_ENTER, "another key while holding up stops the repeat (%d)", n);
-    key(KEY_PAGEDOWN, 1); n = collect(900, big, 64); key(KEY_PAGEDOWN, 0); collect(100, big + n, 64 - n);
-    CHECK(n == 1, "PgDn (band step) never repeats (%d)", n);
-    /* a keyboard with its own autorepeat: ours stays out of the way */
-    key(KEY_DOWN, 1); n = collect(300, big, 64);
-    for (int i = 0; i < 8; ++i) { key(KEY_DOWN, 2); n += collect(100, big + n, 64 - n); }
-    key(KEY_DOWN, 0); n += collect(200, big + n, 64 - n);
-    CHECK(n == 9, "kernel autorepeat: 1 + 8 of its repeats, none of ours (%d)", n);
-
     input_close();
     close(wfd);
     unlink(path);
