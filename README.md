@@ -25,7 +25,7 @@ The full operating guide, with first-time setup and every command, is in **[Oper
 | | |
 |---|---|
 | ![FT8 with a QSO in progress](docs/screenshots/ft8.png) **FT8.** CQ calls in cyan, messages to you in yellow, your transmissions in red. | ![CQ-only filter](docs/screenshots/ft8_cqonly.png) **CQ-only filter** (`/cqonly`). Only CQ calls, plus your own QSO. |
-| ![FT4 on 20 m](docs/screenshots/ft4.png) **FT4.** The same QSO flow on 7.5-second cycles. | ![JS8](docs/screenshots/js8.png) **JS8.** Directed messages, heartbeats, free text. |
+| ![FT4 on 20 m](docs/screenshots/ft4.png) **FT4.** The same QSO flow on 7.5-second cycles. | ![JS8](docs/screenshots/js8.png) Directed messages, heartbeats and free text. |
 | ![WSPR](docs/screenshots/wspr.png) **WSPR.** Spots with distance, and your beacon. | ![Setup](docs/screenshots/setup_audio.png) **Setup.** The *In signal* bar helps you set the receive level. |
 | ![Help](docs/screenshots/help.png) **fn+1** shows the keys and common commands. | ![Setup top](docs/screenshots/setup_top.png) **Setup** (esc). Options for the current mode are listed first. |
 
