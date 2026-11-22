@@ -32,7 +32,7 @@ void config_defaults(config_t *c)
     snprintf(c->log_path, sizeof c->log_path, "%s/qso-zero/qso-zero.adi", home);   /* ADIF log; folder made on demand */
     c->js8_autoreply = 0;
     c->js8_hb_ack = 0;
-    snprintf(c->inbox_path, sizeof c->inbox_path, "%s/qso-zero-inbox.txt", home);
+    snprintf(c->inbox_path, sizeof c->inbox_path, "%s/qso-zero/js8/qso-zero-inbox.txt", home);   /* JS8 MSG inbox; folder made on demand */
     c->wspr_rx = 1;
     c->auto_qsy = 1;
     c->audio_in_level = c->audio_out_level = -1;
@@ -91,6 +91,15 @@ int config_load(config_t *c, const char *path)
     }
     fclose(f);
     for (char *p = c->callsign; *p; ++p) *p = (char)toupper((unsigned char)*p);
+    {   /* settings saved before the inbox moved into ~/qso-zero/js8/ carry the
+         * previous default: use the current default instead */
+        config_t def;
+        config_defaults(&def);
+        char prev[200];
+        size_t n = strlen(def.inbox_path) - strlen("/qso-zero/js8/qso-zero-inbox.txt");
+        snprintf(prev, sizeof prev, "%.*s/qso-zero-inbox.txt", (int)n, def.inbox_path);
+        if (!strcmp(c->inbox_path, prev)) snprintf(c->inbox_path, sizeof c->inbox_path, "%s", def.inbox_path);
+    }
     return 0;
 }
 
@@ -122,8 +131,13 @@ int config_save(const config_t *c, const char *path)
     fprintf(f, "\n# FT8/FT4: show only CQ calls in the decode list (/cqonly)\ncq_only = %d\n", c->cq_only);
     fprintf(f, "\n# GHOSTNET: JS8 on 3.575 / 7.107 / 14.107 MHz USB-D instead of the usual JS8 frequencies\nghostnet = %d\n", c->ghostnet);
     fprintf(f, "\n# JS8 automatic replies (only to messages addressed to you)\njs8_autoreply = %d\njs8_hb_ack = %d\n"
-               "js8_info = %s\njs8_status = %s\ninbox_path = %s\nwspr_rx = %d\n",
-            c->js8_autoreply, c->js8_hb_ack, c->js8_info, c->js8_status, c->inbox_path, c->wspr_rx);
+               "js8_info = %s\njs8_status = %s\nwspr_rx = %d\n",
+            c->js8_autoreply, c->js8_hb_ack, c->js8_info, c->js8_status, c->wspr_rx);
+    {   /* only a custom inbox location is saved; the default stays ~/qso-zero/js8/qso-zero-inbox.txt */
+        config_t def;
+        config_defaults(&def);
+        if (strcmp(c->inbox_path, def.inbox_path)) fprintf(f, "inbox_path = %s\n", c->inbox_path);
+    }
     fprintf(f, "wsprnet_upload = %d\nwsprnet_host = %s\n", c->wsprnet_upload, c->wsprnet_host);
     fprintf(f, "\n# sound card levels in %% (-1 = leave as they are); set in Setup\naudio_in_level = %d\naudio_out_level = %d\n",
             c->audio_in_level, c->audio_out_level);

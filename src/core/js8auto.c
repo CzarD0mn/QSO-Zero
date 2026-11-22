@@ -112,8 +112,9 @@ static int check_msg(char *body)
 
 static void store_inbox(app_t *a, const char *from, const char *msg)
 {
+    log_dir_make(a->cfg.inbox_path);                  /* ~/qso-zero/js8/ made if missing */
     FILE *f = fopen(a->cfg.inbox_path, "a");
-    if (!f) return;
+    if (!f) { app_status(a, "inbox: cannot open %s", a->cfg.inbox_path); return; }
     time_t t = (time_t)clk_now();
     struct tm tm;
     gmtime_r(&t, &tm);

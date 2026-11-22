@@ -761,6 +761,17 @@ int log_dir_make(const char *file)
 static void log_path_setup(app_t *a)
 {
     if (log_dir_make(a->cfg.log_path)) qlog("config", "cannot create the folder for %s", a->cfg.log_path);
+    if (log_dir_make(a->cfg.inbox_path)) qlog("config", "cannot create the folder for %s", a->cfg.inbox_path);
+    /* JS8 messages kept in the inbox's previous default place move into ~/qso-zero/js8/ */
+    config_t def;
+    config_defaults(&def);
+    if (!strcmp(a->cfg.inbox_path, def.inbox_path)) {
+        char prev[200];
+        size_t n = strlen(def.inbox_path) - strlen("/qso-zero/js8/qso-zero-inbox.txt");
+        snprintf(prev, sizeof prev, "%.*s/qso-zero-inbox.txt", (int)n, def.inbox_path);
+        if (access(prev, F_OK) == 0 && access(a->cfg.inbox_path, F_OK) != 0 && rename(prev, a->cfg.inbox_path) == 0)
+            qlog("config", "JS8 inbox moved to %s", a->cfg.inbox_path);
+    }
 }
 
 int app_init(app_t *a, const char *cfgpath, int hw)

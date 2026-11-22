@@ -231,6 +231,28 @@ int main(void)
         if (f) fclose(f);
         CHECK(nr > 0 && !strstr(buf, "log_path"), "Save settings leaves the default log path out of the config");
 
+        /* JS8 inbox: ~/qso-zero/js8/qso-zero-inbox.txt, folder made at start, default not saved */
+        snprintf(p, sizeof p, "%s/qso-zero/js8/qso-zero-inbox.txt", home);
+        snprintf(q, sizeof q, "%s/qso-zero/js8", home);
+        CHECK(!strcmp(b.cfg.inbox_path, p) && stat(q, &st) == 0 && S_ISDIR(st.st_mode), "JS8 inbox %s, folder created", b.cfg.inbox_path);
+        CHECK(!strstr(buf, "inbox_path"), "Save settings leaves the default inbox path out of the config");
+        {   /* settings saved with the previous default, and a message stored there */
+            char prev[300], c2[300];
+            snprintf(prev, sizeof prev, "%s/qso-zero-inbox.txt", home);
+            FILE *o = fopen(prev, "w"); fprintf(o, "2026-11-22 20:00:00Z  W1AW -> KM4FLG: TEST\n"); fclose(o);
+            snprintf(c2, sizeof c2, "%s/old.conf", home);
+            o = fopen(c2, "w"); fprintf(o, "inbox_path = %s\n", prev); fclose(o);
+            static app_t d;
+            memset(&d, 0, sizeof d);
+            app_init(&d, c2, 0);
+            o = fopen(p, "r");
+            char ib[200] = "";
+            if (o) { if (!fgets(ib, sizeof ib, o)) ib[0] = 0; fclose(o); }
+            CHECK(!strcmp(d.cfg.inbox_path, p) && strstr(ib, "W1AW") && access(prev, F_OK) != 0,
+                  "old default inbox setting -> ~/qso-zero/js8/, earlier messages moved there");
+            app_shutdown(&d);
+        }
+
         /* a custom path is kept (and saved), and its folder made */
         f = fopen(cfg, "w"); fprintf(f, "log_path = %s/logs/field/my.adi\n", home); fclose(f);
         memset(&b, 0, sizeof b);
