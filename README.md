@@ -214,11 +214,11 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 
 ## Log file (for troubleshooting)
 
-QSO-Zero writes what it's doing to **`~/.cache/qso-zero/qso-zero.log`**. Each start begins a new file, and the previous run is kept as `qso-zero.log.1`. Tools shows the path.
+QSO-Zero writes what it's doing to **`~/.cache/qso-zero/qso-zero.log`**. Each start begins a new file. Only the **5 newest logs** are kept: `qso-zero.log`, then `qso-zero.log.1` (the newest older one) up to `.4`. Each file is capped at 1 MB, rotating within a run if needed, so the logs never take more than about 5 MB. Tools shows the path.
 
 ```sh
 qso-zero-setup --log        # the last 150 lines
-qso-zero-setup --log all    # everything, including the previous run
+qso-zero-setup --log all    # all 5 kept logs, oldest first
 ```
 
 It records:
