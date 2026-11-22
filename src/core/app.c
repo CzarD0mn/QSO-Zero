@@ -867,14 +867,27 @@ static void sleep_until(app_t *a, double utc)
  * The sequencer's per-cycle step (repeat / give up) runs once, after the
  * final pass. Each cycle's timing goes to the activity log. */
 #define FT_MAX_SEEN 64
+/* A message we sent ourselves: "CQ [MOD] MYCALL ...", or "DX MYCALL ...".
+ * Radios like the X6200 return the TX audio on USB, so without this our own
+ * transmission shows up as a decode. */
+static int ft_is_own(const app_t *a, const char *text)
+{
+    char tok[4][16] = {{0}};
+    int n = sscanf(text, "%15s %15s %15s %15s", tok[0], tok[1], tok[2], tok[3]);
+    const char *me = a->cfg.callsign;
+    if (n >= 2 && !strcmp(tok[0], "CQ")) return !strcmp(tok[1], me) || (n >= 3 && !strcmp(tok[2], me));
+    return n >= 2 && !strcmp(tok[1], me);
+}
+
 static void ft_add_decodes(app_t *a, op_mode_t mode, double start, int odd, const ft8w_decode_t *d, int nd,
-                           char seen[][40], int *nseen, int *added)
+                           char seen[][40], int *nseen, int *added, int *own)
 {
     pthread_mutex_lock(&a->lock);
     for (int i = 0; i < nd; ++i) {
         int dup = 0;
         for (int k = 0; k < *nseen; ++k) if (!strcmp(seen[k], d[i].text)) { dup = 1; break; }
         if (dup) continue;
+        if (ft_is_own(a, d[i].text)) { ++*own; continue; }   /* our own signal heard back through the radio */
         if (*nseen < FT_MAX_SEEN) snprintf(seen[(*nseen)++], 40, "%s", d[i].text);
         rxline_t l = {.utc = start, .snr = d[i].snr, .dt = d[i].dt, .freq = d[i].freq, .mode = mode, .slot_odd = odd};
         snprintf(l.text, sizeof l.text, "%s", d[i].text);
@@ -894,7 +907,7 @@ static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double re
     double early = mode == MODE_FT4 ? 5.65 : 13.35;
     int odd = ((long long)llround(start / P)) & 1;
     char seen[FT_MAX_SEEN][40];
-    int nseen = 0, n1 = 0, n2 = 0, ran_early = 0;
+    int nseen = 0, n1 = 0, n2 = 0, ran_early = 0, nown = 0;
     double ms1 = 0, ms2 = 0, at1 = 0, at2 = 0;
     ft8w_decode_t d[60];
     if (clk_now() < start + early - 0.02) {
@@ -909,7 +922,7 @@ static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double re
             double t0 = clk_mono();
             int nd = ft8w_decode(dec, buf, n, d, 60);
             ms1 = (clk_mono() - t0) * 1000;
-            ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n1);
+            ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n1, &nown);
             ran_early = 1;
         }
     }
@@ -918,12 +931,14 @@ static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double re
     int n = (int)((ready - 0.1) * 12000);
     a->decoding = 1;
     a->dirty = 1;
+    int ran_final = 0;
     if (ring_extract(a, start, n, buf) == 0) {
+        ran_final = 1;
         at2 = clk_now() - start;
         double t0 = clk_mono();
         int nd = ft8w_decode(dec, buf, n, d, 60);
         ms2 = (clk_mono() - t0) * 1000;
-        ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n2);
+        ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n2, &nown);
         pthread_mutex_lock(&a->lock);
         seq_after_cycle(a, odd);
         pthread_mutex_unlock(&a->lock);
@@ -934,12 +949,19 @@ static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double re
     time_t ts = (time_t)start;
     struct tm tm;
     gmtime_r(&ts, &tm);
-    if (ran_early)
-        qlog("decode", "%s %02d:%02d:%04.1f  early pass at +%.2f s: %d in %.0f ms (on screen +%.2f s)  final at +%.2f s: %d more in %.0f ms (+%.2f s)",
-             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, ms1, at1 + ms1 / 1000, at2, n2, ms2, at2 + ms2 / 1000);
+    const char *own = nown ? "  (our own transmission heard back: hidden)" : "";
+    if (!ran_final && !ran_early)
+        qlog("decode", "%s %02d:%02d:%04.1f  skipped: not a full cycle of audio yet (just switched mode or band, or the input restarted)",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0));
+    else if (!ran_final)
+        qlog("decode", "%s %02d:%02d:%04.1f  early pass at +%.2f s: %d in %.0f ms (on screen +%.2f s)  final pass skipped: audio not in%s",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, ms1, at1 + ms1 / 1000, own);
+    else if (ran_early)
+        qlog("decode", "%s %02d:%02d:%04.1f  early pass at +%.2f s: %d in %.0f ms (on screen +%.2f s)  final at +%.2f s: %d more in %.0f ms (+%.2f s)%s",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, ms1, at1 + ms1 / 1000, at2, n2, ms2, at2 + ms2 / 1000, own);
     else
-        qlog("decode", "%s %02d:%02d:%04.1f  final at +%.2f s: %d in %.0f ms (+%.2f s)",
-             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at2, n2, ms2, at2 + ms2 / 1000);
+        qlog("decode", "%s %02d:%02d:%04.1f  final at +%.2f s: %d in %.0f ms (+%.2f s)%s",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at2, n2, ms2, at2 + ms2 / 1000, own);
 }
 
 static void *decode_thread(void *arg)

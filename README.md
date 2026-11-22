@@ -211,7 +211,7 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 
 ## FT8 / FT4 QSOs
 
-Start a QSO by selecting a station's line and pressing **ENTER**, by calling CQ (Ctrl+Q), or by typing a standard message to a station you've heard, such as `W1AW KN4CRD EM73`. After that, the auto-sequencer answers each reply (report → R-report → RR73 → 73), logs the QSO, and repeats an unanswered message up to 6 times (10 for CQ). It transmits in the slot opposite the station's. A message addressed to you is only answered while a QSO is in progress. Every sequencer step is in the activity log under `[seq]`, including why a message was ignored.
+Start a QSO by selecting a station's line and pressing **ENTER**, by calling CQ (Ctrl+Q), or by typing a standard message to a station you've heard, such as `W1AW KN4CRD EM73`. After that, the auto-sequencer answers each reply (report → R-report → RR73 → 73), logs the QSO, and repeats an unanswered message up to 6 times (10 for CQ). It transmits in the slot opposite the station's. A message addressed to you is only answered while a QSO is in progress. Every sequencer step is in the activity log under `[seq]`, including why a message was ignored. Radios such as the X6200 return your transmit audio over USB; your own transmissions are only shown once, as sent, never as received decodes.
 
 ## FT8 / FT4 decode timing
 

@@ -406,6 +406,17 @@ static void realtime_reply(app_t *a)
     while (a->tx_active) usleep(20000);         /* let the R-report's airtime finish */
 }
 
+/* our own transmission coming back through the radio's USB audio is hidden */
+static void realtime_own(app_t *a)
+{
+    printf("[1c] our own transmission heard back is not listed as a decode\n");
+    double s0 = (floor(clk_now() / 15) + 1) * 15;
+    air_slot(a, s0, "CQ KN4CRD EM73", 0);
+    for (int w = 0; w < 30; ++w) { int16_t z[240] = {0}; app_audio_in(z, 240, clk_now(), a); usleep(50000); }
+    int i = find_line(a, "CQ KN4CRD EM73", 0);
+    CHECK(i < 0 || (a->lines[i].flags & LINE_TX), "'CQ KN4CRD EM73' (ours) not shown as received");
+}
+
 int main(void)
 {
     static app_t a;
@@ -420,6 +431,7 @@ int main(void)
     app_start_threads(&a);
     realtime_ft8(&a);
     realtime_reply(&a);
+    realtime_own(&a);
     wspr_cycle(&a);
     app_stop_threads(&a);
     printf(fails ? "FAIL (%d)\n" : "PASS\n", fails);
