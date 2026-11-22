@@ -26,7 +26,7 @@ typedef struct {
     int  js8_submode;        /* 0 normal 1 fast 2 turbo 3 slow */
     int  rx_offset;          /* audio Hz */
     int  tx_offset;
-    char log_path[160];
+    char log_path[160];      /* ADIF log: ~/qso-zero/qso-zero.adi */
     int  audio_in_level, audio_out_level;   /* sound card mixer %, -1 = leave as it is */
     int  auto_qsy;           /* move the VFO to the mode's standard frequency automatically */
     char bands[64];          /* optional band list, e.g. "40,30,20"; blank = all the radio covers */

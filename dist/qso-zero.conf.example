@@ -30,7 +30,8 @@ wspr_tx_pct = 20
 js8_submode = 0            # 0 normal, 1 fast, 2 turbo, 3 slow
 rx_offset = 1500
 tx_offset = 1500
-#log_path = ~/qso-zero.adi        (default: in your home folder)
+# ADIF contact log (default ~/qso-zero/qso-zero.adi; the folder is created if missing)
+# log_path = /home/USER/qso-zero/qso-zero.adi
 
 # JS8 automatic replies (only to messages addressed to you)
 js8_autoreply = 0

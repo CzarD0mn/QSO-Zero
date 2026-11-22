@@ -2,7 +2,7 @@
 
 A lightweight FT8 / FT4 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**, built for field ops with QRP radios. Plain C, no Qt, no X, no SDL: it draws straight to the Linux framebuffer and runs as a single ~200 KB binary.
 
-* **FT8**: decode, encode and auto-sequence (CQ → report → R-report → RR73 → 73), ADIF logging
+* **FT8**: decode, encode and auto-sequence (CQ → report → R-report → RR73 → 73), ADIF logging to `~/qso-zero/qso-zero.adi` (folder created automatically)
 * **FT4**: the same messages and auto-sequencer on 7.5-second cycles, at the WSJT-X FT4 frequencies, logged as MFSK/FT4 in ADIF
 * **JS8**: native C port of the JS8Call modem and message layer. All four speeds (Normal/Fast/Turbo/Slow), heartbeats, CQ, directed commands, compound calls, Huffman and JSC-compressed free text, multi-frame messages
 * **JS8 auto-replies** (off by default, a toggle in Setup): answers `SNR?`, `GRID?`, `INFO?`, `STATUS?`, `HEARING?`, `AGN?`, stores checksummed `MSG`s in an inbox file and ACKs them, and optionally ACKs heartbeats. Wording matches JS8Call's own replies

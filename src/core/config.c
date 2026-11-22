@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pwd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 void config_defaults(config_t *c)
 {
@@ -26,8 +28,8 @@ void config_defaults(config_t *c)
     c->rx_offset = 1500;
     c->tx_offset = 1500;
     const char *home = getenv("HOME");
-    if (!home || !*home) home = "/tmp";
-    snprintf(c->log_path, sizeof c->log_path, "%s/qso-zero.adi", home);
+    if (!home || !*home) { struct passwd *pw = getpwuid(getuid()); home = pw && pw->pw_dir ? pw->pw_dir : "/tmp"; }
+    snprintf(c->log_path, sizeof c->log_path, "%s/qso-zero/qso-zero.adi", home);   /* ADIF log; folder made on demand */
     c->js8_autoreply = 0;
     c->js8_hb_ack = 0;
     snprintf(c->inbox_path, sizeof c->inbox_path, "%s/qso-zero-inbox.txt", home);
@@ -109,8 +111,13 @@ int config_save(const config_t *c, const char *path)
             c->audio_in, c->audio_out, c->tx_level);
     fprintf(f, "\ngps_device = %s\ngps_baud = %d\ngps_latency_ms = %d\n", c->gps_device, c->gps_baud, c->gps_latency_ms);
     fprintf(f, "\ndisplay = %s\nkeyboard = %s\njsc_path = %s\n", c->display, c->keyboard, c->jsc_path);
-    fprintf(f, "\nwspr_dbm = %d\nwspr_tx_pct = %d\njs8_submode = %d\nrx_offset = %d\ntx_offset = %d\nlog_path = %s\n",
-            c->wspr_dbm, c->wspr_tx_pct, c->js8_submode, c->rx_offset, c->tx_offset, c->log_path);
+    fprintf(f, "\nwspr_dbm = %d\nwspr_tx_pct = %d\njs8_submode = %d\nrx_offset = %d\ntx_offset = %d\n",
+            c->wspr_dbm, c->wspr_tx_pct, c->js8_submode, c->rx_offset, c->tx_offset);
+    {   /* only a custom log location is saved; the default stays ~/qso-zero/qso-zero.adi */
+        config_t def;
+        config_defaults(&def);
+        if (strcmp(c->log_path, def.log_path)) fprintf(f, "log_path = %s\n", c->log_path);
+    }
     fprintf(f, "\n# FT8 CQ modifier (CQ POTA ...): 1-4 letters or 3 digits, blank for plain CQ\ncq_mod = %s\n", c->cq_mod);
     fprintf(f, "\n# GHOSTNET: JS8 on 3.575 / 7.107 / 14.107 MHz USB-D instead of the usual JS8 frequencies\nghostnet = %d\n", c->ghostnet);
     fprintf(f, "\n# JS8 automatic replies (only to messages addressed to you)\njs8_autoreply = %d\njs8_hb_ack = %d\n"

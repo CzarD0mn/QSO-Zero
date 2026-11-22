@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "core/app.h"
 #include "dsp/ft8w.h"
 #include "dsp/js8_varicode.h"
@@ -194,6 +196,48 @@ int main(void)
     CHECK(app_aprs_message(&a, "NOTACALLSIGN1", "hi") != 0, "bad callsign refused");
     app_set_mode(&a, MODE_FT8);
     CHECK(app_aprs_sms(&a, "5551234567", "hi") != 0 && a.ntxq == 0, "refused outside JS8: \"%s\"", a.status);
+
+    printf("[6] ADIF log location\n");
+    {
+        char home[] = "/tmp/qsoz-adifXXXXXX", p[400], cfg[300], q[300];
+        if (!mkdtemp(home)) return 1;
+        setenv("HOME", home, 1);
+        static app_t b;
+        memset(&b, 0, sizeof b);
+        app_init(&b, "/nonexistent", 0);
+        snprintf(p, sizeof p, "%s/qso-zero/qso-zero.adi", home);
+        struct stat st;
+        snprintf(q, sizeof q, "%s/qso-zero", home);
+        CHECK(!strcmp(b.cfg.log_path, p) && stat(q, &st) == 0 && S_ISDIR(st.st_mode), "default %s, folder created", b.cfg.log_path);
+        snprintf(b.cfg.callsign, sizeof b.cfg.callsign, "KM4FLG");
+        b.mode = MODE_FT8;
+        adif_log(&b, "W1AW", "FN31", "FT8", -10, -12);
+        FILE *f = fopen(p, "r");
+        char buf[600] = "";
+        size_t nr = f ? fread(buf, 1, sizeof buf - 1, f) : 0;
+        buf[nr] = 0;
+        if (f) fclose(f);
+        CHECK(strstr(buf, "<call:4>W1AW") && strstr(buf, "<eoh>"), "contact written there");
+        app_shutdown(&b);
+
+        /* Save settings doesn't pin the default path */
+        snprintf(cfg, sizeof cfg, "%s/saved.conf", home);
+        config_save(&b.cfg, cfg);
+        f = fopen(cfg, "r");
+        nr = f ? fread(buf, 1, sizeof buf - 1, f) : 0;
+        buf[nr] = 0;
+        if (f) fclose(f);
+        CHECK(nr > 0 && !strstr(buf, "log_path"), "Save settings leaves the default log path out of the config");
+
+        /* a custom path is kept (and saved), and its folder made */
+        f = fopen(cfg, "w"); fprintf(f, "log_path = %s/logs/field/my.adi\n", home); fclose(f);
+        memset(&b, 0, sizeof b);
+        app_init(&b, cfg, 0);
+        snprintf(q, sizeof q, "%s/logs/field", home);
+        CHECK(strstr(b.cfg.log_path, "/logs/field/my.adi") && stat(q, &st) == 0, "custom log_path kept, folder created");
+        app_shutdown(&b);
+        snprintf(q, sizeof q, "rm -rf %s", home); if (system(q)) {}
+    }
 
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
     return fails != 0;
