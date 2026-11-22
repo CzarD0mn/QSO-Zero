@@ -88,8 +88,6 @@ First-time setup is covered step by step in [Operations.md](Operations.md#first-
 
 ### Essential keys
 
-On the Cardputer Zero, the arrows are on the **fn** layer and `/` is on the **sym** layer.
-
 | Key | Does |
 |---|---|
 | fn+F / fn+X (↑ ↓) | select a decode; move in Setup |
