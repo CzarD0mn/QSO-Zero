@@ -95,11 +95,14 @@ int main(void)
     close(fd);
 
     static app_t a;
-    printf("[1] startup follows the radio's band\n");
+    printf("[1] startup: WSPR on 20 m\n");
     app_init(&a, cfg, 1);
     CHECK(a.rig_ok, "rig connected");
-    CHECK(a.band == 3, "radio on 7.150 -> band 40m (got %d)", a.band);
-    CHECK(g_vfo == 7074000 && a.dial_hz == 7074000, "VFO moved to 40m FT8 7.074 (vfo %lld)", g_vfo);
+    CHECK(a.mode == MODE_WSPR && a.band == 5, "starts in WSPR on 20m (mode %s, band %d)", mode_name(a.mode), a.band);
+    CHECK(g_vfo == 14095600 && a.dial_hz == 14095600, "radio (was on 7.150) tuned to 20m WSPR 14.0956 (vfo %lld)", g_vfo);
+    app_set_band(&a, 3);
+    app_set_mode(&a, MODE_FT8);
+    CHECK(g_vfo == 7074000, "then 40m FT8 7.074 as before (vfo %lld)", g_vfo);
 
     CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "on connect: radio in PKTUSB (USB-D), 3 kHz (mode %s, %d Hz)", g_mode, g_pb);
 
