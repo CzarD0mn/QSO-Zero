@@ -24,6 +24,11 @@ void input_close(void);
 /* waits up to timeout_ms; returns 1 and fills ev when a key arrives */
 int  input_poll(keyev_t *ev, int timeout_ms);
 
+/* Hold to scroll: an arrow (or backspace) held longer than delay_ms repeats
+ * every rate_ms. The Zero's keypad sends no autorepeat of its own; on a
+ * keyboard that does, its own repeat is used instead. */
+void input_set_repeat(int delay_ms, int rate_ms);
+
 /* Cardputer Zero Sym layer: load the keypad's console keymap (input_open()
  * does this; returns the number of Sym codes read from the file, 0 = the
  * built-in fallback table is used). */

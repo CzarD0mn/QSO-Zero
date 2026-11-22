@@ -13,6 +13,8 @@
 #include "core/app.h"
 #include "dsp/ft8w.h"
 #include "dsp/js8_varicode.h"
+#include "ui/input.h"
+#include "ui/views.h"
 
 static int fails;
 #define CHECK(c, ...) do { if (c) printf("  ok    " __VA_ARGS__); else { printf("  FAIL  " __VA_ARGS__); ++fails; } printf("\n"); } while (0)
@@ -237,6 +239,48 @@ int main(void)
         CHECK(strstr(b.cfg.log_path, "/logs/field/my.adi") && stat(q, &st) == 0, "custom log_path kept, folder created");
         app_shutdown(&b);
         snprintf(q, sizeof q, "rm -rf %s", home); if (system(q)) {}
+    }
+
+    printf("[7] CQ-only filter (/cqonly)\n");
+    {
+        static app_t c;
+        app_init(&c, "/nonexistent", 0);
+        snprintf(c.cfg.callsign, sizeof c.cfg.callsign, "KM4FLG");
+        c.mode = MODE_FT8;
+        const struct { const char *t; int f; } L[] = {
+            {"CQ W1AW FN31", LINE_CQ}, {"K1ABC W9XYZ R-08", 0}, {"CQ POTA N7LD DM43", LINE_CQ},
+            {"W2XX K3YY -12", 0}, {"KM4FLG KJ5DZV -03", LINE_TOME}, {"KJ5DZV KM4FLG R-12", LINE_TX}, {"DL1XX EA8ZZ RR73", 0}};
+        for (int i = 0; i < 7; ++i) {
+            rxline_t l = {.mode = MODE_FT8, .flags = L[i].f};
+            snprintf(l.text, sizeof l.text, "%s", L[i].t);
+            app_add_line(&c, &l);
+        }
+        int shown = 0;
+        for (int i = 0; i < c.nlines; ++i) shown += line_shown(&c, &c.lines[i]);
+        CHECK(shown == 7, "filter off: all 7 listed");
+        snprintf(c.input, sizeof c.input, "/cqonly"); app_submit_input(&c);
+        shown = 0;
+        for (int i = 0; i < c.nlines; ++i) shown += line_shown(&c, &c.lines[i]);
+        CHECK(c.cfg.cq_only && shown == 4, "/cqonly: 2 CQs + the reply to us + our TX listed (%d)", shown);
+        /* up/down only visit listed lines */
+        keyev_t up = {.key = K_UP}, dn = {.key = K_DOWN};
+        int path[6], np = 0;
+        c.sel = -1;
+        for (int k = 0; k < 5; ++k) { ui_key(&c, &up); path[np++] = c.sel; }
+        CHECK(path[0] == 5 && path[1] == 4 && path[2] == 2 && path[3] == 0 && path[4] == 0, "up walks 5,4,2,0 (skips hidden) [%d %d %d %d %d]", path[0], path[1], path[2], path[3], path[4]);
+        ui_key(&c, &dn); int d1 = c.sel; ui_key(&c, &dn); int d2 = c.sel; ui_key(&c, &dn); ui_key(&c, &dn); int d4 = c.sel;
+        CHECK(d1 == 2 && d2 == 4 && d4 == -1, "down walks 2,4 then back to live (%d %d %d)", d1, d2, d4);
+        snprintf(c.input, sizeof c.input, "/filter"); app_submit_input(&c);
+        shown = 0;
+        for (int i = 0; i < c.nlines; ++i) shown += line_shown(&c, &c.lines[i]);
+        CHECK(!c.cfg.cq_only && shown == 7, "/filter toggles it off: earlier non-CQ decodes are back (%d)", shown);
+        snprintf(c.input, sizeof c.input, "/cqonly on"); app_submit_input(&c);
+        c.mode = MODE_JS8;
+        rxline_t j = {.mode = MODE_JS8};
+        snprintf(j.text, sizeof j.text, "W1AW: KM4FLG HELLO");
+        CHECK(line_shown(&c, &j), "JS8 is never filtered");
+        snprintf(c.input, sizeof c.input, "/scroll 300 40"); app_submit_input(&c);
+        CHECK(c.cfg.scroll_delay_ms == 300 && c.cfg.scroll_rate_ms == 40, "/scroll 300 40 sets the hold-to-scroll timing");
     }
 
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);

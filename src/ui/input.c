@@ -34,6 +34,11 @@ static const struct { unsigned char code; char ch; } k_zero_sym[] = {
 static int g_mods;
 static int g_esc_code = -1, g_esc_fired;     /* key currently acting as ESC */
 static double g_esc_t0;
+/* our own key repeat (hold to scroll) */
+static int g_rep_delay_ms = 400, g_rep_rate_ms = 60;
+static int g_rep_code = -1, g_rep_dev, g_rep_kernel;
+static double g_rep_next;
+static keyev_t g_rep_ev;
 
 static double now_s(void)
 {
@@ -232,14 +237,42 @@ static int esc_hold_due(keyev_t *ev)
     return 0;
 }
 
+void input_set_repeat(int delay_ms, int rate_ms)
+{
+    g_rep_delay_ms = delay_ms < 100 ? 100 : delay_ms > 2000 ? 2000 : delay_ms;
+    g_rep_rate_ms = rate_ms < 15 ? 15 : rate_ms > 500 ? 500 : rate_ms;
+}
+
+static int repeats(int code)
+{
+    return code == KEY_UP || code == KEY_DOWN || code == KEY_LEFT || code == KEY_RIGHT || code == KEY_BACKSPACE;
+}
+
+static int repeat_due(keyev_t *ev)
+{
+    if (g_rep_code < 0 || g_rep_kernel) return 0;
+    double t = now_s();
+    if (t < g_rep_next) return 0;
+    g_rep_next += g_rep_rate_ms / 1000.0;
+    if (g_rep_next < t) g_rep_next = t + g_rep_rate_ms / 1000.0;   /* don't burst after a stall */
+    *ev = g_rep_ev;
+    ev->mods = g_mods;
+    return 1;
+}
+
 int input_poll(keyev_t *ev, int timeout_ms)
 {
+    if (repeat_due(ev)) return 1;
+    if (g_rep_code >= 0 && !g_rep_kernel) {                     /* wake in time for the next repeat */
+        int ms = (int)((g_rep_next - now_s()) * 1000) + 1;
+        if (ms < timeout_ms) timeout_ms = ms < 0 ? 0 : ms;
+    }
     struct pollfd p[MAXDEV];
     if (esc_hold_due(ev)) return 1;
     if (g_esc_code >= 0 && timeout_ms > 20) timeout_ms = 20;   /* watch the hold timer */
     for (int i = 0; i < g_n; ++i) p[i] = (struct pollfd){.fd = g_fd[i], .events = POLLIN};
     if (g_n == 0) { usleep(timeout_ms * 1000); return 0; }
-    if (poll(p, g_n, timeout_ms) <= 0) return esc_hold_due(ev);
+    if (poll(p, g_n, timeout_ms) <= 0) return esc_hold_due(ev) || repeat_due(ev);
     for (int i = 0; i < g_n; ++i) {
         if (!(p[i].revents & POLLIN)) continue;
         struct input_event e;
@@ -270,9 +303,21 @@ int input_poll(keyev_t *ev, int timeout_ms)
                 *ev = (keyev_t){.key = K_ESC_HOLDING, .mods = g_mods};
                 return 1;
             }
-            if (e.value == 0) continue;                 /* release */
-            if (translate(e.code, g_builtin[i], ev)) return 1;   /* press or autorepeat */
+            if (e.value == 0) {                         /* release */
+                if (e.code == g_rep_code && i == g_rep_dev) g_rep_code = -1;
+                continue;
+            }
+            if (e.value == 2 && e.code == g_rep_code && i == g_rep_dev) g_rep_kernel = 1;   /* it repeats by itself */
+            if (translate(e.code, g_builtin[i], ev)) {   /* press or autorepeat */
+                if (e.value == 1) {
+                    if (repeats(e.code)) {
+                        g_rep_code = e.code; g_rep_dev = i; g_rep_kernel = 0; g_rep_ev = *ev;
+                        g_rep_next = now_s() + g_rep_delay_ms / 1000.0;
+                    } else g_rep_code = -1;                 /* another key: stop repeating */
+                }
+                return 1;
+            }
         }
     }
-    return esc_hold_due(ev);
+    return esc_hold_due(ev) || repeat_due(ev);
 }
