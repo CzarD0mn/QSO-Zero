@@ -2,7 +2,7 @@
 # Build build/qso-zero_<version>_<arch>.deb from an already-built tree.
 # Run on (or in an emulated container of) the target architecture.
 set -eu
-VERSION=${VERSION:-0.1.11}
+VERSION=${VERSION:-0.2.5}
 ARCH=$(dpkg --print-architecture)
 STAGE=build/deb-root
 PKG=build/qso-zero_${VERSION}_${ARCH}.deb
