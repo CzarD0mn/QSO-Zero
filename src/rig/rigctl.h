@@ -23,6 +23,8 @@ const char *rig_error(void);
 int  rig_set_freq(int64_t hz);
 int64_t rig_get_freq(void);
 int  rig_set_mode(const char *mode, int passband);
+/* Current mode, e.g. "PKTUSB"; passband in Hz (0 if not reported). 0 on success. */
+int  rig_get_mode(char *mode, int msz, int *passband);
 int  rig_ptt(int on);          /* safe to call repeatedly */
 int  rig_ptt_state(void);
 int  rig_get_level(const char *level, float *val);  /* SWR, RFPOWER, STRENGTH */

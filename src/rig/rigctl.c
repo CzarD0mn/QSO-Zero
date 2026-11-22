@@ -214,6 +214,19 @@ int rig_set_mode(const char *mode, int pb)
     return r;
 }
 
+int rig_get_mode(char *mode, int msz, int *passband)
+{
+    char v[64];
+    pthread_mutex_lock(&g_lock);
+    int r = rig_cmd("m", v, sizeof v);           /* extended reply: "Mode: PKTUSB" then "Passband: 3000" */
+    pthread_mutex_unlock(&g_lock);
+    if (r) return r;
+    v[strcspn(v, " \r\n")] = 0;
+    snprintf(mode, msz, "%s", v);
+    if (passband) *passband = 0;
+    return 0;
+}
+
 int rig_ptt(int on)
 {
     pthread_mutex_lock(&g_lock);
