@@ -192,7 +192,7 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 | 10 m | 28.074 | 28.180 | 28.078 | 28.1246 |
 | 6 m | 50.313 | 50.318 | 50.318 | 50.293 |
 
-* **At start-up** it reads the radio and stays on the band the radio is already on, rather than always starting on 20 m.
+* **At start-up** QSO-Zero opens in **WSPR on 20 m** (14.0956 MHz) and tunes the radio there, so you can beacon (Ctrl+W) and check how far you're being heard before you start calling. Switch modes with Tab and bands with the band keys as usual.
 * **Changing mode or band** retunes the radio.
 * **USB-D for every digital mode:** on connect, on every mode change (even with Auto frequency off) and on every frequency change, QSO-Zero puts the radio in its data mode with a 3 kHz passband: Hamlib `PKTUSB`, which is USB-D / U-DIG on the Xiegus and DATA-U on the FT-891. It reads the mode back to confirm. A radio without a data mode (such as the G90) refuses it, and QSO-Zero falls back to USB and says so once. The log records which mode was used.
 * **Turning the VFO knob onto another band** is noticed within about 2 s, and the radio is moved to the mode's frequency on that band. Tuning within a band is left alone.

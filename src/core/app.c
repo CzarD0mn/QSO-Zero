@@ -774,7 +774,11 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         a->gps_ok = gps_start(a->cfg.gps_device, a->cfg.gps_baud, a->cfg.gps_latency_ms) == 0;
         if (a->cfg.wsprnet_upload) uplink_start(a->cfg.wsprnet_host, 443, 80, my_call, my_grid);
     }
-    app_set_mode(a, MODE_FT8);
+    /* Start in WSPR on 20 m: in the field you spot yourself first (beacon
+     * with Ctrl+W, check wsprnet / the band) before calling anyone. With
+     * Auto frequency on, the radio is tuned to 14.0956 MHz. */
+    if (a->band_mask & (1u << 5)) a->band = 5;
+    app_set_mode(a, MODE_WSPR);
     if (!strcmp(a->cfg.callsign, "N0CALL")) {
         app_status(a, "Welcome! Set your callsign: ESC > Callsign");
         a->status_until = clk_mono() + 60;
