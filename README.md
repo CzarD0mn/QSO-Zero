@@ -48,6 +48,8 @@ On an HDMI monitor:
 
 QSO-Zero finds the radio's CAT port and USB sound card by itself. You can also pick them in Setup.
 
+Even with the defaults, you may need to set the correct paths yourself, for example when the radio has more than one serial port or another USB device is plugged in. Check that Setup shows your radio's port under **CAT port** (the X6100 and X6200 use their second port, `/dev/ttyACM1`, shown as `…-if02`) and its sound card under **Audio in** and **Audio out** (usually `plughw:CARD=Device,DEV=0`). The `[rig]` and `[audio]` lines from `qso-zero-setup --log` show which paths were used.
+
 ## Install from a package
 
 Each release on the **[Releases page](../../releases/latest)** has two packages. The Cardputer Zero uses **arm64**; armhf is for 32-bit Raspberry Pi OS. On the device, `dpkg --print-architecture` tells you which you need.
