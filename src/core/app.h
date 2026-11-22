@@ -193,6 +193,7 @@ void app_stop_threads(app_t *a);
 /* scheduler.c */
 void seq_on_decode(app_t *a, const rxline_t *l);
 void seq_start_reply(app_t *a, const rxline_t *l);
+int seq_start_typed(app_t *a, const char *text);
 void seq_start_cq(app_t *a);
 void seq_reset(app_t *a);
 void seq_after_cycle(app_t *a, int rx_slot_odd);

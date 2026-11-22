@@ -208,6 +208,10 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 * **Turning it off:** use ESC › **Auto frequency**, `/qsy off`, or `auto_qsy = 0` in the config. With it off, mode changes leave the VFO alone and the band display just follows the radio. Picking a band explicitly still tunes the radio.
 * **Limiting the band list:** set `bands = 40,30,20` in the config, for example.
 
+## FT8 / FT4 QSOs
+
+Start a QSO by selecting a station's line and pressing **ENTER**, by calling CQ (Ctrl+Q), or by typing a standard message to a station you've heard, such as `W1AW KN4CRD EM73`. After that, the auto-sequencer answers each reply (report → R-report → RR73 → 73), logs the QSO, and repeats an unanswered message up to 6 times (10 for CQ). It transmits in the slot opposite the station's. A message addressed to you is only answered while a QSO is in progress. Every sequencer step is in the activity log under `[seq]`, including why a message was ignored.
+
 ## FT8 / FT4 decode timing
 
 Each FT8/FT4 cycle is decoded twice:

@@ -1475,6 +1475,7 @@ void app_submit_input(app_t *a)
         uint8_t tones[105];
         if (ft8w_encode(a->mode == MODE_FT4 ? FT8W_FT4 : FT8W_FT8, s, tones) < 0) { app_status(a, "not a valid %s message", mode_name(a->mode)); return; }
         pthread_mutex_lock(&a->lock);
+        if (seq_start_typed(a, s)) { pthread_mutex_unlock(&a->lock); return; }
         if (a->ntxq < MAX_TXQ) a->txq[a->ntxq++] = (txitem_t){.kind = TXK_FT8, .slot_odd = a->seq.st != SEQ_IDLE ? a->seq.slot_odd : 0};
         snprintf(a->txq[a->ntxq - 1].text, sizeof a->txq[0].text, "%s", s);
         pthread_mutex_unlock(&a->lock);
