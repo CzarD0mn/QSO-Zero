@@ -442,11 +442,14 @@ int app_aprs_email(app_t *a, const char *addr, const char *text)
     return aprs_send(a, "EMAIL-2", body);
 }
 
+static void clear_decodes(app_t *a);
+
 void app_ghostnet_band(app_t *a, int band)
 {
     if (!ghostnet_freq(band)) return;
     if (a->tx_active) { app_status(a, "can't change band while transmitting"); return; }
     a->cfg.ghostnet = 1;
+    if (a->mode != MODE_JS8) clear_decodes(a);
     a->mode = MODE_JS8;
     a->ghost_hz[band] = 0;                        /* chosen from the menu: the net default */
     app_set_band(a, band);                        /* explicit: tunes even with auto QSY off */
@@ -468,9 +471,21 @@ void app_set_ghostnet(app_t *a, int on)
     app_ghostnet_band(a, b);
 }
 
+/* New mode: the stations in the list were heard on the old one, so start
+ * the decode list afresh. */
+static void clear_decodes(app_t *a)
+{
+    pthread_mutex_lock(&a->lock);
+    a->nlines = 0;
+    a->sel = -1;
+    pthread_mutex_unlock(&a->lock);
+    a->dirty = 1;
+}
+
 void app_set_mode(app_t *a, op_mode_t m)
 {
     if (a->tx_active) { app_status(a, "can't change mode while transmitting"); return; }
+    if (m != a->mode) clear_decodes(a);
     a->mode = m;
     if (m == MODE_WSPR) { a->tx_off = 1500; a->rx_off = 1500; }
     clear_tx_for_qsy(a);

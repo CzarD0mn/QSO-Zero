@@ -69,7 +69,7 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 | `Enter` on empty line | reply to the selected decode |
 | `↑` `↓` (or `Ctrl` + `;` `.`) | select decode |
 | `←` `→` (or `Ctrl` + `,` `/`) | move RX/TX offset 10 Hz (Shift: 100 Hz) |
-| `Tab` | FT8 → FT4 → JS8 → WSPR |
+| `Tab` | FT8 → FT4 → JS8 → WSPR (the decode list starts fresh in the new mode) |
 | `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band (skips bands the radio can't do) |
 | `Esc` or `` ` `` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
 | `Ctrl+Q` | CQ |
