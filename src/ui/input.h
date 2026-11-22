@@ -1,4 +1,4 @@
-/* QSO-Zero - keyboard input via Linux evdev (Cardputer keyboard + USB). */
+/* QSO-Zero - keyboard input via Linux evdev (Cardputer Zero keypad + USB keyboards). */
 #ifndef QSOZERO_INPUT_H
 #define QSOZERO_INPUT_H
 
@@ -23,5 +23,15 @@ int  input_open(const char *dev);      /* "auto" = every keyboard-like device */
 void input_close(void);
 /* waits up to timeout_ms; returns 1 and fills ev when a key arrives */
 int  input_poll(keyev_t *ev, int timeout_ms);
+
+/* Cardputer Zero Sym layer: load the keypad's console keymap (input_open()
+ * does this; returns the number of Sym codes read from the file, 0 = the
+ * built-in fallback table is used). */
+int  input_load_keymap(const char *path);
+int  input_keymap_from_file(void);
+int  input_device_count(void);
+const char *input_device_name(int i);
+int  input_device_builtin(int i);        /* 1 = the Zero's keypad: Sym codes apply */
+void input_set_builtin(int i, int on);   /* tests */
 
 #endif

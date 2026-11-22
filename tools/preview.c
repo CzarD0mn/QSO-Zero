@@ -205,6 +205,10 @@ int main(int argc, char **argv)
     ui_render(&a, c);
     snprintf(p, sizeof p, "%s/compact_menu_ft4.ppm", dir); save_ppm(c, 3, p);
     a.mode = MODE_FT8; a.screen = 0;
+    a.screen = 3;
+    ui_render(&a, c);
+    snprintf(p, sizeof p, "%s/compact_help.ppm", dir); save_ppm(c, 3, p);
+    a.screen = 0;
     printf("wrote previews to %s\n", dir);
     return 0;
 }

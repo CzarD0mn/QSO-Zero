@@ -16,6 +16,18 @@
   `tests/test_devices.c` using the real `/dev/serial/by-id` and
   `/proc/asound/{cards,pcm}` from the device.
 
+## Keyboard (Cardputer Zero)
+- The built-in keypad (TCA8418) sends each **Sym** symbol as its own key
+  code (e.g. 43 = `^`, 53 = `(`, 92 = `/`), defined by the stock keymap
+  `/usr/share/keymaps/tca8418_keypad_m5stack_keymap.map`. `src/ui/input.c`
+  reads that file (fallback: the same 32 entries built in) and applies it
+  **only to the built-in keypad** - USB keyboards keep the US layout.
+- Never bind shortcuts to `;` `,` `.` `/` `` ` `` or other symbol key codes:
+  on the Zero they are Sym symbols. Arrows are **fn + F / X / Z / C**
+  (real KEY_UP/DOWN/LEFT/RIGHT), PgUp/PgDn are **fn + L / M**, F1 is
+  **fn + 1**, and there is a real **esc** key and a **ctrl** key.
+- Test keymap: `tests/data/tca8418_keypad_m5stack_keymap.map` (from a device).
+
 ## Working with the owner
 - Changes are built and tested locally first. Make an arm64 test package
   (`0.x.y~testN`) for the device, and **do not push to GitHub until the
