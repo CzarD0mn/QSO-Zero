@@ -93,7 +93,7 @@ These are for the **Cardputer Zero's own keyboard**, following M5Stack's Quick S
 | `ctrl`+`T` | tools (GPS/time, rig, audio, battery) |
 | `fn`+`1` (F1) | help |
 
-Commands (type `/` on the sym layer): `/band 40`, `/mode js8` (ft8, ft4, js8, wspr), `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands (type `/` on the sym layer): `/band 40`, `/mode js8` (ft8, ft4, js8, wspr), `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/cqonly` (or `/filter`), `/scroll 400 60`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
 ### Battery
 
@@ -114,6 +114,10 @@ ESC opens Setup. Options for the current mode come right under **Mode**, and opt
 Change the Mode line (←/→) and the list updates. Everything else (band, auto frequency, callsign, radio, ports, audio and so on) is always shown.
 
 ### FT8 CQ modifier (CQ POTA, SOTA, QRP, DX)
+
+**CQ-only filter** (FT8/FT4): `/cqonly` (or `/filter`) toggles it; `/cqonly on` and `/cqonly off` also work. While it's on, the decode list shows only CQ calls, plus messages to you, your own transmissions and notices, so a QSO in progress stays visible. A **CQ** chip shows in the header. Nothing is deleted: turn it off and every decode comes back. The setting is kept with **Save settings**.
+
+**Hold to scroll:** hold ↑/↓ (fn+F / fn+X) and the selection keeps moving, after 400 ms and then every 60 ms. ←/→ and backspace repeat the same way. Tune it with `/scroll DELAY RATE` in milliseconds, for example `/scroll 300 40` for faster, and keep it with **Save settings**.
 
 Setup › **CQ modifier** (FT8 only). Use ←/→ to step through none, DX, POTA, SOTA and QRP, or press ENTER to type your own (`/cqmod WWFF`). Ctrl+Q then calls `CQ POTA KN4CRD EM73`, and the auto-sequencer runs the QSO as usual.
 

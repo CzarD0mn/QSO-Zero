@@ -133,6 +133,15 @@ typedef struct app {
     volatile int quit;
 } app_t;
 
+/* Shown in the decode list? With the CQ-only filter on (FT8/FT4), only CQ
+ * calls, messages to us, our own transmissions and notices are listed;
+ * nothing is deleted, so turning the filter off brings the rest back. */
+static inline int line_shown(const app_t *a, const rxline_t *l)
+{
+    if (!a->cfg.cq_only || !mode_is_ft(a->mode) || !mode_is_ft(l->mode)) return 1;
+    return (l->flags & (LINE_CQ | LINE_TOME | LINE_TX | LINE_SYS)) != 0;
+}
+
 typedef struct { const char *name; int64_t ft8, js8, wspr, lo, hi, ft4; } band_t;   /* ft4 0 = none on that band */
 const band_t *band_table(int *count);
 

@@ -153,25 +153,32 @@ static void draw_list(app_t *a, surface_t *s, int x, int y, int w, int rows, int
     int cols = w / FONT_W;
     int prew = wide ? 21 : 9;               /* prefix columns */
     int room = cols - prew - 1;
-    int last = a->nlines - 1 - a->scroll;
-    if (a->sel >= 0 && a->sel < last - rows + 1) last = a->sel + rows - 1;
-    if (a->sel > last) last = a->sel;
-    if (last > a->nlines - 1) last = a->nlines - 1;
+    /* the lines the CQ-only filter lets through, oldest first */
+    int vis[MAX_LINES], nv = 0, selp = -1;
+    for (int i = 0; i < a->nlines; ++i)
+        if (line_shown(a, &a->lines[i])) { if (i == a->sel) selp = nv; vis[nv++] = i; }
+    if (a->sel >= 0 && selp < 0) a->sel = -1;   /* the selected line was filtered out */
+    int last = nv - 1;
+    if (selp >= 0 && selp < last - rows + 1) last = selp + rows - 1;
+    if (selp > last) last = selp;
+    if (last > nv - 1) last = nv - 1;
     /* walk back from 'last' until the rows are used (lines wrap up to 4 rows) */
     int first = last, used = 0;
     while (first >= 0) {
-        int need = wrap_rows(a->lines[first].text, room, 4);
+        int need = wrap_rows(a->lines[vis[first]].text, room, 4);
         if (used + need > rows) { if (first == last) { used = rows; } break; }
         used += need;
         --first;
     }
     ++first;
     int yy = y + (rows - used) * FONT_H;    /* newest line sits on the bottom row */
-    if (a->nlines == 0) {
-        gfx_text(s, x + 4, y + FONT_H, a->mode == MODE_WSPR ? (a->cfg.wspr_rx ? "WSPR: spots every 2 min   ^W beacon" : "WSPR RX off   ^W beacon") : "listening...", C_FAINT, 1);
+    if (nv == 0) {
+        gfx_text(s, x + 4, y + FONT_H, a->mode == MODE_WSPR ? (a->cfg.wspr_rx ? "WSPR: spots every 2 min   ^W beacon" : "WSPR RX off   ^W beacon")
+                                       : a->nlines ? "no CQ calls yet   (/cqonly to show all)" : "listening...", C_FAINT, 1);
         return;
     }
-    for (int i = first; i <= last; ++i) {
+    for (int p = first; p <= last; ++p) {
+        int i = vis[p];
         const rxline_t *l = &a->lines[i];
         int nr = wrap_rows(l->text, room, 4);
         if (yy + nr * FONT_H > y + rows * FONT_H) nr = (y + rows * FONT_H - yy) / FONT_H;
@@ -236,6 +243,7 @@ static void render_compact_main(app_t *a, surface_t *s)
     if (a->mode == MODE_JS8) x = gfx_chip(s, x + 2, 1, sub_short(a->js8_sub), C_PURPLE, C_BG, 1);
     if (a->mode == MODE_JS8 && a->cfg.ghostnet) x = gfx_chip(s, x + 2, 1, "GN", C_MAGENTA, C_BG, 1);
     if (a->mode == MODE_JS8 && a->cfg.js8_autoreply) x = gfx_chip(s, x + 2, 1, "A", C_MINT, C_BG, 1);
+    if (mode_is_ft(a->mode) && a->cfg.cq_only) x = gfx_chip(s, x + 2, 1, "CQ", C_SUN, C_BG, 1);
     x = gfx_text(s, x + 4, 2, bt[a->band].name, C_CYAN, 1);
     fmt_freq(a->dial_hz, buf);
     gfx_text(s, x + 6, 2, buf, C_SUN, 1);
@@ -307,6 +315,7 @@ static void render_large_main(app_t *a, surface_t *s)
     if (a->mode == MODE_JS8) x = gfx_chip(s, x + 4, 5, sub_short(a->js8_sub), C_PURPLE, C_BG, 2);
     if (a->mode == MODE_JS8 && a->cfg.ghostnet) x = gfx_chip(s, x + 4, 5, "GHOSTNET", C_MAGENTA, C_BG, 2);
     if (a->mode == MODE_JS8 && a->cfg.js8_autoreply) x = gfx_chip(s, x + 4, 5, "AUTO", C_MINT, C_BG, 2);
+    if (mode_is_ft(a->mode) && a->cfg.cq_only) x = gfx_chip(s, x + 4, 5, "CQ ONLY", C_SUN, C_BG, 2);
     x = gfx_text(s, x + 8, 7, bt[a->band].name, C_CYAN, 2);
     fmt_freq(a->dial_hz, buf);
     gfx_text(s, x + 10, 7, buf, C_SUN, 2);
@@ -676,18 +685,18 @@ static void render_help(app_t *a, surface_t *s)
     static const char *lines[] = {
         "KEYS (Cardputer Zero)  hold ESC: exit",
         "ENTER   send / reply to selected",
-        "fn+F/X  up/down    fn+Z/C  left/right",
+        "fn+F/X  up/down (hold: scroll)  fn+Z/C l/r",
         "TAB     next mode (FT8 FT4 JS8 WSPR)",
         "fn+L/M  band up/down     ESC  setup",
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
         "^U tune  ^W WSPR beacon  ^T tools",
         "commands: / is on the sym layer",
         "/band 40  /mode js8  /sub fast  /qsy on|off",
-        "/ghost 80|40|20|off  /cqmod POTA",
+        "/cqonly (CQ filter)  /cqmod POTA  /scroll",
         "/aprs CALL msg  /sms NUM msg  /email A msg",
         "/freq 7.074  /call K1ABC  /grid FN42",
         "/level 40  /pwr 23  /save  /quit",
-        "/auto on|off  /hback on|off",
+        "/auto on|off  /hback on|off  /ghost 40|off",
         "/info TEXT  /status TEXT  /net",
     };
     gfx_clear(s, C_BG);
@@ -999,11 +1008,18 @@ void ui_key(app_t *a, const keyev_t *k)
         else if (a->sel >= 0) a->sel = -1;
         else { a->screen = 1; }
         break;
-    case K_UP:
-        if (a->nlines) a->sel = a->sel < 0 ? a->nlines - 1 : (a->sel > 0 ? a->sel - 1 : 0);
+    case K_UP: {                            /* previous listed line (the filter may hide some) */
+        int i = a->sel < 0 ? a->nlines : a->sel;
+        while (--i >= 0 && !line_shown(a, &a->lines[i])) {}
+        if (i >= 0) a->sel = i;
         break;
-    case K_DOWN:
-        if (a->sel >= 0) a->sel = a->sel + 1 >= a->nlines ? -1 : a->sel + 1;
+    }
+    case K_DOWN:                            /* next listed line; past the newest = back to live */
+        if (a->sel >= 0) {
+            int i = a->sel;
+            while (++i < a->nlines && !line_shown(a, &a->lines[i])) {}
+            a->sel = i < a->nlines ? i : -1;
+        }
         break;
     case K_LEFT: a->rx_off = (int)fmax(200, a->rx_off - step); a->tx_off = a->rx_off; break;
     case K_RIGHT: a->rx_off = (int)fmin(2900, a->rx_off + step); a->tx_off = a->rx_off; break;

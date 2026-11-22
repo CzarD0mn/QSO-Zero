@@ -34,6 +34,8 @@ void config_defaults(config_t *c)
     c->js8_hb_ack = 0;
     snprintf(c->inbox_path, sizeof c->inbox_path, "%s/qso-zero-inbox.txt", home);
     c->wspr_rx = 1;
+    c->scroll_delay_ms = 400;
+    c->scroll_rate_ms = 60;
     c->auto_qsy = 1;
     c->audio_in_level = c->audio_out_level = -1;
     c->wsprnet_upload = 1;
@@ -85,7 +87,7 @@ int config_load(config_t *c, const char *path)
         INT("wspr_dbm", wspr_dbm); INT("wspr_tx_pct", wspr_tx_pct); INT("js8_submode", js8_submode);
         INT("auto_qsy", auto_qsy); INT("audio_in_level", audio_in_level); INT("audio_out_level", audio_out_level); STR("bands", bands);
         INT("rx_offset", rx_offset); INT("tx_offset", tx_offset); STR("log_path", log_path);
-        INT("ghostnet", ghostnet); STR("cq_mod", cq_mod); INT("js8_autoreply", js8_autoreply); INT("js8_hb_ack", js8_hb_ack);
+        INT("ghostnet", ghostnet); STR("cq_mod", cq_mod); INT("cq_only", cq_only); INT("scroll_delay_ms", scroll_delay_ms); INT("scroll_rate_ms", scroll_rate_ms); INT("js8_autoreply", js8_autoreply); INT("js8_hb_ack", js8_hb_ack);
         STR("js8_info", js8_info); STR("js8_status", js8_status); STR("inbox_path", inbox_path);
         INT("wspr_rx", wspr_rx); INT("wsprnet_upload", wsprnet_upload); STR("wsprnet_host", wsprnet_host);
     }
@@ -119,6 +121,9 @@ int config_save(const config_t *c, const char *path)
         if (strcmp(c->log_path, def.log_path)) fprintf(f, "log_path = %s\n", c->log_path);
     }
     fprintf(f, "\n# FT8 CQ modifier (CQ POTA ...): 1-4 letters or 3 digits, blank for plain CQ\ncq_mod = %s\n", c->cq_mod);
+    fprintf(f, "\n# FT8/FT4: show only CQ calls in the decode list (/cqonly)\ncq_only = %d\n", c->cq_only);
+    fprintf(f, "\n# hold an arrow key: repeat after scroll_delay_ms, then every scroll_rate_ms (/scroll)\nscroll_delay_ms = %d\nscroll_rate_ms = %d\n",
+            c->scroll_delay_ms, c->scroll_rate_ms);
     fprintf(f, "\n# GHOSTNET: JS8 on 3.575 / 7.107 / 14.107 MHz USB-D instead of the usual JS8 frequencies\nghostnet = %d\n", c->ghostnet);
     fprintf(f, "\n# JS8 automatic replies (only to messages addressed to you)\njs8_autoreply = %d\njs8_hb_ack = %d\n"
                "js8_info = %s\njs8_status = %s\ninbox_path = %s\nwspr_rx = %d\n",
