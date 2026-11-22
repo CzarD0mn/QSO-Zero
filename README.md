@@ -24,6 +24,17 @@ A lightweight FT8 / FT4 / JS8 / WSPR terminal for the **M5Stack Cardputer Zero**
 
 The model IDs come from Hamlib's `riglist.h`. QMX and X6200 need Hamlib 4.6 or newer. On older Hamlib, QSO-Zero automatically retries with the compatible backend.
 
+### Adding a radio
+
+Radio profiles live in `src/rig/radios.c`. Each new radio needs:
+* **Hamlib model:** with a fallback model for older Hamlib if needed.
+* **CAT serial hint, default port and baud.**
+* **Sound card hint.**
+* **Band coverage.**
+* **Data mode (required):** digital modes must run in the radio's **USB-Digital / DATA mode**, so set `data_mode` to `"PKTUSB"` (Hamlib's name for USB-D, U-DIG, DATA-U or PKT-U). If the radio has no data mode, QSO-Zero automatically falls back to **USB at the widest passband the radio accepts** (it tries 3 kHz first, usually the maximum). Use plain `"USB"` only for a radio known to misbehave when asked for `PKTUSB`.
+
+Then add the radio's serial ports and `/proc/asound` listing to `tests/test_devices.c`, and check `qso-zero-setup --log` on the real radio for the `[rig] mode …` line.
+
 ## Install on the Cardputer Zero
 
 **From a package (easiest).** Each push to `main` builds `.deb` packages for 64-bit (`arm64`) and 32-bit (`armhf`) Raspberry Pi OS. They're published on the [`packages` branch](../../tree/packages), and each new version also gets a GitHub [Release](../../releases/latest) (`vX.Y.Z`) with plain `X.Y.Z` packages to download.

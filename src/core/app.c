@@ -250,8 +250,9 @@ static pthread_t g_dec_thr, g_tx_thr, g_misc_thr;
 static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
 
 /* Put the radio in its digital mode: USB-D / DATA-U (Hamlib PKTUSB) with a
- * 3 kHz passband, read it back, and fall back to plain USB on radios
- * without a data mode (e.g. the G90). The working choice is remembered. */
+ * 3 kHz passband, read it back, and fall back to plain USB at the widest
+ * passband the radio accepts on radios without a data mode (e.g. the G90).
+ * The working choice is remembered. This is the rule for every radio. */
 static char g_rig_mode[16];
 static void set_data_mode(app_t *a)
 {
@@ -268,7 +269,9 @@ static void set_data_mode(app_t *a)
     if (strcmp(want, "USB")) {                           /* no data mode on this radio: plain USB */
         qlog("rig", "radio refused %s (%s, reads back '%s'): using USB", want, rc ? rig_error() : "set ok", got);
         snprintf(g_rig_mode, sizeof g_rig_mode, "USB");
-        if (rig_set_mode("USB", 3000)) rig_set_mode("USB", 0);
+        /* widest USB the radio accepts: 3 kHz is usually the top filter */
+        static const int pbw[] = {3000, 2900, 2800, 2700, 2400, 0};
+        for (int i = 0; i < 6; ++i) if (rig_set_mode("USB", pbw[i]) == 0) { qlog("rig", "USB passband %d Hz", pbw[i]); break; }
         app_status(a, "%s has no data mode here: using USB", a->radio->name);
     } else qlog("rig", "setting USB failed: %s", rig_error());
 }
