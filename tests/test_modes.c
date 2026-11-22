@@ -137,6 +137,25 @@ int main(void)
     app_set_cq_mod(&a, "none");
     app_set_mode(&a, MODE_FT8);
 
+    printf("[3b] switching modes clears the decode list\n");
+    {
+        rxline_t l = {.snr = -10, .freq = 1200, .mode = MODE_FT8};
+        snprintf(l.text, sizeof l.text, "CQ W1AW FN31");
+        app_set_mode(&a, MODE_FT8);
+        a.nlines = 0;
+        app_add_line(&a, &l); app_add_line(&a, &l);
+        a.sel = 1;
+        app_set_mode(&a, MODE_FT8);
+        CHECK(a.nlines == 2 && a.sel == 1, "same mode again (e.g. radio reconnect): list kept");
+        app_set_mode(&a, MODE_FT4);
+        CHECK(a.nlines == 0 && a.sel == -1, "FT8 -> FT4: list cleared, nothing selected");
+        app_add_line(&a, &l);
+        app_ghostnet_band(&a, 3);
+        CHECK(a.mode == MODE_JS8 && a.nlines == 0, "GHOSTNET from the menu (FT4 -> JS8): cleared");
+        a.cfg.ghostnet = 0;
+        app_set_mode(&a, MODE_FT8);
+    }
+
     printf("[4] JS8 -> APRS frames, as a JS8Call relay sees them\n");
     app_set_mode(&a, MODE_JS8);
     a.ntxq = 0;
