@@ -166,6 +166,7 @@ void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET default freq
 void app_use_rig_device(app_t *a, const char *dev);
 void app_use_audio(app_t *a, const char *in, const char *out);
 void app_rescan_audio(app_t *a);
+int  log_dir_make(const char *file);   /* create the folder a file goes in (mkdir -p); 0 = ok */
 void app_audio_level(app_t *a, int capture, int delta);   /* change the sound card level by delta % */
 void app_rig_port(const app_t *a, char *out, int outsz);   /* the CAT port in use (saved or auto) */             /* look for sound devices again and reconnect */      /* next/previous band the radio covers */
 int  band_from_freq(int64_t hz);            /* band index, -1 outside the ham bands */

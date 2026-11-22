@@ -1,5 +1,7 @@
 /* QSO-Zero - engine: audio ring, waterfall, decode and transmit threads. */
 #include "app.h"
+#include <sys/stat.h>
+#include <errno.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -741,6 +743,25 @@ void app_use_audio(app_t *a, const char *in, const char *out)
     if (a->audio_ok) app_status(a, "audio in %s, out %s", a->audio_in_dev, a->audio_out_dev);
 }
 
+/* ADIF log location: ~/qso-zero/qso-zero.adi by default; the folder is
+ * created when missing. */
+int log_dir_make(const char *file)
+{
+    char d[200];
+    snprintf(d, sizeof d, "%s", file);
+    char *slash = strrchr(d, '/');
+    if (!slash || slash == d) return 0;
+    *slash = 0;
+    for (char *p = d + 1; *p; ++p)
+        if (*p == '/') { *p = 0; mkdir(d, 0755); *p = '/'; }
+    return mkdir(d, 0755) == 0 || errno == EEXIST ? 0 : -1;
+}
+
+static void log_path_setup(app_t *a)
+{
+    if (log_dir_make(a->cfg.log_path)) qlog("config", "cannot create the folder for %s", a->cfg.log_path);
+}
+
 int app_init(app_t *a, const char *cfgpath, int hw)
 {
     memset(a, 0, sizeof *a);
@@ -749,6 +770,7 @@ int app_init(app_t *a, const char *cfgpath, int hw)
     g_hw = hw;
     config_defaults(&a->cfg);
     config_load(&a->cfg, cfgpath);
+    log_path_setup(a);
     a->radio = radio_find(a->cfg.radio);
     if (!a->radio) { int n; a->radio = radio_list(&n); }
     a->js8_sub = a->cfg.js8_submode;

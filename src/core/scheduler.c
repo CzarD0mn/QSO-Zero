@@ -227,6 +227,7 @@ void js8_assemble(app_t *a, const char frame[13], int bits, int snr, float freq,
 
 void adif_log(app_t *a, const char *call, const char *grid, const char *mode, int sent, int rcvd)
 {
+    log_dir_make(a->cfg.log_path);                       /* ~/qso-zero/ made if missing */
     FILE *f = fopen(a->cfg.log_path, "a");
     if (!f) { app_status(a, "log: cannot open %s", a->cfg.log_path); return; }
     if (ftell(f) == 0) fprintf(f, "QSO-Zero ADIF export\n<adif_ver:5>3.1.4 <programid:7>QSO-Zero <eoh>\n");
