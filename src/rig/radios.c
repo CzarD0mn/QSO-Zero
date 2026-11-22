@@ -10,6 +10,13 @@
  * skipped), QMX+ 160-6 m, G90 160-10 m, X6100/X6200/FT-891 160-6 m.
  * QMX and X6200 entries need Hamlib >= 4.6; on older Hamlib the app falls
  * back to the TS-480 / X6100 backends, which speak the same protocol.
+ *
+ * RULE FOR EVERY RADIO (existing and future): digital modes run in the
+ * radio's DATA / USB-Digital mode. Set data_mode to "PKTUSB" (Hamlib's name
+ * for USB-D / U-DIG / DATA-U / PKT-U). If a radio has no data mode, the app
+ * falls back to USB at the widest passband the radio accepts (3 kHz first,
+ * usually the maximum) - see set_data_mode() in core/app.c. Only put "USB"
+ * here if the radio is known to misbehave when asked for PKTUSB.
  */
 static const radio_profile_t k_radios[] = {
     {"qmx", "QRP Labs QMX", 2057, 2028, 115200, PTT_CAT,
