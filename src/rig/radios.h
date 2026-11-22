@@ -14,7 +14,7 @@ typedef struct {
     const char  *serial_hint;   /* substring to look for in /dev/serial/by-id */
     const char  *serial_default;
     const char  *audio_hint;    /* substrings in /proc/asound/cards, '|' separated */
-    const char  *data_mode;     /* Hamlib mode for digital: USB or PKTUSB */
+    const char  *data_mode;     /* Hamlib mode for digital: PKTUSB (USB-D / DATA-U); USB is the fallback */
     float        max_watts;
     unsigned     bands;         /* bit i = band_table()[i] the radio can work */
     const char  *notes;

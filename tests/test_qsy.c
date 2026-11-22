@@ -19,7 +19,9 @@ static int fails;
 
 static volatile long long g_vfo = 7150000;            /* radio starts on 40 m, off the FT8 spot */
 static volatile long long g_refuse_lo, g_refuse_hi;   /* radio silently ignores these */
-static volatile int g_sets;
+static volatile int g_sets, g_no_data_mode, g_mode_sets;
+static char g_mode[16] = "USB";
+static int g_pb = 2400;
 static int g_lsock;
 
 static void *fake_rigctld(void *arg)
@@ -45,7 +47,15 @@ static void *fake_rigctld(void *arg)
                     ++g_sets;
                     if (!(f >= g_refuse_lo && f <= g_refuse_hi)) g_vfo = f;   /* refusal: VFO stays put */
                     snprintf(out, sizeof out, "set_freq: %lld\nRPRT 0\n", f);
-                } else
+                } else if (!strncmp(buf, "+M ", 3)) {
+                    char m[16]; int pb = 0;
+                    sscanf(buf + 3, "%15s %d", m, &pb);
+                    ++g_mode_sets;
+                    if (g_no_data_mode && !strncmp(m, "PKT", 3)) snprintf(out, sizeof out, "set_mode:\nRPRT -11\n");   /* like a G90 */
+                    else { snprintf(g_mode, sizeof g_mode, "%s", m); if (pb) g_pb = pb; snprintf(out, sizeof out, "set_mode:\nRPRT 0\n"); }
+                } else if (!strcmp(buf, "+m"))
+                    snprintf(out, sizeof out, "get_mode:\nMode: %s\nPassband: %d\nRPRT 0\n", g_mode, g_pb);
+                else
                     snprintf(out, sizeof out, "%s:\nRPRT 0\n", buf + 1);
                 send(c, out, strlen(out), MSG_NOSIGNAL);
                 memmove(buf, nl + 1, got - (nl + 1 - buf) + 1);
@@ -90,6 +100,8 @@ int main(void)
     CHECK(a.rig_ok, "rig connected");
     CHECK(a.band == 3, "radio on 7.150 -> band 40m (got %d)", a.band);
     CHECK(g_vfo == 7074000 && a.dial_hz == 7074000, "VFO moved to 40m FT8 7.074 (vfo %lld)", g_vfo);
+
+    CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "on connect: radio in PKTUSB (USB-D), 3 kHz (mode %s, %d Hz)", g_mode, g_pb);
 
     printf("[2] mode change retunes\n");
     app_set_mode(&a, MODE_JS8);
@@ -179,6 +191,23 @@ int main(void)
     command(&a, "/ghost off");
     CHECK(!a.cfg.ghostnet && g_vfo == 7078000, "off -> normal JS8 7.078 (vfo %lld)", g_vfo);
 
+    printf("[12] USB-D for every digital mode\n");
+    {
+        op_mode_t ms[] = {MODE_FT8, MODE_FT4, MODE_JS8, MODE_WSPR};
+        int all = 1;
+        for (int k = 0; k < 4; ++k) {
+            snprintf(g_mode, sizeof g_mode, "USB");          /* operator changed it on the radio */
+            app_set_mode(&a, ms[k]);
+            all &= !strcmp(g_mode, "PKTUSB") && g_pb == 3000;
+        }
+        CHECK(all, "FT8, FT4, JS8, WSPR each put the radio back in PKTUSB 3 kHz");
+        a.cfg.auto_qsy = 0;
+        snprintf(g_mode, sizeof g_mode, "USB");
+        app_set_mode(&a, MODE_FT8);
+        CHECK(!strcmp(g_mode, "PKTUSB"), "auto frequency off: VFO left alone but still PKTUSB");
+        a.cfg.auto_qsy = 1;
+    }
+
     printf("[11] FT4\n");
     a.tx_active = 0;
     app_set_mode(&a, MODE_FT8);
@@ -260,8 +289,11 @@ int main(void)
         unsetenv("QSOZERO_DEVROOT");
         snprintf(p, sizeof p, "rm -rf %s", r); if (system(p)) {}
     }
+    g_no_data_mode = 1;                                    /* the G90 has no data mode */
     app_use_radio(&a, "g90");
     for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+    CHECK(!strcmp(g_mode, "USB"), "radio without a data mode: falls back to USB (mode %s)", g_mode);
+    g_no_data_mode = 0;
     CHECK(a.rig_ok && a.radio && !strcmp(a.radio->id, "g90") && (a.band_mask & 1u), "radio switched live to G90 (160 m now allowed)");
     a.tx_active = 1;
     app_use_rig_device(&a, "/dev/ttyUSB0");

@@ -249,6 +249,30 @@ static pthread_t g_dec_thr, g_tx_thr, g_misc_thr;
 
 static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
 
+/* Put the radio in its digital mode: USB-D / DATA-U (Hamlib PKTUSB) with a
+ * 3 kHz passband, read it back, and fall back to plain USB on radios
+ * without a data mode (e.g. the G90). The working choice is remembered. */
+static char g_rig_mode[16];
+static void set_data_mode(app_t *a)
+{
+    if (!(g_hw && a->rig_ok)) return;
+    const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
+    char got[24] = "";
+    int rc = rig_set_mode(want, 3000);
+    if (rc) rc = rig_set_mode(want, 0);                  /* radio has no 3 kHz filter choice: its default */
+    if (rc == 0 && rig_get_mode(got, sizeof got, NULL) == 0 && !strcmp(got, want)) {
+        if (strcmp(g_rig_mode, want)) qlog("rig", "mode %s (%s)", want, !strcmp(want, "PKTUSB") ? "USB-D / DATA-U" : "plain USB");
+        snprintf(g_rig_mode, sizeof g_rig_mode, "%s", want);
+        return;
+    }
+    if (strcmp(want, "USB")) {                           /* no data mode on this radio: plain USB */
+        qlog("rig", "radio refused %s (%s, reads back '%s'): using USB", want, rc ? rig_error() : "set ok", got);
+        snprintf(g_rig_mode, sizeof g_rig_mode, "USB");
+        if (rig_set_mode("USB", 3000)) rig_set_mode("USB", 0);
+        app_status(a, "%s has no data mode here: using USB", a->radio->name);
+    } else qlog("rig", "setting USB failed: %s", rig_error());
+}
+
 /* Tune the radio and confirm it took the frequency. Returns 0 on success. */
 static int do_qsy(app_t *a, int band, int64_t hz)
 {
@@ -263,9 +287,9 @@ static int do_qsy(app_t *a, int band, int64_t hz)
         app_status(a, "%s: radio won't tune %s MHz - band skipped", k_bands[band].name, f);
         return -1;
     }
-    rig_set_mode(a->radio->data_mode, 0);
+    set_data_mode(a);
     a->dial_hz = hz;
-    qlog("rig", "QSY %s %.6f MHz %s %s", k_bands[band].name, hz / 1e6, mode_name(a->mode), a->radio->data_mode);
+    qlog("rig", "QSY %s %.6f MHz %s %s", k_bands[band].name, hz / 1e6, mode_name(a->mode), g_rig_mode);
     app_status(a, "QSY %s %s MHz %s", k_bands[band].name, f, mode_name(a->mode));
     return 0;
 }
@@ -490,6 +514,7 @@ void app_set_mode(app_t *a, op_mode_t m)
     if (m == MODE_WSPR) { a->tx_off = 1500; a->rx_off = 1500; }
     clear_tx_for_qsy(a);
     if (a->cfg.auto_qsy || !(g_hw && a->rig_ok)) app_set_band(a, a->band);
+    else set_data_mode(a);                               /* VFO left alone, but still USB-D */
     app_status(a, "%s %s", mode_name(m), m == MODE_JS8 ? js8_submode_info(a->js8_sub)->name : "");
 }
 
@@ -545,6 +570,8 @@ static void rig_connect(app_t *a)
     if (b >= 0 && (a->band_mask & (1u << b))) a->band = b;
     a->rig_ok = 1;
     qlog("rig", "online, VFO %.6f MHz", f / 1e6);
+    g_rig_mode[0] = 0;
+    set_data_mode(a);
     a->dirty = 1;
 }
 

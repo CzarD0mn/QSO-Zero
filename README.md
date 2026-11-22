@@ -145,7 +145,7 @@ Setup has a **GHOSTNET** section for running JS8 on the GHOSTNET frequencies (di
 * QSO-Zero remembers where you tuned on each band. If you switch to FT8 and back, or step bands, you return to where the net was. Setup shows "now 7.110" when you're off the default. Choosing a GHOSTNET frequency in Setup again (or `/ghost 40`) resets to the default.
 * While GHOSTNET is on and you're in JS8, the band keys cycle only 80 → 40 → 20 m. A **GN** chip (or **GHOSTNET** on an external display) shows in the header.
 * FT8 and WSPR keep their usual frequencies. Switching back to JS8 returns to GHOSTNET.
-* `/ghost 40` (or `80`, `20`, `off`) does the same from the keyboard, and `ghostnet = 1` in the config makes it stick. "USB-D" is the radio's data mode: USB on the QMX and Xiegus, PKTUSB (DATA-U) on the FT-891.
+* `/ghost 40` (or `80`, `20`, `off`) does the same from the keyboard, and `ghostnet = 1` in the config makes it stick. "USB-D" is the radio's data mode (see below).
 
 ### Choosing the radio, CAT port and sound cards
 
@@ -182,7 +182,8 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 | 6 m | 50.313 | 50.318 | 50.318 | 50.293 |
 
 * **At start-up** it reads the radio and stays on the band the radio is already on, rather than always starting on 20 m.
-* **Changing mode or band** retunes the radio and sets USB (PKTUSB on the FT-891).
+* **Changing mode or band** retunes the radio.
+* **USB-D for every digital mode:** on connect, on every mode change (even with Auto frequency off) and on every frequency change, QSO-Zero puts the radio in its data mode with a 3 kHz passband: Hamlib `PKTUSB`, which is USB-D / U-DIG on the Xiegus and DATA-U on the FT-891. It reads the mode back to confirm. A radio without a data mode (such as the G90) refuses it, and QSO-Zero falls back to USB and says so once. The log records which mode was used.
 * **Turning the VFO knob onto another band** is noticed within about 2 s, and the radio is moved to the mode's frequency on that band. Tuning within a band is left alone.
 * **Bands per radio:**
   * QMX: 80–10 m
