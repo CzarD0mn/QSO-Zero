@@ -2,7 +2,7 @@
 # QSO-Zero first-run helper.
 #   qso-zero-setup           create ~/.config/qso-zero.conf and fix group membership
 #   qso-zero-setup --check   print what QSO-Zero will find on this machine (no changes)
-#   qso-zero-setup --log     show QSO-Zero's activity log (--log all: the whole file, plus the previous run)
+#   qso-zero-setup --log     show QSO-Zero's activity log (--log all: this and the 4 earlier logs kept)
 set -u
 CONF="${HOME}/.config/qso-zero.conf"
 EXAMPLE=/usr/share/qso-zero/qso-zero.conf.example
@@ -84,8 +84,10 @@ showlog() {
     L="$D/qso-zero.log"
     if [ ! -f "$L" ]; then echo "no log yet ($L): start QSO-Zero first"; exit 1; fi
     if [ "${1:-}" = all ]; then
-        [ -f "$L.1" ] && { echo "===== previous run: $L.1"; cat "$L.1"; echo; }
-        echo "===== this run: $L"; cat "$L"
+        for i in 4 3 2 1; do
+            [ -f "$L.$i" ] && { echo "===== older log ($i back): $L.$i"; cat "$L.$i"; echo; }
+        done
+        echo "===== newest: $L"; cat "$L"
     else
         echo "===== $L (last 150 lines; 'qso-zero-setup --log all' for everything)"
         tail -n 150 "$L"

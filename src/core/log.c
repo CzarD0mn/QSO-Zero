@@ -13,7 +13,8 @@
 #include <sys/time.h>
 #include <time.h>
 
-#define LOG_MAX_BYTES (2L * 1024 * 1024)   /* start a new file past 2 MB */
+#define LOG_MAX_BYTES (1L * 1024 * 1024)   /* start a new file past 1 MB */
+#define LOG_KEEP 5                          /* qso-zero.log + .1 .. .4: at most ~5 MB */
 
 static FILE *g_f;
 static char g_path[256];
@@ -30,11 +31,19 @@ static void mkdirs(const char *path)
         if (*s == '/') { *s = 0; mkdir(p, 0755); *s = '/'; }
 }
 
+/* qso-zero.log -> .1 -> .2 ... ; the oldest (.LOG_KEEP-1) is deleted */
 static void rotate(void)
 {
-    char old[270];
-    snprintf(old, sizeof old, "%s.1", g_path);
-    rename(g_path, old);
+    char a[280], b[280];
+    snprintf(a, sizeof a, "%s.%d", g_path, LOG_KEEP - 1);
+    remove(a);
+    for (int i = LOG_KEEP - 2; i >= 1; --i) {
+        snprintf(a, sizeof a, "%s.%d", g_path, i);
+        snprintf(b, sizeof b, "%s.%d", g_path, i + 1);
+        rename(a, b);
+    }
+    snprintf(b, sizeof b, "%s.1", g_path);
+    rename(g_path, b);
 }
 
 int log_open(const char *path)
@@ -47,7 +56,7 @@ int log_open(const char *path)
         else snprintf(g_path, sizeof g_path, "%s/.cache/qso-zero/qso-zero.log", h && *h ? h : "/tmp");
     }
     mkdirs(g_path);
-    rotate();                                   /* each run starts a fresh file; the last one is .1 */
+    rotate();                                   /* each run starts a fresh file; older runs are .1 .. .4 */
     g_f = fopen(g_path, "w");
     if (!g_f) { g_path[0] = 0; return -1; }
     g_bytes = 0;
