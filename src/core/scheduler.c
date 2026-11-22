@@ -10,6 +10,7 @@
 #include "core/clock.h"
 #include "dsp/js8.h"
 #include "dsp/js8_varicode.h"
+#include "core/log.h"
 
 #define FT8_MAX_TRIES 6
 #define CQ_MAX_TRIES  10
@@ -121,13 +122,64 @@ void seq_on_decode(app_t *a, const rxline_t *l)
     int n = split(l->text, t);
     if (n < 2 || strcmp(t[0], a->cfg.callsign)) return;
     ft8seq_t *s = &a->seq;
-    if (s->st == SEQ_IDLE) return;                     /* never answer unattended */
+    static const char *stn[] = {"idle", "CQ", "calling", "report", "R-report", "RR73", "73"};
+    if (s->st == SEQ_IDLE) {                           /* never answer unattended */
+        qlog("seq", "heard \"%s\" for us, but no QSO is in progress: not answering (select the line and press ENTER)", l->text);
+        return;
+    }
     if (s->st == SEQ_CQ) {                              /* first caller wins */
         snprintf(s->dx, sizeof s->dx, "%s", t[1]);
         s->slot_odd = !l->slot_odd;
         app_status(a, "%s answered", s->dx);
-    } else if (strcmp(t[1], s->dx)) return;
+    } else if (strcmp(t[1], s->dx)) {
+        qlog("seq", "heard \"%s\": from %s, but our QSO is with %s: ignored", l->text, t[1], s->dx);
+        return;
+    }
+    seq_state_t was = s->st;
     advance(a, n >= 3 ? t[2] : "", 0, l->snr);
+    qlog("seq", "heard \"%s\" (%+d dB, %s slot): %s -> %s, next \"%s\" in the %s slot", l->text, l->snr,
+         l->slot_odd ? "odd" : "even", stn[was], stn[s->st], s->st == SEQ_IDLE ? "-" : s->last_tx, s->slot_odd ? "odd" : "even");
+}
+
+/* The operator typed a standard message to a station ("W1AW KN4CRD EM73",
+ * "W1AW KN4CRD -12", ...): run the QSO with them from here on, in the slot
+ * opposite the one they were last heard in. Returns 1 if it took over. */
+int seq_start_typed(app_t *a, const char *text)
+{
+    char t[6][16];
+    int n = split(text, t), v;
+    if (n < 2 || n > 3 || strcmp(t[1], a->cfg.callsign) || !strcmp(t[0], "CQ") || t[0][0] == '<') return 0;
+    const char *third = n == 3 ? t[2] : "";
+    seq_state_t st;
+    if (!third[0] || is_grid4(third)) st = SEQ_REPLYING;
+    else if (is_report(third, &v)) st = SEQ_REPORT;
+    else if (third[0] == 'R' && is_report(third + 1, &v)) st = SEQ_RREPORT;
+    else if (!strcmp(third, "RR73") || !strcmp(third, "RRR")) st = SEQ_RR73;
+    else if (!strcmp(third, "73")) st = SEQ_73;
+    else return 0;
+    int odd = -1, snr = 0;
+    for (int i = a->nlines - 1; i >= 0 && i >= a->nlines - 200; --i) {
+        const rxline_t *l = &a->lines[i];
+        if (l->flags & (LINE_TX | LINE_SYS) || !mode_is_ft(l->mode)) continue;
+        char u[6][16];
+        int m = split(l->text, u);
+        for (int k = 0; k < m; ++k)
+            if (!strcmp(u[k], t[0])) { odd = l->slot_odd; snr = l->snr; break; }
+        if (odd >= 0) break;
+    }
+    if (odd < 0) return 0;                              /* never heard them: plain queued message */
+    if (strcmp(a->seq.dx, t[0])) seq_reset(a);
+    ft8seq_t *s = &a->seq;
+    snprintf(s->dx, sizeof s->dx, "%s", t[0]);
+    s->slot_odd = !odd;
+    if (!s->snr_sent) s->snr_sent = snr;
+    if (st == SEQ_REPORT && is_report(third, &v)) s->snr_sent = v;
+    if (st == SEQ_RREPORT && is_report(third + 1, &v)) s->snr_sent = v;
+    s->st = st;
+    queue_ft8(a, text);
+    qlog("seq", "typed \"%s\": running the QSO with %s, our slot %s", text, s->dx, s->slot_odd ? "odd" : "even");
+    app_status(a, "calling %s (%s slots)", s->dx, s->slot_odd ? "odd" : "even");
+    return 1;
 }
 
 void seq_start_reply(app_t *a, const rxline_t *l)
@@ -156,6 +208,7 @@ void seq_start_reply(app_t *a, const rxline_t *l)
     s->st = SEQ_REPLYING;
     snprintf(m, sizeof m, "%s %s %.4s", s->dx, a->cfg.callsign, a->cfg.grid);
     queue_ft8(a, m);
+    qlog("seq", "calling %s with \"%s\" in the %s slot", s->dx, m, s->slot_odd ? "odd" : "even");
     app_status(a, "calling %s (%s slots)", s->dx, s->slot_odd ? "odd" : "even");
 }
 
@@ -170,12 +223,14 @@ void seq_after_cycle(app_t *a, int rx_slot_odd)
     int limit = s->st == SEQ_CQ ? CQ_MAX_TRIES : FT8_MAX_TRIES;
     if (s->tries >= limit) {
         app_status(a, s->st == SEQ_CQ ? "CQ: no answer" : "%s: no reply, giving up", s->dx);
+        qlog("seq", "%s after %d tries", s->st == SEQ_CQ ? "CQ: no answer" : "no reply: giving up", s->tries);
         seq_reset(a);
         return;
     }
     txitem_t t = {.kind = TXK_FT8, .slot_odd = s->slot_odd};
     snprintf(t.text, sizeof t.text, "%s", s->last_tx);
     a->txq[a->ntxq++] = t;
+    qlog("seq", "no answer from %s yet: repeating \"%s\" (try %d of %d)", s->dx[0] ? s->dx : "anyone", s->last_tx, s->tries + 1, limit);
 }
 
 /* ------------------------------------------------------------------ */

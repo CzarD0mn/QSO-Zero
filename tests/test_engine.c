@@ -124,6 +124,17 @@ static void sequencer(app_t *a)
     CHECK(strstr(buf, "<call:6>VE3XYZ") && strstr(buf, "<call:6>JA1ABC") && strstr(buf, "<gridsquare:4>PM95"),
           "ADIF log has both QSOs");
     a->tx_enabled = 1;
+    /* typed call to a station we've heard: the sequencer takes over */
+    seq_reset(a); a->ntxq = 0;
+    rxline_t heard = mk("CQ K9XYZ EN52", -11, 1);
+    app_add_line(a, &heard);
+    CHECK(seq_start_typed(a, "K9XYZ KN4CRD EM73") == 1 && a->seq.st == SEQ_REPLYING && a->seq.slot_odd == 0,
+          "typed 'K9XYZ KN4CRD EM73': sequencer runs the QSO, even slot (K9XYZ is odd)");
+    rxline_t back = mk("KN4CRD K9XYZ -07", -9, 1);
+    seq_on_decode(a, &back);
+    CHECK(a->ntxq == 1 && !strcmp(a->txq[0].text, "K9XYZ KN4CRD R-11"), "their report -> auto '%s'", a->ntxq ? a->txq[0].text : "-");
+    CHECK(seq_start_typed(a, "N0NE KN4CRD EM73") == 0, "typed call to a station never heard: just queued");
+    seq_reset(a); a->ntxq = 0;
 }
 
 static void js8_path(app_t *a)
@@ -329,6 +340,72 @@ static void wspr_cycle(app_t *a)
     free(mix); free(w); free(pcm);
 }
 
+
+/* stream one FT8 slot of audio carrying `msg` (or just noise) in real time */
+static void air_slot(app_t *a, double slot, const char *msg, int snr_db)
+{
+    int n = 15 * 12000;
+    int16_t *pcm = malloc(sizeof(int16_t) * n);
+    float *s1 = calloc(n, sizeof(float));
+    size_t ns = 0;
+    if (msg) { uint8_t tones[79]; ft8w_encode(FT8W_FT8, msg, tones); ns = ft8w_synth(FT8W_FT8, tones, 79, 1500, 12000, 1.0f, s1); }
+    float amp = powf(10, snr_db / 20.0f) * 0.3f;
+    for (int i = 0; i < n; ++i) {
+        float v = (i >= 6000 && (size_t)(i - 6000) < ns) ? s1[i - 6000] * amp : 0;
+        pcm[i] = (int16_t)((v + 0.05 * gauss()) * 8000);
+    }
+    for (int k = 0; k < n; k += 240) {
+        double due = slot + k / 12000.0;
+        while (clk_now() < due + 0.02) usleep(2000);
+        app_audio_in(pcm + k, 240, due, a);
+    }
+    free(pcm); free(s1);
+}
+
+static int find_tx_since(app_t *a, const char *text, int from)
+{
+    for (int i = from; i < a->nlines; ++i)
+        if ((a->lines[i].flags & LINE_TX) && strstr(a->lines[i].text, text)) return i;
+    return -1;
+}
+
+/* We answer a CQ, the DX comes back with our report: the sequencer must send
+ * the R-report in our next slot on its own (real time, decode + TX threads). */
+static void realtime_reply(app_t *a)
+{
+    printf("[1b] real-time auto-reply: we call W1AW, W1AW sends our report\n");
+    a->mode = MODE_FT8;
+    double now = clk_now(), s0 = floor(now / 15) * 15;
+    int odd_now = ((long long)llround(s0 / 15)) & 1;
+    /* W1AW's CQ was in the current slot's parity, so we transmit in the other */
+    rxline_t cq = {.utc = s0, .snr = -8, .freq = 1500, .mode = MODE_FT8, .slot_odd = odd_now};
+    snprintf(cq.text, sizeof cq.text, "CQ W1AW FN31");
+    pthread_mutex_lock(&a->lock);
+    int from = a->nlines;
+    seq_start_reply(a, &cq);
+    pthread_mutex_unlock(&a->lock);
+    double ours = s0 + 15;                      /* our slot */
+    air_slot(a, s0, NULL, 0);                   /* rest of the current slot */
+    air_slot(a, ours, NULL, 0);                 /* we transmit here (sim: noise in) */
+    int t1 = find_tx_since(a, "W1AW KN4CRD EM73", from);
+    CHECK(t1 >= 0, "sent 'W1AW KN4CRD EM73' in our slot");
+    air_slot(a, ours + 15, "KN4CRD W1AW -12", 0);   /* their reply */
+    double wait_end = ours + 30 + 2;
+    int t2 = -1;
+    while (clk_now() < wait_end && (t2 = find_tx_since(a, "W1AW KN4CRD R-", from)) < 0) {
+        int16_t z[240] = {0};
+        app_audio_in(z, 240, clk_now(), a);
+        usleep(20000);
+    }
+    CHECK(find_line(a, "KN4CRD W1AW -12", 0) >= 0, "decoded W1AW's reply 'KN4CRD W1AW -12'");
+    CHECK(t2 >= 0, "auto-sent '%s' in the next slot", t2 >= 0 ? a->lines[t2].text : "W1AW KN4CRD R-xx");
+    if (t2 < 0) printf("        seq state %d dx '%s' ntxq %d tries %d last '%s'\n", a->seq.st, a->seq.dx, a->ntxq, a->seq.tries, a->seq.last_tx);
+    pthread_mutex_lock(&a->lock);
+    seq_reset(a); a->ntxq = 0;
+    pthread_mutex_unlock(&a->lock);
+    while (a->tx_active) usleep(20000);         /* let the R-report's airtime finish */
+}
+
 int main(void)
 {
     static app_t a;
@@ -342,6 +419,7 @@ int main(void)
     autoreply(&a);
     app_start_threads(&a);
     realtime_ft8(&a);
+    realtime_reply(&a);
     wspr_cycle(&a);
     app_stop_threads(&a);
     printf(fails ? "FAIL (%d)\n" : "PASS\n", fails);
