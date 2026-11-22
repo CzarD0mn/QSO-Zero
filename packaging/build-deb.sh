@@ -18,6 +18,7 @@ for i in qso-zero.png qso-zero_100.png qso-zero_80.png; do
     install -D -m 644 "packaging/appstore/$i" "$STAGE/usr/share/APPLaunch/share/images/$i"
 done
 install -D -m 644 README.md                    "$STAGE/usr/share/doc/qso-zero/README.md"
+install -D -m 644 Operations.md                "$STAGE/usr/share/doc/qso-zero/Operations.md"
 install -D -m 644 packaging/copyright          "$STAGE/usr/share/doc/qso-zero/copyright"
 strip --strip-unneeded "$STAGE/usr/bin/qso-zero"
 
