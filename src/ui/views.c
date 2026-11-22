@@ -647,13 +647,14 @@ static void render_help(app_t *a, surface_t *s)
 {
     (void)a;
     static const char *lines[] = {
-        "KEYS            hold ESC: exit",
+        "KEYS (Cardputer Zero)  hold ESC: exit",
         "ENTER   send / reply to selected",
-        "UP/DN   select decode   L/R move RX+TX",
+        "fn+F/X  up/down    fn+Z/C  left/right",
         "TAB     next mode (FT8 FT4 JS8 WSPR)",
-        "PGUP/DN band            ESC setup",
+        "fn+L/M  band up/down     ESC  setup",
         "^Q CQ   ^E JS8 heartbeat   ^X HALT TX",
         "^U tune  ^W WSPR beacon  ^T tools",
+        "commands: / is on the sym layer",
         "/band 40  /mode js8  /sub fast  /qsy on|off",
         "/ghost 80|40|20|off  /cqmod POTA",
         "/aprs CALL msg  /sms NUM msg  /email A msg",
@@ -912,11 +913,8 @@ void ui_key(app_t *a, const keyev_t *k)
         case 'r': app_reply_selected(a); return;
         case 'n': app_step_band(a, 1); return;
         case 'p': app_step_band(a, -1); return;
-        /* Cardputer has no arrow keys: Ctrl + ; . , / are the printed arrows */
-        case ';': { keyev_t e = {K_UP, 0, 0}; ui_key(a, &e); return; }
-        case '.': { keyev_t e = {K_DOWN, 0, 0}; ui_key(a, &e); return; }
-        case ',': { keyev_t e = {K_LEFT, 0, 0}; ui_key(a, &e); return; }
-        case '/': { keyev_t e = {K_RIGHT, 0, 0}; ui_key(a, &e); return; }
+        /* (no Ctrl + ; . , / arrows: on the Cardputer Zero those are Sym codes;
+         *  its arrows are Fn + F / X / Z / C, which arrive as real arrow keys) */
         }
     }
     if (k->key == K_F1) { a->screen = a->screen == 3 ? 0 : 3; return; }

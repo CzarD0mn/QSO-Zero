@@ -1,6 +1,8 @@
 /* Keyboard handling with real evdev records fed through a FIFO:
  * short ESC = K_ESC (on release), held ESC = K_ESC_HOLD after ESC_HOLD_S,
- * the Cardputer's ` key behaves as ESC, Shift+` types '~'. */
+ * and the Cardputer Zero's Sym layer from its stock keymap file
+ * (tests/data/tca8418_keypad_m5stack_keymap.map, copied from a device). */
+#include <stdlib.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <stdio.h>
@@ -36,6 +38,7 @@ static int collect(int ms, keyev_t *out, int max)
 int main(void)
 {
     const char *path = "/tmp/qz_kbd_fifo";
+    setenv("QSOZERO_KEYMAP", "tests/data/tca8418_keypad_m5stack_keymap.map", 1);
     unlink(path);
     mkfifo(path, 0600);
     if (input_open(path)) { printf("cannot open fifo\n"); return 1; }
@@ -54,13 +57,48 @@ int main(void)
     n += collect(200, ev + n, 16 - n);
     CHECK(n == 2 && ev[0].key == K_ESC_HOLDING && ev[1].key == K_ESC_HOLD, "held ESC 1.2 s: HOLDING then HOLD, nothing on release (%d events)", n);
 
-    key(KEY_GRAVE, 1); usleep(100000); key(KEY_GRAVE, 0);
-    n = collect(200, ev, 16);
-    CHECK(n == 2 && ev[1].key == K_ESC, "Cardputer ` key acts as ESC");
-
-    key(KEY_LEFTSHIFT, 1); key(KEY_GRAVE, 1); key(KEY_GRAVE, 0); key(KEY_LEFTSHIFT, 0);
+    /* --- Cardputer Zero keypad: the FIFO has no device name, and the keymap
+     * file is loaded, so it counts as the built-in keypad --- */
+    CHECK(input_keymap_from_file() && input_device_builtin(0), "keymap file read; device treated as the Zero keypad");
+    static const struct { int code; char ch; } sym[] = {
+        {26, '!'}, {27, '@'}, {39, '#'}, {40, '$'}, {41, '%'}, {43, '^'}, {51, '&'}, {52, '*'},
+        {53, '('}, {94, ')'}, {55, '~'}, {69, '`'}, {70, '_'}, {71, '-'}, {72, '+'}, {73, '='},
+        {74, '['}, {75, ']'}, {76, '{'}, {77, '}'}, {79, ';'}, {80, ':'}, {81, '\''}, {82, '"'},
+        {83, '<'}, {85, '>'}, {86, '\\'}, {89, '|'}, {90, ','}, {91, '.'}, {92, '/'}, {93, '?'},
+    };
+    int okc = 0;
+    char bad[64] = "";
+    for (size_t i = 0; i < sizeof sym / sizeof *sym; ++i) {
+        key(sym[i].code, 1); key(sym[i].code, 0);
+        n = collect(30, ev, 16);
+        if (n == 1 && ev[0].key == K_CHAR && ev[0].ch == sym[i].ch) ++okc;
+        else snprintf(bad + strlen(bad), sizeof bad - strlen(bad), " %d", sym[i].code);
+    }
+    CHECK(okc == 32, "all 32 Sym symbols type what the keymap says (%d/32)%s", okc, bad);
+    key(43, 1); key(43, 0); key(53, 1); key(53, 0); key(92, 1); key(92, 0);
+    n = collect(80, ev, 16);
+    CHECK(n == 3 && ev[0].ch == '^' && ev[1].ch == '(' && ev[2].ch == '/', "Sym+6 = ^, Sym+9 = (, slash = / (were \\ and / before)");
+    key(KEY_LEFTSHIFT, 1); key(70, 1); key(70, 0); key(KEY_A, 1); key(KEY_A, 0); key(KEY_LEFTSHIFT, 0);
+    key(KEY_6, 1); key(KEY_6, 0);
+    n = collect(80, ev, 16);
+    CHECK(n == 3 && ev[0].ch == '_' && ev[1].ch == 'A' && ev[2].ch == '6', "Shift leaves Sym symbols alone, still capitalises letters; digits plain");
+    key(41, 1); usleep(50000); key(41, 0);
     n = collect(150, ev, 16);
-    CHECK(n == 1 && ev[0].key == K_CHAR && ev[0].ch == '~', "Shift+` types '~'");
+    CHECK(n == 1 && ev[0].key == K_CHAR && ev[0].ch == '%', "code 41 is Sym '%%', not an ESC alias any more");
+
+    /* --- a USB keyboard on the same Zero: ordinary US layout --- */
+    input_set_builtin(0, 0);
+    key(26, 1); key(26, 0); key(43, 1); key(43, 0); key(KEY_SLASH, 1); key(KEY_SLASH, 0);
+    key(KEY_LEFTSHIFT, 1); key(KEY_GRAVE, 1); key(KEY_GRAVE, 0); key(KEY_LEFTSHIFT, 0);
+    n = collect(100, ev, 16);
+    CHECK(n == 4 && ev[0].ch == '[' && ev[1].ch == '\\' && ev[2].ch == '/' && ev[3].ch == '~', "USB keyboard: [ \\ / and Shift+` = ~");
+    input_set_builtin(0, 1);
+
+    /* --- no keymap file: the built-in table is used --- */
+    CHECK(input_load_keymap("/nonexistent") == 0, "missing keymap file -> fallback table");
+    key(43, 1); key(43, 0); key(92, 1); key(92, 0);
+    n = collect(60, ev, 16);
+    CHECK(n == 2 && ev[0].ch == '^' && ev[1].ch == '/', "fallback table gives the same symbols");
 
     key(KEY_LEFTCTRL, 1); key(KEY_X, 1); key(KEY_X, 0); key(KEY_LEFTCTRL, 0);
     n = collect(150, ev, 16);

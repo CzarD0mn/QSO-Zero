@@ -74,24 +74,26 @@ The user running it needs to be in the `dialout`, `audio`, `video` and `input` g
 
 ## Keys
 
+These are for the **Cardputer Zero's own keyboard**, following M5Stack's Quick Start. **fn**, **sym** and **shift** can be held, tapped once (next key only) or tapped twice (locked). The arrows are on the **fn** layer: **F** up, **X** down, **Z** left, **C** right. Symbols in blue are on the **sym** layer, exactly as the legends show (QSO-Zero reads the Zero's own keymap, `/usr/share/keymaps/tca8418_keypad_m5stack_keymap.map`, so the sym layer types what's printed). A USB keyboard plugged into the Zero works with its normal layout.
+
 | Key | Action |
 |---|---|
-| type + `Enter` | send (FT8 message / JS8 text) |
+| type + `Enter` | send (FT8/FT4 message, JS8 text) |
 | `Enter` on empty line | reply to the selected decode |
-| `↑` `↓` (or `Ctrl` + `;` `.`) | select decode |
-| `←` `→` (or `Ctrl` + `,` `/`) | move RX/TX offset 10 Hz (Shift: 100 Hz) |
+| `fn`+`F` / `fn`+`X` (↑ ↓) | select decode; move in Setup |
+| `fn`+`Z` / `fn`+`C` (← →) | move RX/TX offset 10 Hz (Shift: 100 Hz); change a Setup value |
 | `Tab` | FT8 → FT4 → JS8 → WSPR (the decode list starts fresh in the new mode) |
-| `PgUp` / `PgDn`, `Ctrl+N` / `Ctrl+P` | band (skips bands the radio can't do) |
-| `Esc` or `` ` `` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
-| `Ctrl+Q` | CQ |
-| `Ctrl+E` | JS8 heartbeat |
-| `Ctrl+X` | **halt TX now** |
-| `Ctrl+U` | tune carrier 5 s |
-| `Ctrl+W` | WSPR beacon on/off |
-| `Ctrl+T` | tools (GPS/time, rig, audio) |
-| `F1` | help |
+| `fn`+`L` / `fn`+`M` (PgUp/PgDn), or `ctrl`+`N` / `ctrl`+`P` | next / previous band (skips bands the radio can't do) |
+| `esc` | short press: back / Setup menu. **Hold 1 s: exit to the launcher** |
+| `ctrl`+`Q` | CQ |
+| `ctrl`+`E` | JS8 heartbeat |
+| `ctrl`+`X` | **halt TX now** |
+| `ctrl`+`U` | tune carrier 5 s |
+| `ctrl`+`W` | WSPR beacon on/off |
+| `ctrl`+`T` | tools (GPS/time, rig, audio, battery) |
+| `fn`+`1` (F1) | help |
 
-Commands: `/band 40`, `/mode js8` (ft8, ft4, js8, wspr), `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
+Commands (type `/` on the sym layer): `/band 40`, `/mode js8` (ft8, ft4, js8, wspr), `/sub turbo`, `/freq 7.078`, `/call K1ABC`, `/grid FN42`, `/level 40`, `/pwr 23`, `/tune 5`, `/auto on|off`, `/qsy on|off`, `/ghost 80|40|20|off`, `/cqmod POTA`, `/aprs CALL msg`, `/sms NUMBER msg`, `/email ADDRESS msg`, `/aprspos`, `/port /dev/ttyUSB0`, `/ain plughw:CARD=Device`, `/aout …`, `/hback on|off`, `/info TEXT`, `/status TEXT`, `/save`, `/quit`.
 
 ### Battery
 

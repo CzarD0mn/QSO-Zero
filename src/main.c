@@ -72,7 +72,11 @@ int main(int argc, char **argv)
     if (input_open(a->cfg.keyboard)) {
         fprintf(stderr, "qso-zero: no keyboard found (check /dev/input permissions)\n");
         qlog("input", "no keyboard found (check /dev/input permissions / input group)");
-    } else qlog("input", "keyboard open");
+    } else {
+        for (int i = 0; i < input_device_count(); ++i)
+            qlog("input", "keyboard \"%s\"%s", input_device_name(i), input_device_builtin(i) ? " (Cardputer Zero keypad: Sym layer on)" : "");
+        qlog("input", "Sym keymap: %s", input_keymap_from_file() ? "from /usr/share/keymaps/tca8418_keypad_m5stack_keymap.map" : "built-in table (keymap file not found)");
+    }
 
     surface_t *compact = surf_new(320, 170), *large = surf_new(LARGE_W, LARGE_H);
     app_start_threads(a);
