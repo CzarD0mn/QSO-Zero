@@ -832,7 +832,8 @@ void app_shutdown(app_t *a)
 /* Decode thread                                                        */
 /* ------------------------------------------------------------------ */
 
-static void sleep_until(app_t *a, double utc)
+/* Transmit timing: sleep until exactly `utc` (only quitting cuts it short). */
+static void tx_sleep_until(app_t *a, double utc)
 {
     for (;;) {
         double d = utc - clk_now();
@@ -840,6 +841,105 @@ static void sleep_until(app_t *a, double utc)
         struct timespec ts = {0, (long)(fmin(d, 0.1) * 1e9)};
         nanosleep(&ts, NULL);
     }
+}
+
+/* Decode timing: sleep until `utc`, but wake at once if the mode changes, so
+ * e.g. leaving WSPR (whose decode waits up to 2 minutes) for FT8 doesn't
+ * stall decoding. Never used for transmit timing. */
+static void sleep_until(app_t *a, double utc)
+{
+    op_mode_t m = a->mode;
+    for (;;) {
+        double d = utc - clk_now();
+        if (d <= 0 || a->quit || a->mode != m) return;
+        struct timespec ts = {0, (long)(fmin(d, 0.1) * 1e9)};
+        nanosleep(&ts, NULL);
+    }
+}
+
+/* One FT8/FT4 receive cycle in two passes:
+ *  early - just after an on-time transmission ends (FT8 0.5 + 12.64 s =
+ *          13.14 s -> 13.35 s; FT4 0.5 + 5.04 s = 5.54 s -> 5.65 s), so most
+ *          decodes appear ~0.65 s / ~0.25 s sooner and the sequencer can
+ *          queue its reply earlier;
+ *  final - at `ready` (FT8 14.0 s, FT4 5.9 s) over the longer window, for
+ *          stations whose clocks run late; only new decodes are added.
+ * The sequencer's per-cycle step (repeat / give up) runs once, after the
+ * final pass. Each cycle's timing goes to the activity log. */
+#define FT_MAX_SEEN 64
+static void ft_add_decodes(app_t *a, op_mode_t mode, double start, int odd, const ft8w_decode_t *d, int nd,
+                           char seen[][40], int *nseen, int *added)
+{
+    pthread_mutex_lock(&a->lock);
+    for (int i = 0; i < nd; ++i) {
+        int dup = 0;
+        for (int k = 0; k < *nseen; ++k) if (!strcmp(seen[k], d[i].text)) { dup = 1; break; }
+        if (dup) continue;
+        if (*nseen < FT_MAX_SEEN) snprintf(seen[(*nseen)++], 40, "%s", d[i].text);
+        rxline_t l = {.utc = start, .snr = d[i].snr, .dt = d[i].dt, .freq = d[i].freq, .mode = mode, .slot_odd = odd};
+        snprintf(l.text, sizeof l.text, "%s", d[i].text);
+        if (!strncmp(l.text, "CQ ", 3)) l.flags |= LINE_CQ;
+        size_t cl = strlen(a->cfg.callsign);
+        if (!strncmp(l.text, a->cfg.callsign, cl) && l.text[cl] == ' ') l.flags |= LINE_TOME;
+        app_add_line(a, &l);
+        seq_on_decode(a, &l);
+        ++*added;
+    }
+    pthread_mutex_unlock(&a->lock);
+    a->dirty = 1;
+}
+
+static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double ready, ft8w_t *dec, int16_t *buf)
+{
+    double early = mode == MODE_FT4 ? 5.65 : 13.35;
+    int odd = ((long long)llround(start / P)) & 1;
+    char seen[FT_MAX_SEEN][40];
+    int nseen = 0, n1 = 0, n2 = 0, ran_early = 0;
+    double ms1 = 0, ms2 = 0, at1 = 0, at2 = 0;
+    ft8w_decode_t d[60];
+    if (clk_now() < start + early - 0.02) {
+        sleep_until(a, start + early);
+        if (a->quit || a->mode != mode) return;
+        int n = (int)((early - 0.1) * 12000);
+        if (ring_extract(a, start, n, buf) != 0) qlog("decode", "%s early pass skipped: audio up to +%.2f s not in yet", mode_name(mode), early - 0.1);
+        else {
+            a->decoding = 1;
+            a->dirty = 1;
+            at1 = clk_now() - start;
+            double t0 = clk_mono();
+            int nd = ft8w_decode(dec, buf, n, d, 60);
+            ms1 = (clk_mono() - t0) * 1000;
+            ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n1);
+            ran_early = 1;
+        }
+    }
+    sleep_until(a, start + ready);
+    if (a->quit || a->mode != mode) { a->decoding = 0; return; }
+    int n = (int)((ready - 0.1) * 12000);
+    a->decoding = 1;
+    a->dirty = 1;
+    if (ring_extract(a, start, n, buf) == 0) {
+        at2 = clk_now() - start;
+        double t0 = clk_mono();
+        int nd = ft8w_decode(dec, buf, n, d, 60);
+        ms2 = (clk_mono() - t0) * 1000;
+        ft_add_decodes(a, mode, start, odd, d, nd, seen, &nseen, &n2);
+        pthread_mutex_lock(&a->lock);
+        seq_after_cycle(a, odd);
+        pthread_mutex_unlock(&a->lock);
+    }
+    a->last_decode_ms = ms2 > ms1 ? ms2 : ms1;
+    a->decoding = 0;
+    a->dirty = 1;
+    time_t ts = (time_t)start;
+    struct tm tm;
+    gmtime_r(&ts, &tm);
+    if (ran_early)
+        qlog("decode", "%s %02d:%02d:%04.1f  early pass at +%.2f s: %d in %.0f ms (on screen +%.2f s)  final at +%.2f s: %d more in %.0f ms (+%.2f s)",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, ms1, at1 + ms1 / 1000, at2, n2, ms2, at2 + ms2 / 1000);
+    else
+        qlog("decode", "%s %02d:%02d:%04.1f  final at +%.2f s: %d in %.0f ms (+%.2f s)",
+             mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at2, n2, ms2, at2 + ms2 / 1000);
 }
 
 static void *decode_thread(void *arg)
@@ -901,32 +1001,17 @@ static void *decode_thread(void *arg)
             ready = in->start_delay_ms / 1000.0 + 79.0 * in->symbol_samples / 12000.0 + 0.35;
         }
         if (clk_now() > start + ready) start += P;      /* already past it: next period */
+        if (mode_is_ft(mode)) {
+            ft_cycle(a, mode, start, P, ready, mode == MODE_FT4 ? ft4 : ft8, buf);
+            continue;
+        }
         double trigger = start + ready;
         sleep_until(a, trigger);
         if (a->quit || a->mode != mode) continue;
         a->decoding = 1;
         a->dirty = 1;
         double t0 = clk_mono();
-        if (mode_is_ft(mode)) {
-            int n = (int)((ready - 0.1) * 12000);
-            if (ring_extract(a, start, n, buf) == 0) {
-                ft8w_decode_t d[60];
-                int nd = ft8w_decode(mode == MODE_FT4 ? ft4 : ft8, buf, n, d, 60);
-                int odd = ((long long)llround(start / P)) & 1;
-                pthread_mutex_lock(&a->lock);
-                for (int i = 0; i < nd; ++i) {
-                    rxline_t l = {.utc = start, .snr = d[i].snr, .dt = d[i].dt, .freq = d[i].freq, .mode = mode, .slot_odd = odd};
-                    snprintf(l.text, sizeof l.text, "%s", d[i].text);
-                    if (!strncmp(l.text, "CQ ", 3)) l.flags |= LINE_CQ;
-                    size_t cl = strlen(a->cfg.callsign);
-                    if (!strncmp(l.text, a->cfg.callsign, cl) && l.text[cl] == ' ') l.flags |= LINE_TOME;
-                    app_add_line(a, &l);
-                    seq_on_decode(a, &l);
-                }
-                seq_after_cycle(a, odd);
-                pthread_mutex_unlock(&a->lock);
-            }
-        } else if (mode == MODE_JS8) {
+        if (mode == MODE_JS8) {
             if (js8_sub != a->js8_sub) {
                 js8_decoder_free(js8);
                 js8_sub = a->js8_sub;
@@ -1051,11 +1136,11 @@ static void *tx_thread(void *arg)
             pthread_mutex_unlock(&a->lock);
             continue;
         }
-        qlog("tx", "%s at %.6f MHz + %d Hz: \"%s\"", t.kind == TXK_TUNE ? "TUNE" : t.kind == TXK_WSPR ? "WSPR" : t.kind == TXK_JS8 ? "JS8" : "FT8",
+        qlog("tx", "%s at %.6f MHz + %d Hz: \"%s\"", t.kind == TXK_TUNE ? "TUNE" : t.kind == TXK_WSPR ? "WSPR" : t.kind == TXK_JS8 ? "JS8" : mode_name(a->mode),
              a->dial_hz / 1e6, a->tx_off, t.text);
         if (g_hw && !a->rig_ok) qlog("tx", "radio not connected: no PTT");
         if (g_hw && a->rig_ok && rig_ptt(1)) { app_status(a, "PTT failed: %s", rig_error()); free(audio); goto pop; }
-        sleep_until(a, start);
+        tx_sleep_until(a, start);
         if (t.kind == TXK_WSPR) a->wspr_tx_slot = floor(start / 120.0) * 120.0;
         a->tx_active = 1;
         a->dirty = 1;
