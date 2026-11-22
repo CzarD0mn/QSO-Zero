@@ -38,7 +38,7 @@ js8_autoreply = 0
 js8_hb_ack = 0             # ACK heartbeats (needs js8_autoreply = 1)
 js8_info = QMX 5W EFHW
 js8_status = QRV POTA
-#inbox_path = ~/qso-zero-inbox.txt (default: in your home folder)
+#inbox_path = ~/qso-zero/js8/qso-zero-inbox.txt (default; the folder is created automatically)
 wspr_rx = 1                # decode WSPR between beacon slots
 wsprnet_upload = 1         # checked every 5 min; spots dropped when offline
 wsprnet_host = wsprnet.org

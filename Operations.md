@@ -273,7 +273,7 @@ Turn on with **Setup › JS8 auto-reply** or `/auto on`. An **A** chip shows in 
 | `INFO?` / `STATUS?` | your INFO / STATUS text (no reply if it's blank) |
 | `HEARING?` | up to 4 stations heard in the last hour |
 | `AGN?` | repeats your last transmission |
-| `MSG …` | checks it, saves it to the inbox file, replies `ACK` |
+| `MSG …` | checks it, saves it to `~/qso-zero/js8/qso-zero-inbox.txt`, replies `ACK` |
 | `@HB` heartbeat | `CALL HEARTBEAT SNR -12`, only with **JS8 heartbeat ACK** on, at most once per station every 15 minutes |
 
 It never answers while you have something queued or are transmitting, or after ctrl+X. Each reply shows on screen as `AUTO-REPLY queued: …`.

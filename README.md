@@ -153,7 +153,7 @@ The package lands in `build/`. Use `--platform linux/arm/v7` for armhf. Emulatio
 | Settings | `~/.config/qso-zero.conf` (written by **Save settings** or `/save`) |
 | QSO log (ADIF) | `~/qso-zero/qso-zero.adi` (the folder is created automatically) |
 | Activity log | `~/.cache/qso-zero/qso-zero.log`; the 5 newest are kept. View with `qso-zero-setup --log` |
-| JS8 message inbox | `~/qso-zero-inbox.txt` by default (`inbox_path` in the settings) |
+| JS8 message inbox | `~/qso-zero/js8/qso-zero-inbox.txt` (the folder is created automatically) |
 
 ## Adding a radio
 
