@@ -208,6 +208,14 @@ QSO-Zero drives the radio's VFO to the usual frequency for the current mode on e
 * **Turning it off:** use ESC › **Auto frequency**, `/qsy off`, or `auto_qsy = 0` in the config. With it off, mode changes leave the VFO alone and the band display just follows the radio. Picking a band explicitly still tunes the radio.
 * **Limiting the band list:** set `bands = 40,30,20` in the config, for example.
 
+## FT8 / FT4 decode timing
+
+Each FT8/FT4 cycle is decoded twice:
+* **Early pass:** right after an on-time transmission ends, at 13.35 s for FT8 (signals end at 13.14 s) and 5.65 s for FT4 (signals end at 5.54 s). Most decodes, and any reply the auto-sequencer queues, appear about 0.65 s sooner (FT8) or 0.25 s sooner (FT4).
+* **Final pass:** at 14.0 s (FT8) or 5.9 s (FT4), over a slightly longer window. It catches stations whose clocks run a little late and adds only stations the early pass didn't already show.
+
+Each cycle's timing is in the activity log, for example `[decode] FT8 21:45:00.0  early pass at +13.35 s: 9 in 410 ms (on screen +13.76 s)  final at +14.00 s: 1 more in 405 ms`. If the audio hasn't arrived in time for the early pass, the log says so and the final pass still runs. Switching modes (for example from WSPR) starts decoding in the new mode straight away.
+
 ## Decode speed check
 
 `qso-zero --bench` builds a busy band for each mode: 20 FT8 signals, 15 FT4, 8 for each JS8 speed and 8 WSPR. It times the same decoder calls the app makes, and compares the slowest of 3 runs with the time available before a reply would have to start. The available time is 1.5 s for FT8 and 2.1 s for FT4 (decoding starts as soon as the last symbol is in), 1.7 to 4.4 s for JS8 depending on speed, and 6 s for WSPR. Run it on the Cardputer Zero. **OK** means well within the time, **TIGHT** fits with little margin, and **TOO SLOW** means replies would go out late.

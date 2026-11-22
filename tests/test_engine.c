@@ -48,7 +48,7 @@ static void realtime_ft8(app_t *a)
     int16_t *pcm = malloc(sizeof(int16_t) * n);
     for (int i = 0; i < n; ++i) pcm[i] = (int16_t)((sig[i] + 0.05 * gauss()) * 8000);
     /* stream it like the capture thread does: 20 ms chunks, wall-clock paced */
-    double t = slot - 0.5;
+    double t = slot - 0.5, t_found = -1;
     while (clk_now() < t) usleep(10000);
     a->mode = MODE_FT8;
     for (int k = -6000; k < n; k += 240) {
@@ -57,7 +57,7 @@ static void realtime_ft8(app_t *a)
         int16_t chunk[240];
         for (int i = 0; i < 240; ++i) chunk[i] = (k + i >= 0 && k + i < n) ? pcm[k + i] : (int16_t)(400 * gauss());
         app_audio_in(chunk, 240, due, a);
-        if (find_line(a, "CQ W1AW FN31", LINE_CQ) >= 0) break;
+        if (find_line(a, "CQ W1AW FN31", LINE_CQ) >= 0) { t_found = clk_now() - slot; break; }
     }
     for (int w = 0; w < 30 && find_line(a, "CQ W1AW FN31", LINE_CQ) < 0; ++w) usleep(100000);
     int i = find_line(a, "CQ W1AW FN31", LINE_CQ);
@@ -66,6 +66,7 @@ static void realtime_ft8(app_t *a)
         CHECK(fabs(a->lines[i].freq - 1234) < 4, "frequency %.1f Hz (sent 1234)", a->lines[i].freq);
         CHECK(fabs(a->lines[i].dt) < 0.25, "DT %+.2f s (time tagging is consistent)", a->lines[i].dt);
         printf("        decode took %.0f ms on this machine\n", a->last_decode_ms);
+        CHECK(t_found > 13.3 && t_found < 13.9, "on screen at +%.2f s: from the early pass (final pass starts at +14.0)", t_found);
     }
     free(sig); free(s1); free(pcm);
 }
