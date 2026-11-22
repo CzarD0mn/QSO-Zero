@@ -236,7 +236,7 @@ static void *rx_thread(void *arg)
             float a = fabsf(buf[i] / 32768.0f);
             if (a > peak) peak = a;
         }
-        if ((peak_n += (int)r) >= 24000) { g_level = peak; peak = 0; peak_n = 0; }
+        if ((peak_n += (int)r) >= 9600) { g_level = peak;   /* every 200 ms: quick enough for the Setup meter */ peak = 0; peak_n = 0; }
         int nd = decim4_run(&d, buf, (int)r, dec);
         /* time of first output sample: end time minus the chunk, minus the
          * FIR group delay ((NTAPS-1)/2 input samples). */

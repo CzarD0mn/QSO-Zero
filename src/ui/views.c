@@ -396,7 +396,7 @@ enum { MI_MODE,
        MI_SUB, MI_AUTO, MI_HBACK, MI_INFO, MI_STATUS, MI_GHOST, MI_GN80, MI_GN40, MI_GN20,   /* JS8 */
        MI_APRS, MI_APOS, MI_AMSG, MI_ASMS, MI_AMAIL,                                          /* JS8 APRS */
        MI_WRX, MI_WPWR, MI_WPCT,                                                              /* WSPR */
-       MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AINLVL, MI_AOUT, MI_AOUTLVL, MI_ARESCAN, MI_TXL,
+       MI_BAND, MI_QSY, MI_CALL, MI_GRID, MI_RADIO, MI_PORT, MI_AIN, MI_AINLVL, MI_AINMETER, MI_AOUT, MI_AOUTLVL, MI_ARESCAN, MI_TXL,
        MI_AGRID, MI_TUNE, MI_SAVE, MI_QUIT, MI_COUNT };
 
 static int menu_visible(const app_t *a, int i)
@@ -413,7 +413,7 @@ static int menu_step(const app_t *a, int from, int dir)
     int i = from;
     for (int n = 0; n < MI_COUNT; ++n) {
         i = (i + dir + MI_COUNT) % MI_COUNT;
-        if (menu_visible(a, i)) return i;
+        if (menu_visible(a, i) && i != MI_AINMETER) return i;   /* the meter row is display-only */
     }
     return MI_MODE;
 }
@@ -497,9 +497,35 @@ static const char *k_menu_names[MI_COUNT] = {
     [MI_ASMS] = "  Text a phone (SMS)", [MI_AMAIL] = "  Email",
     [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
     [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
-    [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AINLVL] = "  In level", [MI_AOUT] = "Audio out", [MI_AOUTLVL] = "  Out level", [MI_ARESCAN] = "Rescan audio",
+    [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AINLVL] = "  In level", [MI_AINMETER] = "  In signal", [MI_AOUT] = "Audio out", [MI_AOUTLVL] = "  Out level", [MI_ARESCAN] = "Rescan audio",
     [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_TUNE] = "Tune 5 s",
     [MI_SAVE] = "Save settings", [MI_QUIT] = "Quit"};
+
+/* Live receive-audio peak under "In level": green up to 70 %, yellow to
+ * 90 %, red above (clipping). The two ticks mark the 50-70 % sweet spot. */
+static void in_signal_bar(surface_t *s, int y, int rowh, int sc)
+{
+    float lvl = audio_rx_level();
+    if (lvl < 0) lvl = 0;
+    if (lvl > 1) lvl = 1;
+    char pct[8];
+    snprintf(pct, sizeof pct, "%3.0f%%", lvl * 100);
+    int tw = gfx_text_w("100%", sc);
+    int bx = 8 * sc + gfx_text_w("  In signal", sc) + 6 * sc;
+    int bw = s->w - bx - tw - 12 * sc, bh = rowh - 4 * sc - 1;
+    if (bh < 4) bh = 4;
+    int by = y + (rowh - 1 - bh) / 2 - 1;
+    if (bw < 20) return;
+    gfx_fill(s, bx, by, bw, bh, C_PANEL2);
+    int f = (int)(lvl * bw), g = (int)(0.7f * bw), yl = (int)(0.9f * bw);
+    gfx_fill(s, bx, by, f < g ? f : g, bh, C_MINT);
+    if (f > g) gfx_fill(s, bx + g, by, (f < yl ? f : yl) - g, bh, C_SUN);
+    if (f > yl) gfx_fill(s, bx + yl, by, f - yl, bh, C_RED);
+    gfx_fill(s, bx + (int)(0.5f * bw), by - 1, 1, bh + 2, C_TEXT);
+    gfx_fill(s, bx + (int)(0.7f * bw), by - 1, 1, bh + 2, C_TEXT);
+    gfx_rect(s, bx - 1, by - 1, bw + 2, bh + 2, C_FAINT);
+    gfx_text(s, s->w - tw - 6 * sc, y, pct, lvl > 0.9f ? C_RED : lvl > 0.7f ? C_SUN : C_MINT, sc);
+}
 
 static void render_menu(app_t *a, surface_t *s, int sc_large)
 {
@@ -525,6 +551,7 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
         if (i == a->menu_sel) { gfx_fill(s, 0, y - 1, s->w, rowh - 1, C_PANEL2); gfx_fill(s, 0, y - 1, 3 * sc, rowh - 1, C_MAGENTA); }
         uint16_t nc = i == a->menu_sel ? C_TEXT : (i == MI_GHOST || i == MI_APRS) ? C_MAGENTA : C_DIM;
         gfx_text(s, 8 * sc, y, k_menu_names[i], nc, sc);
+        if (i == MI_AINMETER) { in_signal_bar(s, y, rowh, sc); continue; }
         menu_value(a, i, v);
         int vx = s->w - gfx_text_w(v, sc) - 6 * sc;
         if (v[0]) gfx_text(s, vx, y, v, i == a->menu_sel ? C_SUN : C_CYAN, sc);
@@ -532,7 +559,7 @@ static void render_menu(app_t *a, surface_t *s, int sc_large)
     const char *hint = (a->menu_sel == MI_RADIO || a->menu_sel == MI_PORT || a->menu_sel == MI_AIN || a->menu_sel == MI_AOUT)
                          ? "ENTER: choose from what's connected"
                      : a->menu_sel == MI_ARESCAN ? "look for sound devices again and reconnect"
-                     : a->menu_sel == MI_AINLVL ? (a->mix_in.ok ? "</> receive audio level from the radio" : a->mix_in.error)
+                     : a->menu_sel == MI_AINLVL ? (a->mix_in.ok ? "</> aim for 50-70% on the In signal bar" : a->mix_in.error)
                      : a->menu_sel == MI_AOUTLVL ? (a->mix_out.ok ? "</> transmit audio level to the radio" : a->mix_out.error)
                      : a->menu_sel == MI_TXL ? "QSO-Zero's own TX drive (on top of Out level)"
                      : (a->menu_sel == MI_CALL || a->menu_sel == MI_GRID || a->menu_sel == MI_INFO || a->menu_sel == MI_STATUS) ? "ENTER to edit"
