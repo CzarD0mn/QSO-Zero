@@ -1448,13 +1448,6 @@ static int handle_command(app_t *a, char *cmd)
         a->cfg.cq_only = !strcasecmp(arg, "on") ? 1 : !strcasecmp(arg, "off") ? 0 : !a->cfg.cq_only;
         app_status(a, a->cfg.cq_only ? "showing CQ calls only (/cqonly again for all)" : "showing all decodes");
         if (a->cfg.cq_only && !mode_is_ft(a->mode)) app_status(a, "CQ-only filter on: applies in FT8 and FT4");
-    } else if (!strcmp(cmd, "/scroll")) {
-        int d = 0, r = 0;
-        if (sscanf(arg, "%d %d", &d, &r) >= 1) {
-            a->cfg.scroll_delay_ms = d < 100 ? 100 : d > 2000 ? 2000 : d;
-            if (r) a->cfg.scroll_rate_ms = r < 15 ? 15 : r > 500 ? 500 : r;
-        }
-        app_status(a, "hold to scroll: starts after %d ms, then every %d ms", a->cfg.scroll_delay_ms, a->cfg.scroll_rate_ms);
     }
     else if (!strcmp(cmd, "/rescan")) app_rescan_audio(a);
     else if (!strcmp(cmd, "/inlevel") || !strcmp(cmd, "/outlevel")) {

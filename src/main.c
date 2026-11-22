@@ -85,7 +85,6 @@ int main(int argc, char **argv)
     int was_hdmi = fb.is_hdmi;
     while (!a->quit) {
         keyev_t k;
-        input_set_repeat(a->cfg.scroll_delay_ms, a->cfg.scroll_rate_ms);
         while (input_poll(&k, 30)) ui_key(a, &k);
 
         double now = clk_mono();

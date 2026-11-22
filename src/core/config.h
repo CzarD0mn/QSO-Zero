@@ -31,8 +31,6 @@ typedef struct {
     int  auto_qsy;           /* move the VFO to the mode's standard frequency automatically */
     char bands[64];          /* optional band list, e.g. "40,30,20"; blank = all the radio covers */
     int  cq_only;            /* FT8/FT4: list only CQ calls (plus our own QSO) */
-    int  scroll_delay_ms;    /* hold an arrow this long before it repeats */
-    int  scroll_rate_ms;     /* then one step every this many ms */
     char cq_mod[8];          /* FT8 CQ modifier: 1-4 letters or 3 digits (POTA, DX, ...) */
     int  ghostnet;           /* JS8 on the GHOSTNET frequencies (80/40/20 m) */
     int  js8_autoreply;      /* answer SNR?/GRID?/INFO?/STATUS?/HEARING?/AGN?/MSG */
