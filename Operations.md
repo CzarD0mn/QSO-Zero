@@ -244,6 +244,8 @@ Type a message the way you would in JS8Call and press Enter:
 
 Long messages are split into several frames; the status line shows how many and how long they'll take. Received messages build up on one line as their frames arrive.
 
+**Decode timing.** Each JS8 period is decoded 0.35 s after an on-time transmission ends. At **Fast** and **Turbo**, a second pass about a second later picks up frames from stations whose clocks run late. Frames already decoded aren't added twice, so a message spread over several periods is still joined in order on one line. (At Normal and Slow the first pass already copies stations up to about 2 seconds late, so there's no second pass.) Each period's timing is in the activity log as a `[decode] JS8 …` line.
+
 To reply to a station, select its line and press Enter: QSO-Zero fills in their callsign and moves to their audio frequency.
 
 ### JS8 commands
