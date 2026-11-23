@@ -417,6 +417,57 @@ static void realtime_own(app_t *a)
     CHECK(i < 0 || (a->lines[i].flags & LINE_TX), "'CQ KN4CRD EM73' (ours) not shown as received");
 }
 
+/* JS8 in real time with a station whose clock runs late: the late pass must
+ * pick up the frame the first pass can't see yet, and the message must still
+ * be stitched together in order, once, across the periods. */
+static void realtime_js8_late(app_t *a)
+{
+    printf("[1d] real-time JS8 Turbo: a 3-frame message, the 2nd frame sent 1.9 s late, -6 dB\n");
+    const char *msg = "HELLO FROM THE PARK, QMX AT 5W";
+    js8_txframe_t f[8];
+    int nf = js8v_build_frames("VE3XYZ", "FN03", "KN4CRD", msg, 0, 0, JS8_TURBO, f, 8);
+    pthread_mutex_lock(&a->lock);
+    a->js8_sub = JS8_TURBO;
+    a->mode = MODE_JS8;
+    a->rx_off = a->tx_off = 1500;
+    a->nlines = 0; a->sel = -1;
+    pthread_mutex_unlock(&a->lock);
+    const int P = 6, n = P * 12000;
+    double s0 = (floor(clk_now() / P) + 1) * P;
+    int16_t *pcm = malloc(sizeof(int16_t) * n);
+    float *sig = malloc(sizeof(float) * n);
+    srand(11);
+    for (int k = 0; k <= nf; ++k) {                    /* nf periods with frames, then one quiet */
+        memset(sig, 0, sizeof(float) * n);
+        if (k < nf) {
+            uint8_t tones[79];
+            js8_encode(JS8_TURBO, f[k].bits, f[k].text, tones);
+            int off = (int)((0.1 + (k == 1 ? 1.9 : 0.0)) * 12000);
+            float *w = malloc(sizeof(float) * 79 * 600 + 4);
+            size_t ns = js8_synth(JS8_TURBO, tones, 1500, 12000, 0.4f, w);
+            for (size_t i = 0; i < ns && off + (int)i < n; ++i) sig[off + i] = w[i] * 0.07f;   /* about -6 dB in 2.5 kHz */
+            free(w);
+        }
+        for (int i = 0; i < n; ++i) pcm[i] = (int16_t)((sig[i] + 0.06 * gauss()) * 8000);
+        double st = s0 + k * P;
+        for (int c = 0; c < n; c += 240) {
+            double due = st + c / 12000.0;
+            while (clk_now() < due + 0.02) usleep(2000);
+            app_audio_in(pcm + c, 240, due, a);
+        }
+    }
+    free(pcm); free(sig);
+    int lines = 0, li = -1;
+    for (int i = 0; i < a->nlines; ++i) if (!(a->lines[i].flags & (LINE_TX | LINE_SYS))) { ++lines; li = i; }
+    CHECK(lines == 1, "one line for the whole message (%d)", lines);
+    if (li >= 0) {
+        printf("        \"%s\"\n", a->lines[li].text);
+        CHECK(strstr(a->lines[li].text, msg) != NULL, "text complete and in order, nothing doubled");
+        CHECK(!(a->lines[li].flags & LINE_PARTIAL), "marked complete");
+    }
+    a->mode = MODE_FT8;
+}
+
 int main(void)
 {
     static app_t a;
@@ -432,6 +483,7 @@ int main(void)
     realtime_ft8(&a);
     realtime_reply(&a);
     realtime_own(&a);
+    realtime_js8_late(&a);
     wspr_cycle(&a);
     app_stop_threads(&a);
     printf(fails ? "FAIL (%d)\n" : "PASS\n", fails);

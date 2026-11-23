@@ -976,6 +976,93 @@ static void ft_cycle(app_t *a, op_mode_t mode, double start, double P, double re
              mode_name(mode), tm.tm_hour, tm.tm_min, fmod(start, 60.0), at2, n2, ms2, at2 + ms2 / 1000, own);
 }
 
+/* One JS8 receive period, in two passes at Fast and Turbo:
+ *  first - 0.35 s after an on-time transmission ends (as before);
+ *  late  - about 1 s later (never past the end of the period), over a longer
+ *          window, for stations whose clocks run late.
+ * Measured with the decoder: at Normal and Slow the first pass already copies
+ * frames up to ~2.4 s late, and nothing later is copied by either pass, so a
+ * second pass would only cost CPU. At Turbo (and Fast, on weak signals) it
+ * recovers frames 1.6-3 s late that the first pass misses.
+ * Frames are assembled into messages in the order they're decoded. The late
+ * pass skips any frame the early pass already had, so a multi-frame message
+ * is never joined twice; frames arriving over several periods are stitched
+ * together by js8_assemble(), which follows each station's audio frequency
+ * until the frame marked LAST. */
+#define JS8_MAX_SEEN 48
+static int js8_add_frames(app_t *a, double start, const js8_decode_t *d, int nd, char seen[][16], int *nseen)
+{
+    int added = 0;
+    pthread_mutex_lock(&a->lock);
+    for (int i = 0; i < nd; ++i) {
+        char key[16];
+        snprintf(key, sizeof key, "%.12s%d", d[i].text, d[i].frame_type & 7);
+        int dup = 0;
+        for (int k = 0; k < *nseen; ++k) if (!strcmp(seen[k], key)) { dup = 1; break; }
+        if (dup) continue;
+        if (*nseen < JS8_MAX_SEEN) snprintf(seen[(*nseen)++], 16, "%s", key);
+        js8_assemble(a, d[i].text, d[i].frame_type, d[i].snr, d[i].freq, d[i].dt, start);
+        ++added;
+    }
+    pthread_mutex_unlock(&a->lock);
+    a->dirty = 1;
+    return added;
+}
+
+static void js8_cycle(app_t *a, js8_decoder_t *js8, int sub, double start, double P, double ready, int16_t *buf)
+{
+    double late = (sub == JS8_FAST || sub == JS8_TURBO) ? fmin(ready + 1.0, P - 0.25) : ready;
+    int nmax = js8_decoder_samples(js8);
+    char seen[JS8_MAX_SEEN][16];
+    int nseen = 0, n1 = 0, n2 = 0, ran1 = 0, ran2 = 0;
+    double ms1 = 0, ms2 = 0, at1 = 0, at2 = 0;
+    js8_decode_t d[40];
+    sleep_until(a, start + ready);
+    if (a->quit || a->mode != MODE_JS8 || a->js8_sub != sub) return;
+    a->decoding = 1;
+    a->dirty = 1;
+    int n = (int)((ready - 0.1) * 12000);
+    if (n > nmax) n = nmax;
+    if (ring_extract(a, start, n, buf) == 0) {
+        at1 = clk_now() - start;
+        double t0 = clk_mono();
+        int nd = js8_decode(js8, buf, n, 200, 2900, a->rx_off, d, 40);
+        ms1 = (clk_mono() - t0) * 1000;
+        n1 = js8_add_frames(a, start, d, nd, seen, &nseen);
+        ran1 = 1;
+    }
+    if (late > ready + 0.2) {
+        sleep_until(a, start + late);
+        if (a->quit || a->mode != MODE_JS8 || a->js8_sub != sub) { a->decoding = 0; return; }
+        n = (int)((late - 0.1) * 12000);
+        if (n > nmax) n = nmax;
+        if (ring_extract(a, start, n, buf) == 0) {
+            at2 = clk_now() - start;
+            double t0 = clk_mono();
+            int nd = js8_decode(js8, buf, n, 200, 2900, a->rx_off, d, 40);
+            ms2 = (clk_mono() - t0) * 1000;
+            n2 = js8_add_frames(a, start, d, nd, seen, &nseen);
+            ran2 = 1;
+        }
+    }
+    a->last_decode_ms = ms2 > ms1 ? ms2 : ms1;
+    a->decoding = 0;
+    a->dirty = 1;
+    time_t ts = (time_t)start;
+    struct tm tm;
+    gmtime_r(&ts, &tm);
+    const char *nm = js8_submode_info((js8_submode_t)sub)->name;
+    if (!ran1 && !ran2)
+        qlog("decode", "JS8 %s %02d:%02d:%04.1f  skipped: not a full period of audio yet (just switched mode or band, or the input restarted)",
+             nm, tm.tm_hour, tm.tm_min, fmod(start, 60.0));
+    else if (ran2)
+        qlog("decode", "JS8 %s %02d:%02d:%04.1f  first pass at +%.2f s: %d frame%s in %.0f ms  late pass at +%.2f s: %d more in %.0f ms",
+             nm, tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, n1 == 1 ? "" : "s", ms1, at2, n2, ms2);
+    else
+        qlog("decode", "JS8 %s %02d:%02d:%04.1f  at +%.2f s: %d frame%s in %.0f ms",
+             nm, tm.tm_hour, tm.tm_min, fmod(start, 60.0), at1, n1, n1 == 1 ? "" : "s", ms1);
+}
+
 static void *decode_thread(void *arg)
 {
     app_t *a = arg;
@@ -1039,31 +1126,16 @@ static void *decode_thread(void *arg)
             ft_cycle(a, mode, start, P, ready, mode == MODE_FT4 ? ft4 : ft8, buf);
             continue;
         }
-        double trigger = start + ready;
-        sleep_until(a, trigger);
-        if (a->quit || a->mode != mode) continue;
-        a->decoding = 1;
-        a->dirty = 1;
-        double t0 = clk_mono();
         if (mode == MODE_JS8) {
             if (js8_sub != a->js8_sub) {
                 js8_decoder_free(js8);
                 js8_sub = a->js8_sub;
                 js8 = js8_decoder_new((js8_submode_t)js8_sub);
             }
-            int n = (int)((ready - 0.1) * 12000);
-            if (js8 && ring_extract(a, start, n, buf) == 0) {
-                js8_decode_t d[40];
-                int nd = js8_decode(js8, buf, n, 200, 2900, a->rx_off, d, 40);
-                pthread_mutex_lock(&a->lock);
-                for (int i = 0; i < nd; ++i)
-                    js8_assemble(a, d[i].text, d[i].frame_type, d[i].snr, d[i].freq, d[i].dt, start);
-                pthread_mutex_unlock(&a->lock);
-            }
+            if (js8) js8_cycle(a, js8, js8_sub, start, P, ready, buf);
+            continue;
         }
-        a->last_decode_ms = (clk_mono() - t0) * 1000.0;
-        a->decoding = 0;
-        a->dirty = 1;
+        sleep_until(a, start + ready);
     }
     ft8w_free(ft8);
     ft8w_free(ft4);
