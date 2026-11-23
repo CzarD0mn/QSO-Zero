@@ -64,11 +64,11 @@ int main(int argc, char **argv)
     fb_t fb;
     if (fb_open(&fb, fbdev ? fbdev : a->cfg.display)) {
         fprintf(stderr, "qso-zero: no framebuffer (is the LCD/HDMI fb enabled?)\n");
-        qlog("display", "no framebuffer (%s)", fbdev ? fbdev : a->cfg.display);
+        qlog("display", "no framebuffer (%s)%s", fbdev ? fbdev : a->cfg.display, fb_hdmi_connected() ? "  HDMI monitor connected" : "");
         app_shutdown(a);
         return 1;
     }
-    qlog("display", "framebuffer %dx%d%s%s", fb.w, fb.h, fb.is_hdmi ? " HDMI" : " LCD", fb.rotate ? " rotated" : "");
+    qlog("display", "framebuffer %s %dx%d %d bpp%s%s", fb.path, fb.w, fb.h, fb.bpp, fb.is_hdmi ? " HDMI" : " LCD", fb.rotate ? " rotated" : "");
     if (input_open(a->cfg.keyboard)) {
         fprintf(stderr, "qso-zero: no keyboard found (check /dev/input permissions)\n");
         qlog("input", "no keyboard found (check /dev/input permissions / input group)");
@@ -94,7 +94,8 @@ int main(int argc, char **argv)
             int h = fb_hdmi_connected();
             if (h != was_hdmi) {
                 fb_close(&fb);
-                if (fb_open(&fb, "auto") == 0) { was_hdmi = fb.is_hdmi; a->dirty = 1; qlog("display", "HDMI %s: now %dx%d", h ? "connected" : "removed", fb.w, fb.h); }
+                if (fb_open(&fb, "auto") == 0) { was_hdmi = fb.is_hdmi; a->dirty = 1; qlog("display", "HDMI %s: now %s %dx%d", h ? "connected" : "removed", fb.path, fb.w, fb.h); }
+                else { was_hdmi = h; qlog("display", "HDMI %s: no usable framebuffer", h ? "connected" : "removed"); }
             }
         }
         /* redraw on change, at most ~15 fps (keeps the 1 GHz A53 mostly idle) */

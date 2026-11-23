@@ -52,6 +52,7 @@ typedef struct {
     seq_state_t st;
     char dx[16], dxgrid[8];
     int  snr_sent, snr_rcvd, tries, slot_odd;
+    int  logged;             /* this QSO is already in the ADIF log */
     char last_tx[40];
 } ft8seq_t;
 

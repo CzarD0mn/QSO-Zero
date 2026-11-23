@@ -77,6 +77,14 @@ void seq_start_cq(app_t *a)
     app_status(a, "calling CQ%s%s (even slots)", a->cfg.cq_mod[0] ? " " : "", a->cfg.cq_mod);
 }
 
+static void log_once(app_t *a)
+{
+    ft8seq_t *s = &a->seq;
+    if (s->logged) { qlog("seq", "%s: already logged, not logging again", s->dx); return; }
+    adif_log(a, s->dx, s->dxgrid, mode_name(a->mode), s->snr_sent, s->snr_rcvd);
+    s->logged = 1;
+}
+
 /* Advance the QSO from a message addressed to us by the current DX. */
 static void advance(app_t *a, const char *third, int their_snr_of_us, int rx_snr)
 {
@@ -98,16 +106,18 @@ static void advance(app_t *a, const char *third, int their_snr_of_us, int rx_snr
         s->st = SEQ_RREPORT;
         queue_ft8(a, m);
     } else if (third[0] == 'R' && is_report(third + 1, &v)) {   /* R-report */
+        /* answer with RR73; a repeated R-report means they missed our RR73,
+         * so it goes out again, but the QSO is only logged once */
         s->snr_rcvd = v;
         snprintf(m, sizeof m, "%s %s RR73", s->dx, a->cfg.callsign);
         s->st = SEQ_RR73;
         queue_ft8(a, m);
-        adif_log(a, s->dx, s->dxgrid, mode_name(a->mode), s->snr_sent, s->snr_rcvd);
+        log_once(a);
     } else if (!strcmp(third, "RR73") || !strcmp(third, "RRR")) {
         snprintf(m, sizeof m, "%s %s 73", s->dx, a->cfg.callsign);
         s->st = SEQ_73;
         queue_ft8(a, m);
-        adif_log(a, s->dx, s->dxgrid, mode_name(a->mode), s->snr_sent, s->snr_rcvd);
+        log_once(a);
     } else if (!strcmp(third, "73")) {
         app_status(a, "QSO with %s complete", s->dx);
         seq_reset(a);
@@ -219,7 +229,15 @@ void seq_after_cycle(app_t *a, int rx_slot_odd)
     ft8seq_t *s = &a->seq;
     if (s->st == SEQ_IDLE || a->ntxq) return;
     if (rx_slot_odd == s->slot_odd) return;           /* that was our own slot */
-    if (s->st == SEQ_73) { app_status(a, "QSO with %s logged", s->dx); seq_reset(a); return; }
+    /* RR73 and 73 both end the QSO: once ours has gone out, nothing is
+     * repeated. (If they repeat their R-report or RR73, advance() answers it
+     * once more, before this runs, so that reply is still sent.) */
+    if (s->st == SEQ_73 || s->st == SEQ_RR73) {
+        app_status(a, "QSO with %s complete%s", s->dx, s->logged ? " (logged)" : "");
+        qlog("seq", "QSO with %s complete after our %s: nothing more to send", s->dx, s->st == SEQ_73 ? "73" : "RR73");
+        seq_reset(a);
+        return;
+    }
     int limit = s->st == SEQ_CQ ? CQ_MAX_TRIES : FT8_MAX_TRIES;
     if (s->tries >= limit) {
         app_status(a, s->st == SEQ_CQ ? "CQ: no answer" : "%s: no reply, giving up", s->dx);

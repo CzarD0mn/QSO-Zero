@@ -111,7 +111,40 @@ static void sequencer(app_t *a)
     rxline_t rr = mk("KN4CRD JA1ABC R-20", -16, 1);
     seq_on_decode(a, &rr);
     CHECK(!strcmp(a->txq[0].text, "JA1ABC KN4CRD RR73"), "R-report -> '%s'", a->txq[0].text);
-    /* retries */
+    /* our RR73 has gone out and JA1ABC goes quiet: the QSO is over, no repeats */
+    a->ntxq = 0;
+    seq_after_cycle(a, 1);
+    CHECK(a->seq.st == SEQ_IDLE && a->ntxq == 0, "after our RR73 the QSO ends: RR73 is not repeated");
+    /* they missed our RR73 and repeat their R-report: RR73 once more, not logged twice */
+    seq_start_cq(a);
+    rxline_t a2 = mk("KN4CRD DL1XX JO62", -10, 1);
+    seq_on_decode(a, &a2);
+    rxline_t rr2 = mk("KN4CRD DL1XX R-08", -9, 1);
+    seq_on_decode(a, &rr2);
+    a->ntxq = 0;                                   /* our RR73 went out */
+    seq_on_decode(a, &rr2);                        /* ...and they send R-08 again */
+    CHECK(a->ntxq == 1 && !strcmp(a->txq[0].text, "DL1XX KN4CRD RR73"), "repeated R-report -> RR73 again ('%s')", a->ntxq ? a->txq[0].text : "-");
+    seq_after_cycle(a, 1);
+    CHECK(a->seq.st == SEQ_RR73, "...and it goes out before the QSO closes");
+    a->ntxq = 0;
+    seq_after_cycle(a, 1);
+    CHECK(a->seq.st == SEQ_IDLE && a->ntxq == 0, "then the QSO ends, nothing repeated");
+    /* we answered, they send RR73 twice: 73 twice, logged once */
+    rxline_t cq3 = mk("CQ G4ABC IO91", -12, 1);
+    seq_start_reply(a, &cq3);
+    rxline_t g1 = mk("KN4CRD G4ABC -05", -12, 1);
+    seq_on_decode(a, &g1);
+    rxline_t g2 = mk("KN4CRD G4ABC RR73", -12, 1);
+    seq_on_decode(a, &g2);
+    a->ntxq = 0;
+    seq_on_decode(a, &g2);
+    CHECK(a->ntxq == 1 && !strcmp(a->txq[0].text, "G4ABC KN4CRD 73"), "repeated RR73 -> 73 again");
+    a->ntxq = 0;
+    seq_after_cycle(a, 1);
+    CHECK(a->seq.st == SEQ_IDLE, "QSO closes after our 73");
+    /* retries while calling */
+    rxline_t cq4 = mk("CQ W7AAA DM43", -12, 1);
+    seq_start_reply(a, &cq4);
     a->ntxq = 0;
     a->seq.tries = 6;
     seq_after_cycle(a, 1);
@@ -119,10 +152,14 @@ static void sequencer(app_t *a)
     a->ntxq = 0;
     pthread_mutex_unlock(&a->lock);
     FILE *f = fopen(a->cfg.log_path, "r");
-    char buf[2048] = "";
+    char buf[4096] = "";
     if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
     CHECK(strstr(buf, "<call:6>VE3XYZ") && strstr(buf, "<call:6>JA1ABC") && strstr(buf, "<gridsquare:4>PM95"),
-          "ADIF log has both QSOs");
+          "ADIF log has the QSOs");
+    int ndl = 0, ng = 0;
+    for (char *q = buf; (q = strstr(q, "<call:5>DL1XX")); ++q) ++ndl;
+    for (char *q = buf; (q = strstr(q, "<call:5>G4ABC")); ++q) ++ng;
+    CHECK(ndl == 1 && ng == 1, "each QSO logged once, even with repeated R-report / RR73 (DL1XX %d, G4ABC %d)", ndl, ng);
     a->tx_enabled = 1;
     /* typed call to a station we've heard: the sequencer takes over */
     seq_reset(a); a->ntxq = 0;
