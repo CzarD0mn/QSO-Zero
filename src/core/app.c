@@ -556,6 +556,12 @@ static void rig_connect(app_t *a)
     if (!strcmp(a->cfg.ptt, "rts")) rc.ptt = PTT_RTS;
     if (!strcmp(a->cfg.ptt, "dtr")) rc.ptt = PTT_DTR;
     snprintf(rc.ptt_device, sizeof rc.ptt_device, "%s", a->cfg.ptt_device);
+    if (rc.spawn && !rig_have_rigctld(NULL, 0)) {
+        qlog("rig", "rigctld not found: install Hamlib with 'sudo apt install libhamlib-utils' (or run qso-zero-setup). No radio control until then.");
+        app_status(a, "No radio control: run sudo apt install libhamlib-utils");
+        a->dirty = 1;
+        return;
+    }
     qlog("rig", "%s: connecting on %s%s", a->radio->name, rc.serial, a->cfg.rig_device[0] ? "" : " (auto)");
     int ok = rig_open(&rc) == 0;
     if (!ok && !a->cfg.rig_device[0]) {                   /* auto: try the radio's other serial interfaces */

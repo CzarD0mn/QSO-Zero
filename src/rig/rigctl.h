@@ -3,6 +3,7 @@
 #define QSOZERO_RIGCTL_H
 
 #include "radios.h"
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
@@ -16,6 +17,8 @@ typedef struct {
 } rig_config_t;
 
 int  rig_open(const rig_config_t *cfg);
+/* 1 if rigctld (package libhamlib-utils) is on PATH; its path goes to out. */
+int  rig_have_rigctld(char *out, size_t n);
 void rig_close(void);
 int  rig_connected(void);
 const char *rig_error(void);

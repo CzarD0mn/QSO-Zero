@@ -21,10 +21,11 @@ This guide covers setting QSO-Zero up the first time, how commands work, and wha
 
 ### 1. On the command line (once, after installing)
 
-Install the package with `sudo apt update` followed by `sudo apt install ./qso-zero_<version>_arm64.deb`, so that its dependencies (`libhamlib-utils` for radio control, plus the sound and SSL libraries) come with it. If the install stopped with "dependency problems", `sudo apt install -f` finishes it. The [README](README.md#install-from-a-package) has the full requirements.
+Install the package with `sudo apt update` followed by `sudo apt install ./qso-zero_<version>_arm64.deb`, which also fetches Hamlib (`libhamlib-utils`, for radio control). If you installed from the launcher or the store, Hamlib isn't there yet: `qso-zero-setup` below offers to install it, or run `qso-zero-setup --deps`. The [README](README.md#install-from-a-package) has the full requirements.
 
 ```sh
 qso-zero-setup            # asks for your callsign and radio, writes ~/.config/qso-zero.conf,
+                          # installs Hamlib if it's missing (asks first),
                           # and adds you to the dialout, audio, video and input groups
 sudo reboot               # the new groups take effect after a reboot (or log out and back in)
 qso-zero-setup --check    # optional: shows what QSO-Zero will find (screen, keyboard, ports, sound cards)
@@ -382,6 +383,7 @@ Every start opens in **WSPR on 20 m**. The settings file is plain text and has c
 qso-zero-setup --log        # the last 150 lines of the activity log
 qso-zero-setup --log all    # all 5 kept logs, oldest first
 qso-zero-setup --check      # what QSO-Zero finds: screen, keyboard, ports, sound cards, permissions
+qso-zero-setup --deps       # install Hamlib (radio control) if it's missing
 qso-zero --nohw             # run without radio, audio or GPS
 qso-zero --bench            # time the decoders on this device
 ```
@@ -390,6 +392,7 @@ The activity log (`~/.cache/qso-zero/qso-zero.log`) records the radio connection
 
 | Problem | Try |
 |---|---|
+| *No radio control: run sudo apt install libhamlib-utils* | Hamlib isn't installed (normal after installing from the launcher or store). Run `qso-zero-setup --deps`, then restart QSO-Zero. |
 | *radio not connected* | Check the cable and that the radio is on. Setup › CAT port: pick the port by name. |
 | No decodes, waterfall dark | Setup › Audio in, then Rescan audio. Check the In signal bar moves. |
 | Few decodes, In signal red | Turn **In level** down until the bar is 50–70%. |

@@ -11,6 +11,8 @@
 #include <time.h>
 #include <unistd.h>
 #include "core/app.h"
+#include "rig/rigctl.h"
+#include <sys/stat.h>
 #include "ui/input.h"
 #include "ui/views.h"
 
@@ -305,6 +307,23 @@ int main(void)
 
     app_stop_threads(&a);
     unlink(cfg);
+    printf("[13] Hamlib (rigctld) is optional at install time\n");
+    {
+        char *old = getenv("PATH") ? strdup(getenv("PATH")) : NULL, dir[] = "/tmp/qsoz-pathXXXXXX", f[300], got[300] = "";
+        if (!mkdtemp(dir)) return 1;
+        setenv("PATH", dir, 1);
+        CHECK(!rig_have_rigctld(NULL, 0), "no rigctld on PATH: detected as missing");
+        radio_profile_t const *rp = radio_find("qmx");
+        rig_config_t rc = {.profile = rp, .spawn = 1, .port = 4599};
+        snprintf(rc.serial, sizeof rc.serial, "/dev/null");
+        CHECK(rig_open(&rc) != 0 && strstr(rig_error(), "libhamlib-utils"), "connecting says what to install: \"%s\"", rig_error());
+        snprintf(f, sizeof f, "%s/rigctld", dir);
+        FILE *x = fopen(f, "w"); fprintf(x, "#!/bin/sh\nexit 1\n"); fclose(x); chmod(f, 0755);
+        CHECK(rig_have_rigctld(got, sizeof got) && !strcmp(got, f), "found once installed (%s)", got);
+        remove(f); rmdir(dir);
+        if (old) { setenv("PATH", old, 1); free(old); }
+    }
+
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
     return fails != 0;
 }
