@@ -34,3 +34,6 @@
   owner has tested it and says to push.**
 - Pushing a new `version` in `app-builder.json` makes CI publish a GitHub
   Release automatically.
+- **Never put a chat or session link in commits, PRs, release notes or files**
+  (no `Claude-Session:` / `claude.ai/code/session_…` lines). The owner wants
+  the conversation kept private. A plain `Co-Authored-By:` line is fine.
