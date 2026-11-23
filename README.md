@@ -54,10 +54,26 @@ Even with the defaults, you may need to set the correct paths yourself, for exam
 
 Each release on the **[Releases page](../../releases/latest)** has two packages. The Cardputer Zero uses **arm64**; armhf is for 32-bit Raspberry Pi OS. On the device, `dpkg --print-architecture` tells you which you need.
 
+### Requirements
+
+* **Raspberry Pi OS Bookworm or newer** (or another Debian 12+ based image). The package needs `libc6` 2.34 or newer; `ldd --version` shows yours.
+* An **internet connection during the install**, so `apt` can fetch the dependencies.
+
+`apt` installs these for you:
+
+| Package | Why | |
+|---|---|---|
+| `libhamlib-utils` | `rigctld`, which QSO-Zero uses to control the radio | required |
+| `libasound2` (`libasound2t64` on newer images) | the sound cards: receive and transmit audio | recommended, installed by default |
+| `libssl3` (or `libssl1.1`) | HTTPS uploads to wsprnet; plain HTTP is used without it | recommended, installed by default |
+
+### Installing
+
 **On the Cardputer Zero** (with the package downloaded to it):
 
 ```sh
-sudo apt install ./qso-zero_0.2.5_arm64.deb     # also installs rigctld (libhamlib-utils)
+sudo apt update                                 # refresh the package lists first, especially on a new unit
+sudo apt install ./qso-zero_0.2.5_arm64.deb     # keep the ./ - this also installs libhamlib-utils
 sudo systemctl restart APPLaunch.service        # show the new app in the launcher now
 qso-zero-setup                                  # first time only: callsign, radio, permissions
 sudo reboot                                     # first time only: applies the permissions
@@ -69,8 +85,17 @@ Then open **QSO-Zero** from the launcher. To exit, **hold esc for one second**.
 
 ```sh
 scp qso-zero_0.2.5_arm64.deb pi@<device-ip>:/tmp/
-ssh pi@<device-ip> 'sudo apt install -y /tmp/qso-zero_0.2.5_arm64.deb && sudo systemctl restart APPLaunch.service'
+ssh pi@<device-ip> 'sudo apt update && sudo apt install -y /tmp/qso-zero_0.2.5_arm64.deb && sudo systemctl restart APPLaunch.service'
 ```
+
+**If the install stops with "dependency problems"** and leaves QSO-Zero unconfigured (this happens with `dpkg -i`, which doesn't download dependencies, or when the package lists are out of date), finish it with:
+
+```sh
+sudo apt update
+sudo apt install -f        # installs the missing dependencies and finishes configuring QSO-Zero
+```
+
+If `apt` still refuses, check the OS version with `cat /etc/os-release`: images older than Bookworm can't run this package.
 
 **Updating:** install the new package the same way. Your settings (`~/.config/qso-zero.conf`) and your QSO log (`~/qso-zero/qso-zero.adi`) are in your home folder, so updates and even uninstalling leave them alone.
 
