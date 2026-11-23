@@ -21,6 +21,8 @@ This guide covers setting QSO-Zero up the first time, how commands work, and wha
 
 ### 1. On the command line (once, after installing)
 
+Install the package with `sudo apt update` followed by `sudo apt install ./qso-zero_<version>_arm64.deb`, so that its dependencies (`libhamlib-utils` for radio control, plus the sound and SSL libraries) come with it. If the install stopped with "dependency problems", `sudo apt install -f` finishes it. The [README](README.md#install-from-a-package) has the full requirements.
+
 ```sh
 qso-zero-setup            # asks for your callsign and radio, writes ~/.config/qso-zero.conf,
                           # and adds you to the dialout, audio, video and input groups
