@@ -35,7 +35,7 @@ APP_SRC := src/main.c src/core/app.c src/core/devices.c src/core/battery.c src/c
            src/rig/rigctl.c src/rig/radios.c src/net/uplink.c src/gps/gps.c src/audio/audio_alsa.c src/audio/mixer.c \
            src/ui/fb.c src/ui/gfx.c src/ui/font.c src/ui/input.c src/ui/theme.c src/ui/views.c
 
-VERSION ?= 0.2.5
+VERSION ?= 0.2.6
 CFLAGS  += -DQSOZERO_VERSION=\"$(VERSION)\"
 # 32-bit ARM: 64-bit inode numbers/offsets, or readdir() fails with EOVERFLOW
 CFLAGS  += -D_FILE_OFFSET_BITS=64
