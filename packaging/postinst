@@ -15,18 +15,11 @@ if [ "$1" = configure ]; then
         done
         if [ -n "$added" ]; then echo "QSO-Zero: added $U to:$added (reboot to apply)"; fi
     fi
-    if ! command -v rigctld >/dev/null 2>&1; then
-        cat <<'MSG'
-
-QSO-Zero: Hamlib (rigctld) is not installed, so there's no radio control yet.
-  Install it with:  qso-zero-setup --deps     (or: sudo apt install libhamlib-utils)
-MSG
-    fi
     cat <<'MSG'
 
 QSO-Zero installed.
   qso-zero-setup --check   see what it finds on this machine
-  qso-zero-setup           create your config, install Hamlib if missing, set group permissions
+  qso-zero-setup           create your config and set group permissions
   qso-zero --nohw          try the interface without a radio
 
 MSG

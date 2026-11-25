@@ -3,8 +3,6 @@
 #   qso-zero-setup           create ~/.config/qso-zero.conf and fix group membership
 #   qso-zero-setup --check   print what QSO-Zero will find on this machine (no changes)
 #   qso-zero-setup --log     show QSO-Zero's activity log (--log all: this and the 4 earlier logs kept)
-#   qso-zero-setup --deps    install what QSO-Zero needs but the package couldn't pull in
-#                            (Hamlib's rigctld for radio control; the sound library if missing)
 set -u
 CONF="${HOME}/.config/qso-zero.conf"
 EXAMPLE=/usr/share/qso-zero/qso-zero.conf.example
@@ -14,27 +12,6 @@ ME=$(id -un)
 ok()   { printf '  \033[32mOK\033[0m    %s\n' "$*"; }
 warn() { printf '  \033[33mWARN\033[0m  %s\n' "$*"; }
 info() { printf '        %s\n' "$*"; }
-
-# Hamlib (rigctld) is only "Recommended" by the package, so an install with
-# dpkg or the launcher store never fails over it. Install it (and the sound
-# library, should it be missing) here, where apt is free to run.
-deps() {
-    need=""
-    command -v rigctld >/dev/null 2>&1 || need="$need libhamlib-utils"
-    ldconfig -p 2>/dev/null | grep -q 'libasound.so.2' || need="$need ALSA"
-    if [ -z "$need" ]; then ok "Hamlib (rigctld) and the sound library are installed"; return 0; fi
-    echo "QSO-Zero needs:$need"
-    if [ "${1:-}" != yes ]; then
-        if [ ! -t 0 ]; then info "run: qso-zero-setup --deps"; return 1; fi
-        printf 'Install now with apt (needs sudo and internet)? [Y/n] '
-        read -r ans
-        case "$ans" in n*|N*) info "skipped: run qso-zero-setup --deps later"; return 1 ;; esac
-    fi
-    sudo apt-get update || warn "apt-get update failed (no internet?) - trying anyway"
-    case "$need" in *libhamlib-utils*) sudo apt-get install -y libhamlib-utils ;; esac
-    case "$need" in *ALSA*) sudo apt-get install -y libasound2t64 2>/dev/null || sudo apt-get install -y libasound2 ;; esac
-    command -v rigctld >/dev/null 2>&1 && ok "rigctld installed: radio control is ready" || { warn "rigctld still missing"; return 1; }
-}
 
 check() {
     echo "QSO-Zero environment check ($(qso-zero --version 2>/dev/null || echo 'qso-zero not on PATH'))"
@@ -61,7 +38,7 @@ check() {
     echo "Sound cards"
     if [ -r /proc/asound/cards ]; then sed 's/^/        /' /proc/asound/cards; else warn "no ALSA"; fi
     echo "Software"
-    command -v rigctld >/dev/null && ok "rigctld: $(rigctld --version 2>&1 | head -1)" || warn "rigctld missing (no radio control): run qso-zero-setup --deps"
+    command -v rigctld >/dev/null && ok "rigctld: $(rigctld --version 2>&1 | head -1)" || warn "rigctld missing: sudo apt install libhamlib-utils"
     if rigctld -l 2>/dev/null | grep -q '^ *2057 '; then ok "Hamlib knows QMX (2057)"; else info "Hamlib has no QMX/X6200 model: QSO-Zero will use the TS-480/X6100 fallback"; fi
     ldconfig -p 2>/dev/null | grep -q 'libasound.so.2' && ok "libasound (audio)" || warn "libasound.so.2 not found"
     ldconfig -p 2>/dev/null | grep -q 'libssl.so.3\|libssl.so.1.1' && ok "libssl (HTTPS uploads)" || warn "no libssl: wsprnet uploads will use HTTP"
@@ -87,7 +64,6 @@ setup() {
     else
         echo "$CONF already exists - left unchanged"
     fi
-    deps
     missing=""
     for g in dialout audio video input; do
         id -nG "$ME" | tr ' ' '\n' | grep -qx "$g" || missing="$missing $g"
@@ -121,7 +97,6 @@ showlog() {
 case "${1:-}" in
     --check|-c) check ;;
     --log|-l) showlog "${2:-}" ;;
-    --deps|-d) deps "${2:-}" ;;
     "") setup ;;
-    *) echo "usage: qso-zero-setup [--check | --log [all] | --deps [yes]]"; exit 2 ;;
+    *) echo "usage: qso-zero-setup [--check | --log [all]]"; exit 2 ;;
 esac

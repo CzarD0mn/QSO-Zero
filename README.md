@@ -57,23 +57,15 @@ Each release on the **[Releases page](../../releases/latest)** has two packages.
 ### Requirements
 
 * **Raspberry Pi OS Bookworm or newer** (or another Debian 12+ based image). The package needs `libc6` 2.34 or newer; `ldd --version` shows yours.
-* An **internet connection**, so the dependencies below can be fetched.
+* An **internet connection during the install**, so `apt` can fetch the dependencies.
 
-QSO-Zero itself only needs the standard C library, so the package always installs, whichever way you install it. It also uses:
+`apt` installs these for you:
 
-| Package | Why | Already on the Cardputer? |
+| Package | Why | |
 |---|---|---|
-| `libhamlib-utils` | `rigctld`, which QSO-Zero uses to control the radio | **No** |
-| `libasound2` (`libasound2t64` on newer images) | the sound cards: receive and transmit audio | Yes |
-| `libssl3` (or `libssl1.1`) | HTTPS uploads to wsprnet; plain HTTP is used without it | Yes |
-
-`sudo apt install ./qso-zero_….deb` fetches `libhamlib-utils` automatically. **Installed from the launcher or the store** (which can't download extra packages), QSO-Zero still installs and runs, but has no radio control until Hamlib is added. It says so on screen, and one command installs it:
-
-```sh
-qso-zero-setup --deps      # installs libhamlib-utils (and the sound library if missing)
-```
-
-`qso-zero-setup` (first-time setup) also offers to install it.
+| `libhamlib-utils` | `rigctld`, which QSO-Zero uses to control the radio | required |
+| `libasound2` (`libasound2t64` on newer images) | the sound cards: receive and transmit audio | recommended, installed by default |
+| `libssl3` (or `libssl1.1`) | HTTPS uploads to wsprnet; plain HTTP is used without it | recommended, installed by default |
 
 ### Installing
 
@@ -96,7 +88,7 @@ scp qso-zero_0.2.7_arm64.deb pi@<device-ip>:/tmp/
 ssh pi@<device-ip> 'sudo apt update && sudo apt install -y /tmp/qso-zero_0.2.7_arm64.deb && sudo systemctl restart APPLaunch.service'
 ```
 
-**If an install ever stops with "dependency problems"** and leaves QSO-Zero unconfigured (packages before 0.2.7 required Hamlib up front, and `dpkg -i` doesn't download dependencies), finish it with:
+**If the install stops with "dependency problems"** and leaves QSO-Zero unconfigured (this happens with `dpkg -i`, which doesn't download dependencies, or when the package lists are out of date), finish it with:
 
 ```sh
 sudo apt update

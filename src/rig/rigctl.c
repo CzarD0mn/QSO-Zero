@@ -165,31 +165,8 @@ static int try_model(int model, const rig_config_t *c)
     return 0;
 }
 
-/* Is rigctld (Debian package libhamlib-utils) installed? Searches PATH; the
- * full path goes to out (may be NULL). Optional at install time, so the
- * package always installs; without it there's no radio control. */
-int rig_have_rigctld(char *out, size_t n)
-{
-    const char *path = getenv("PATH");
-    if (!path || !*path) path = "/usr/local/bin:/usr/bin:/bin";
-    char dir[256], f[300];
-    while (*path) {
-        size_t k = strcspn(path, ":");
-        snprintf(dir, sizeof dir, "%.*s", (int)(k < sizeof dir ? k : sizeof dir - 1), path);
-        snprintf(f, sizeof f, "%s/rigctld", dir[0] ? dir : ".");
-        if (access(f, X_OK) == 0) { if (out) snprintf(out, n, "%s", f); return 1; }
-        path += k;
-        if (*path == ':') ++path;
-    }
-    return 0;
-}
-
 int rig_open(const rig_config_t *cfg)
 {
-    if (cfg->spawn && !rig_have_rigctld(NULL, 0)) {
-        snprintf(g_err, sizeof g_err, "Hamlib not installed: sudo apt install libhamlib-utils");
-        return -1;
-    }
     pthread_mutex_lock(&g_lock);
     g_cfg = *cfg;
     int rc = try_model(cfg->profile->hamlib_model, cfg);
