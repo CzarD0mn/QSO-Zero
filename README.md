@@ -59,7 +59,7 @@ Each release on the **[Releases page](../../releases/latest)** has two packages.
 * **Raspberry Pi OS Bookworm or newer** (or another Debian 12+ based image). The package needs `libc6` 2.34 or newer; `ldd --version` shows yours.
 * An **internet connection during the install**, so `apt` can fetch the dependencies.
 
-`apt` installs these for you:
+`apt` and the Cardputer Zero launcher / store install these for you:
 
 | Package | Why | |
 |---|---|---|
