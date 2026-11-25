@@ -81,7 +81,7 @@ qso-zero-setup --deps      # installs libhamlib-utils (and the sound library if 
 
 ```sh
 sudo apt update                                 # refresh the package lists first, especially on a new unit
-sudo apt install ./qso-zero_0.2.6_arm64.deb     # keep the ./ - this also installs libhamlib-utils
+sudo apt install ./qso-zero_0.2.7_arm64.deb     # keep the ./ - this also installs libhamlib-utils
 sudo systemctl restart APPLaunch.service        # show the new app in the launcher now
 qso-zero-setup                                  # first time only: callsign, radio, permissions
 sudo reboot                                     # first time only: applies the permissions
@@ -92,8 +92,8 @@ Then open **QSO-Zero** from the launcher. To exit, **hold esc for one second**.
 **From your computer over SSH:**
 
 ```sh
-scp qso-zero_0.2.6_arm64.deb pi@<device-ip>:/tmp/
-ssh pi@<device-ip> 'sudo apt update && sudo apt install -y /tmp/qso-zero_0.2.6_arm64.deb && sudo systemctl restart APPLaunch.service'
+scp qso-zero_0.2.7_arm64.deb pi@<device-ip>:/tmp/
+ssh pi@<device-ip> 'sudo apt update && sudo apt install -y /tmp/qso-zero_0.2.7_arm64.deb && sudo systemctl restart APPLaunch.service'
 ```
 
 **If an install ever stops with "dependency problems"** and leaves QSO-Zero unconfigured (packages before 0.2.7 required Hamlib up front, and `dpkg -i` doesn't download dependencies), finish it with:
@@ -159,8 +159,8 @@ build/qso-zero --nohw  # try the interface without a radio
 
 ```sh
 make -j4
-make deb                         # -> build/qso-zero_0.2.6_arm64.deb
-make deb VERSION=0.2.7~test1     # a test build with its own version number
+make deb                         # -> build/qso-zero_0.2.7_arm64.deb
+make deb VERSION=0.2.8~test1     # a test build with its own version number
 ```
 
 Install it with `sudo apt install ./build/qso-zero_<version>_<arch>.deb`.
