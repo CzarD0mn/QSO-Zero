@@ -60,6 +60,8 @@ setup() {
         call=$(printf '%s' "$call" | tr 'a-z' 'A-Z')
         [ -n "$call" ] && sed -i "s/^callsign *=.*/callsign = $call/" "$CONF"
         [ -n "$radio" ] && sed -i "s/^radio *=.*/radio = $radio/" "$CONF"
+        # the QMX keys up only above 80% audio: start it at full TX audio level
+        [ "$radio" = qmx ] && sed -i "s/^tx_level *=[^#]*/tx_level = 1.00               /" "$CONF"
         echo "Wrote $CONF"
     else
         echo "$CONF already exists - left unchanged"

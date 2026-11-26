@@ -78,6 +78,7 @@ int main(int argc, char **argv)
         qlog("input", "Sym keymap: %s", input_keymap_from_file() ? "from /usr/share/keymaps/tca8418_keypad_m5stack_keymap.map" : "built-in table (keymap file not found)");
     }
 
+    ui_start(a);                                        /* open in Setup, on the Radio line */
     surface_t *compact = surf_new(320, 170), *large = surf_new(LARGE_W, LARGE_H);
     app_start_threads(a);
 

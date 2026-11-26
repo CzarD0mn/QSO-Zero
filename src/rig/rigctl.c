@@ -165,6 +165,40 @@ static int try_model(int model, const rig_config_t *c)
     return 0;
 }
 
+/* Send a raw CAT command through rigctld (its "w" / send_cmd) and return
+ * everything rigctld printed before RPRT, so the caller can look for the
+ * radio's answer (e.g. "MD6;"). 0 on success. */
+int rig_raw(const char *cat, char *out, size_t n)
+{
+    if (out && n) out[0] = 0;
+    if (g_sock < 0) { snprintf(g_err, sizeof g_err, "rig not connected"); return -1; }
+    char buf[96];
+    int k = snprintf(buf, sizeof buf, "+w %s\n", cat);
+    pthread_mutex_lock(&g_lock);
+    if (send(g_sock, buf, k, MSG_NOSIGNAL) != k) { pthread_mutex_unlock(&g_lock); return -1; }
+    size_t got = 0;
+    char acc[512];
+    int rc = -1;
+    for (;;) {
+        struct pollfd p = {.fd = g_sock, .events = POLLIN};
+        if (poll(&p, 1, 1500) <= 0) { snprintf(g_err, sizeof g_err, "rigctld timeout on raw '%s'", cat); break; }
+        ssize_t r = recv(g_sock, acc + got, sizeof acc - 1 - got, 0);
+        if (r <= 0) break;
+        got += r;
+        acc[got] = 0;
+        char *rp = strstr(acc, "RPRT ");
+        if (rp && strchr(rp, '\n')) {
+            rc = atoi(rp + 5);
+            *rp = 0;
+            if (out) snprintf(out, n, "%s", acc);
+            break;
+        }
+        if (got >= sizeof acc - 1) break;
+    }
+    pthread_mutex_unlock(&g_lock);
+    return rc;
+}
+
 int rig_open(const rig_config_t *cfg)
 {
     pthread_mutex_lock(&g_lock);

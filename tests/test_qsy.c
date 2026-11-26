@@ -3,6 +3,7 @@
  * can refuse frequencies in a range, like a radio lacking a band. */
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,8 @@ static volatile long long g_refuse_lo, g_refuse_hi;   /* radio silently ignores 
 static volatile int g_sets, g_no_data_mode, g_mode_sets;
 static char g_mode[16] = "USB";
 static int g_pb = 2400;
+static volatile int g_md = -1;      /* >= 0: answer raw CAT (rigctld "w") like a QMX in mode MD<g_md> */
+static volatile int g_raw_cmds;
 static int g_lsock;
 
 static void *fake_rigctld(void *arg)
@@ -53,6 +56,13 @@ static void *fake_rigctld(void *arg)
                     ++g_mode_sets;
                     if (g_no_data_mode && !strncmp(m, "PKT", 3)) snprintf(out, sizeof out, "set_mode:\nRPRT -11\n");   /* like a G90 */
                     else { snprintf(g_mode, sizeof g_mode, "%s", m); if (pb) g_pb = pb; snprintf(out, sizeof out, "set_mode:\nRPRT 0\n"); }
+                } else if (!strncmp(buf, "+w ", 3) && g_md >= 0) {
+                    ++g_raw_cmds;
+                    const char *cat = buf + 3;
+                    if (!strncmp(cat, "MD", 2) && cat[2] >= '0' && cat[2] <= '9') { g_md = cat[2] - '0'; snprintf(out, sizeof out, "send_cmd: %s\nRPRT 0\n", cat); }
+                    else if (!strcmp(cat, "MD;")) snprintf(out, sizeof out, "send_cmd: MD;\nReply: MD%d;\nRPRT 0\n", g_md);
+                    else if (!strcmp(cat, "FW;")) snprintf(out, sizeof out, "send_cmd: FW;\nReply: FW%04d;\nRPRT 0\n", g_md == 6 ? 3200 : 2700);
+                    else snprintf(out, sizeof out, "send_cmd: %s\nRPRT -1\n", cat);
                 } else if (!strcmp(buf, "+m"))
                     snprintf(out, sizeof out, "get_mode:\nMode: %s\nPassband: %d\nRPRT 0\n", g_mode, g_pb);
                 else
@@ -298,6 +308,8 @@ int main(void)
     CHECK(!strcmp(g_mode, "USB"), "radio without a data mode: falls back to USB (mode %s)", g_mode);
     g_no_data_mode = 0;
     CHECK(a.rig_ok && a.radio && !strcmp(a.radio->id, "g90") && (a.band_mask & 1u), "radio switched live to G90 (160 m now allowed)");
+    CHECK(a.cfg.rig_device[0] == 0, "the CAT port pinned for the QMX went back to auto for the G90");
+    snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/ttyUSB1");
     a.tx_active = 1;
     app_use_rig_device(&a, "/dev/ttyUSB0");
     CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyUSB1") && a.rig_ok, "no port change while transmitting");
@@ -305,6 +317,35 @@ int main(void)
 
     app_stop_threads(&a);
     unlink(cfg);
+    printf("[14] QMX: Digi mode (3.2 kHz) through CAT, radio changes\n");
+    {
+        a.tx_active = 0;
+        app_use_radio(&a, "qmx");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        g_md = 2;                                        /* QMX sitting in USB (SSB) */
+        int before = g_raw_cmds;
+        app_set_mode(&a, MODE_JS8);
+        app_set_mode(&a, MODE_FT8);
+        CHECK(g_md == 6 && g_raw_cmds > before, "QMX put in Digi mode with MD6 (was MD2): now MD%d", g_md);
+        g_md = 2;                                        /* e.g. switched on the radio */
+        app_set_band(&a, 3);
+        CHECK(g_md == 6, "and again after a band change");
+        g_md = -1;
+        /* changing radio: a pinned CAT port goes back to auto; the QMX gets 100% TX audio */
+        snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/serial/by-id/usb-1a86_USB_Dual_Serial-if02");
+        a.cfg.tx_level = 0.5f;
+        app_use_radio(&a, "x6200");
+        CHECK(a.cfg.rig_device[0] == 0, "radio changed: pinned CAT port reset to auto");
+        CHECK(fabsf(a.cfg.tx_level - 0.5f) < 1e-6, "X6200: TX audio level left alone (%.2f)", a.cfg.tx_level);
+        app_use_radio(&a, "qmx");
+        CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX selected: TX audio level 100%% (%.2f)", a.cfg.tx_level);
+        app_use_radio(&a, "qmxplus");
+        CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX+ keeps whatever it was (%.2f)", a.cfg.tx_level);
+        snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/ttyACM0");
+        app_use_radio(&a, "qmxplus");
+        CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyACM0"), "same radio picked again: CAT port kept");
+    }
+
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
     return fails != 0;
 }

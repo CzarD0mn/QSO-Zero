@@ -929,6 +929,13 @@ static void menu_enter(app_t *a)
     }
 }
 
+void ui_start(app_t *a)
+{
+    a->screen = 1;
+    a->menu_sel = MI_RADIO;
+    a->dirty = 1;
+}
+
 void ui_key(app_t *a, const keyev_t *k)
 {
     a->dirty = 1;

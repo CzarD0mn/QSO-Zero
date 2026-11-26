@@ -21,10 +21,11 @@
 static const radio_profile_t k_radios[] = {
     {"qmx", "QRP Labs QMX", 2057, 2028, 115200, PTT_CAT,
      "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_80_TO_10,
-     "Single USB cable: CAT + audio. Set QMX to Digi mode; TX audio level ~50%."},
+     "Single USB cable: CAT + audio. QSO-Zero puts it in Digi mode (3.2 kHz). TX audio 100%: the QMX keys up only above 80% audio.",
+     1.0f, 1},
     {"qmxplus", "QRP Labs QMX+", 2057, 2028, 115200, PTT_CAT,
      "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_ALL,
-     "Same CAT/audio as QMX. 160-6 m band coverage."},
+     "Same CAT/audio as QMX. 160-6 m band coverage.", 0, 1},
     {"g90", "Xiegu G90 + Digirig", 3088, 0, 19200, PTT_CAT,
      "CP210", "/dev/ttyUSB0", "Device|C-Media|USB Audio", "PKTUSB", 20.0f, BANDS_NO6,
      "Digirig CAT cable to G90 COMM port, audio to the head. Turn G90 power down for digital duty cycle."},

@@ -10,5 +10,7 @@
 
 void ui_render(app_t *a, surface_t *s);     /* picks layout from surface size */
 void ui_key(app_t *a, const keyev_t *k);
+/* At start-up: open Setup on the Radio line, so another radio is one press away. */
+void ui_start(app_t *a);
 
 #endif

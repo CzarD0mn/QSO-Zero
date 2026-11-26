@@ -18,6 +18,8 @@ typedef struct {
     float        max_watts;
     unsigned     bands;         /* bit i = band_table()[i] the radio can work */
     const char  *notes;
+    float        tx_level;      /* TX audio level set when this radio is chosen (0 = leave it) */
+    int          digi_md6;      /* QMX: Digi mode is CAT "MD6" (3.2 kHz); make sure it's in it */
 } radio_profile_t;
 
 const radio_profile_t *radio_find(const char *id);

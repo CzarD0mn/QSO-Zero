@@ -38,15 +38,15 @@ Plug the radio's USB cable (or the Digirig) into the Cardputer Zero and turn the
 
 ### 3. In the app
 
-Open **QSO-Zero** from the launcher. Until a callsign is set, the status line says *Welcome! Set your callsign: ESC > Callsign*.
+Open **QSO-Zero** from the launcher. It opens in **Setup**, with the cursor on **Radio**, so choosing a different radio is one press of Enter away. (Every start opens here; **esc** goes to the main screen.) Until a callsign is set, the status line says *Welcome! Set your callsign: ESC > Callsign*.
 
-Press **esc** to open **Setup**. Move with ↑ / ↓ (fn+F / fn+X) and change values with ← / → (fn+Z / fn+C) or **Enter**.
+In Setup, move with ↑ / ↓ (fn+F / fn+X) and change values with ← / → (fn+Z / fn+C) or **Enter**.
 
 | Step | Setup item | What to do |
 |---|---|---|
 | 1 | **Callsign** | Enter opens the input line with `/call ` filled in. Type your call and press Enter. |
 | 2 | **Grid** | Enter, then type your 4- or 6-character locator in capitals (`FN42` or `FN42HN`) and press Enter. With the GPS Cap, turn on **Grid from GPS** instead. |
-| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. |
+| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. Changing the radio puts **CAT port** back on auto. Choosing the **QRP Labs QMX** also sets **TX audio level** to 100%, because the QMX only keys up when its audio is above 80%. |
 | 4 | **CAT port** | Leave on **auto**. If the radio isn't found, Enter shows every serial port with what it is. |
 | 5 | **Audio in / Audio out** | Leave on **auto**: it picks the radio's USB sound card. |
 | 6 | **In level** | Use ← / → until the **In signal** bar sits between the two white marks (50–70%) on a busy band. Red means it's clipping. |
@@ -348,6 +348,8 @@ With **Auto frequency** on (the default), changing mode or band tunes the radio 
 ### USB-Digital mode
 
 For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz passband (USB-D, U-DIG or DATA-U, depending on the radio) and reads it back to check. A radio without a data mode (such as the G90) gets USB at the widest passband it accepts. You don't need to set the mode on the radio.
+
+**QRP Labs QMX:** its digital mode is called **Digi**, and the QMX reports a 3.2 kHz bandwidth in it (its USB mode is for voice). QSO-Zero puts the QMX in Digi directly over CAT (the QMX's own `MD6;` command) on connect and after every mode or band change, and the activity log shows the mode and bandwidth the radio reports.
 
 ### Choosing the radio, port and sound cards
 

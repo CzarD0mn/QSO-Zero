@@ -257,9 +257,41 @@ static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
  * passband the radio accepts on radios without a data mode (e.g. the G90).
  * The working choice is remembered. This is the rule for every radio. */
 static char g_rig_mode[16];
+/* QMX / QMX+: its digital mode is "Digi" (CAT MD6), for which it reports a
+ * 3.2 kHz bandwidth (FW;); USB is its voice mode. Whatever Hamlib's PKTUSB maps to,
+ * check with the radio's own MD; command and put it in Digi if it isn't. */
+static int raw_num(const char *txt, const char *tag)
+{
+    for (const char *p = txt; (p = strstr(p, tag)); p += strlen(tag))
+        if (p[strlen(tag)] >= '0' && p[strlen(tag)] <= '9') return atoi(p + strlen(tag));
+    return -1;
+}
+
+static int qmx_digi(app_t *a)
+{
+    char r[512];
+    int md = rig_raw("MD;", r, sizeof r) == 0 ? raw_num(r, "MD") : -1;
+    if (md < 0) { if (!a->qmx_digi_logged) qlog("rig", "%s: raw CAT 'MD;' not answered (%s): using Hamlib's %s", a->radio->name, rig_error(), a->radio->data_mode); a->qmx_digi_logged = 1; return -1; }
+    if (md != 6) {
+        if (rig_raw("MD6;", r, sizeof r) != 0) { qlog("rig", "%s: could not switch to Digi (MD6): %s", a->radio->name, rig_error()); return -1; }
+        int now = rig_raw("MD;", r, sizeof r) == 0 ? raw_num(r, "MD") : -1;
+        int fw = rig_raw("FW;", r, sizeof r) == 0 ? raw_num(r, "FW") : -1;
+        qlog("rig", "%s: was in mode MD%d, switched to Digi: now MD%d, bandwidth %d Hz", a->radio->name, md, now, fw);
+        if (now != 6) app_status(a, "%s didn't go into Digi mode: set it on the radio", a->radio->name);
+    } else if (!a->qmx_digi_logged) {
+        int fw = rig_raw("FW;", r, sizeof r) == 0 ? raw_num(r, "FW") : -1;
+        qlog("rig", "%s in Digi mode (MD6), bandwidth %d Hz", a->radio->name, fw);
+    }
+    a->qmx_digi_logged = 1;
+    return 0;
+}
+
 static void set_data_mode(app_t *a)
 {
     if (!(g_hw && a->rig_ok)) return;
+    if (a->radio->digi_md6) {                            /* QMX: Digi straight through CAT, Hamlib's PKTUSB if that fails */
+        if (qmx_digi(a) == 0) { snprintf(g_rig_mode, sizeof g_rig_mode, "Digi"); return; }
+    }
     const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
     char got[24] = "";
     int rc = rig_set_mode(want, 3000);
@@ -285,6 +317,7 @@ static int do_qsy(app_t *a, int band, int64_t hz)
     char f[16];
     fmt_mhz(hz, f);
     if (!(g_hw && a->rig_ok)) { a->dial_hz = hz; return 0; }
+    double t0 = clk_mono();
     int rc = rig_set_freq(hz);
     int64_t back = rc ? -1 : rig_get_freq();
     if (rc || back < 0 || llabs(back - hz) > 100) {
@@ -293,9 +326,12 @@ static int do_qsy(app_t *a, int band, int64_t hz)
         app_status(a, "%s: radio won't tune %s MHz - band skipped", k_bands[band].name, f);
         return -1;
     }
+    double t1 = clk_mono();
     set_data_mode(a);
     a->dial_hz = hz;
-    qlog("rig", "QSY %s %.6f MHz %s %s", k_bands[band].name, hz / 1e6, mode_name(a->mode), g_rig_mode);
+    double t2 = clk_mono();
+    qlog("rig", "QSY %s %.6f MHz %s %s  (frequency %.0f ms, mode %.0f ms)", k_bands[band].name, hz / 1e6, mode_name(a->mode), g_rig_mode,
+         (t1 - t0) * 1000, (t2 - t1) * 1000);
     app_status(a, "QSY %s %s MHz %s", k_bands[band].name, f, mode_name(a->mode));
     return 0;
 }
@@ -577,6 +613,7 @@ static void rig_connect(app_t *a)
     a->rig_ok = 1;
     qlog("rig", "online, VFO %.6f MHz", f / 1e6);
     g_rig_mode[0] = 0;
+    a->qmx_digi_logged = 0;
     set_data_mode(a);
     a->dirty = 1;
 }
@@ -719,8 +756,17 @@ void app_use_radio(app_t *a, const char *id)
     const radio_profile_t *r = radio_find(id);
     if (!r) return;
     if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    int changed = a->radio != r;
     a->radio = r;
     snprintf(a->cfg.radio, sizeof a->cfg.radio, "%s", r->id);
+    if (changed && a->cfg.rig_device[0]) {               /* a CAT port pinned for the old radio: back to auto */
+        qlog("rig", "radio changed to %s: CAT port %s -> auto", r->name, a->cfg.rig_device);
+        a->cfg.rig_device[0] = 0;
+    }
+    if (changed && r->tx_level > 0) {
+        a->cfg.tx_level = r->tx_level;
+        app_status(a, "%s: TX audio level %.0f%%", r->name, r->tx_level * 100);
+    }
     apply_band_mask(a);
     if (!hw_change_ok(a)) return;
     if (!a->cfg.audio_in[0]) audio_connect(a);           /* "auto" audio follows the radio */

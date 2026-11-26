@@ -105,7 +105,7 @@ Every push to `main` also publishes test packages on the [`packages` branch](../
 
 ## Quick start
 
-First-time setup is covered step by step in [Operations.md](Operations.md#first-time-setup). In short: **esc** opens Setup; set **Callsign**, **Grid** and **Radio**, and choose **Save settings**.
+First-time setup is covered step by step in [Operations.md](Operations.md#first-time-setup). In short: QSO-Zero opens in Setup, on the **Radio** line; set **Radio**, **Callsign** and **Grid**, choose **Save settings**, and press **esc** for the main screen.
 
 1. **Set the receive level.** In Setup, select **In level** and use ← / → until the **In signal** bar sits between the two white marks (50–70%).
 2. **See how far you're heard.** QSO-Zero starts in WSPR on 20 m. **ctrl+W** turns the beacon on, and the spots appear on wsprnet.
