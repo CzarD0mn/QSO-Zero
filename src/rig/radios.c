@@ -5,9 +5,10 @@
  * Hamlib model numbers (RIG_MAKE_MODEL(mfg, n) = mfg*1000 + n):
  *   Yaesu FT-891      1036   Kenwood TS-480 2028   QRP Labs QMX 2057
  *   Xiegu X6100       3087   Xiegu G90      3088   Xiegu X6200  3091
- * Band coverage: QMX 80-10 m (the 5-band QMX ships in low- or high-band
- * versions; ones it lacks are detected when the radio refuses the QSY and
- * skipped), QMX+ 160-6 m, G90 160-10 m, X6100/X6200/FT-891 160-6 m.
+ * Band coverage: the QMX comes in three hardware versions with different
+ * filters - 80-20 m, 60-15 m and 20-10 m - that look the same over CAT (it
+ * would happily tune a band it has no filters for), so each is its own entry;
+ * QMX+ 160-6 m, G90 160-10 m, X6100/X6200/FT-891 160-6 m.
  * QMX and X6200 entries need Hamlib >= 4.6; on older Hamlib the app falls
  * back to the TS-480 / X6100 backends, which speak the same protocol.
  *
@@ -19,9 +20,17 @@
  * here if the radio is known to misbehave when asked for PKTUSB.
  */
 static const radio_profile_t k_radios[] = {
-    {"qmx", "QRP Labs QMX", 2057, 2028, 115200, PTT_CAT,
-     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_80_TO_10,
-     "Single USB cable: CAT + audio. QSO-Zero puts it in Digi mode (3.2 kHz). TX audio 100%: the QMX keys up only above 80% audio.",
+    {"qmx", "QRP Labs QMX 80-20m", 2057, 2028, 115200, PTT_CAT,
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_LOW,
+     "QMX 80/60/40/30/20 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%: the QMX keys up only above 80% audio.",
+     1.0f, 1},
+    {"qmxmid", "QRP Labs QMX 60-15m", 2057, 2028, 115200, PTT_CAT,
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_MID,
+     "QMX 60/40/30/20/17/15 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%.",
+     1.0f, 1},
+    {"qmxhigh", "QRP Labs QMX 20-10m", 2057, 2028, 115200, PTT_CAT,
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_HIGH,
+     "QMX 20/17/15/12/11/10 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%.",
      1.0f, 1},
     {"qmxplus", "QRP Labs QMX+", 2057, 2028, 115200, PTT_CAT,
      "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_ALL,

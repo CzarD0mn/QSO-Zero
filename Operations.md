@@ -46,7 +46,7 @@ In Setup, move with ↑ / ↓ (fn+F / fn+X) and change values with ← / → (fn
 |---|---|---|
 | 1 | **Callsign** | Enter opens the input line with `/call ` filled in. Type your call and press Enter. |
 | 2 | **Grid** | Enter, then type your 4- or 6-character locator in capitals (`FN42` or `FN42HN`) and press Enter. With the GPS Cap, turn on **Grid from GPS** instead. |
-| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. Changing the radio puts **CAT port** back on auto. Choosing the **QRP Labs QMX** also sets **TX audio level** to 100%, because the QMX only keys up when its audio is above 80%. |
+| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. Changing the radio puts **CAT port** back on auto. There are three QMX entries, one per hardware version (80-20m, 60-15m and 20-10m): choose yours, because they look identical over CAT and only the right one keeps band changes to bands your QMX has filters for. Choosing any of them also sets **TX audio level** to 100%, because the QMX only keys up when its audio is above 80%. |
 | 4 | **CAT port** | Leave on **auto**. If the radio isn't found, Enter shows every serial port with what it is. |
 | 5 | **Audio in / Audio out** | Leave on **auto**: it picks the radio's USB sound card. |
 | 6 | **In level** | Use ← / → until the **In signal** bar sits between the two white marks (50–70%) on a busy band. Red means it's clipping. |

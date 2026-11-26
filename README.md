@@ -39,12 +39,16 @@ On an HDMI monitor:
 
 | Radio | `radio =` | Connection | Bands |
 |---|---|---|---|
-| QRP Labs QMX | `qmx` | one USB cable (CAT + audio) | 80–10 m |
+| QRP Labs QMX 80-20m | `qmx` | one USB cable (CAT + audio) | 80, 60, 40, 30, 20 m |
+| QRP Labs QMX 60-15m | `qmxmid` | one USB cable (CAT + audio) | 60, 40, 30, 20, 17, 15 m |
+| QRP Labs QMX 20-10m | `qmxhigh` | one USB cable (CAT + audio) | 20, 17, 15, 12, 10 m |
 | QRP Labs QMX+ | `qmxplus` | one USB cable | 160–6 m |
 | Xiegu G90 | `g90` | Digirig (CAT + audio) | 160–10 m |
 | Xiegu X6100 | `x6100` | built-in USB | 160–6 m |
 | Xiegu X6200 | `x6200` | built-in USB | 160–6 m |
 | Yaesu FT-891 | `ft891` | Digirig (CAT + DATA jack), PTT on RTS | 160–6 m |
+
+The QMX comes in three hardware versions with different band filters. They all look the same to the computer, so pick the one you have in **Setup › Radio**: QSO-Zero then only offers that version's bands.
 
 QSO-Zero finds the radio's CAT port and USB sound card by itself. You can also pick them in Setup.
 

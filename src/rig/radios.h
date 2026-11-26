@@ -31,5 +31,9 @@ const char *ptt_name(ptt_method_t p);
 #define BANDS_NO160    (BANDS_ALL & ~0x001u)
 #define BANDS_NO6      (BANDS_ALL & ~0x400u)
 #define BANDS_80_TO_10 (BANDS_ALL & ~0x401u)
+/* bit i = band_table()[i]: 160 80 60 40 30 20 17 15 12 10 6 */
+#define BANDS_QMX_LOW  0x03Eu   /* 80 60 40 30 20 */
+#define BANDS_QMX_MID  0x0FCu   /* 60 40 30 20 17 15 */
+#define BANDS_QMX_HIGH 0x3E0u   /* 20 17 15 12 10 (and 11 m, which has no digital-mode spot here) */
 
 #endif

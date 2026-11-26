@@ -123,16 +123,16 @@ int main(void)
     CHECK(g_vfo == 7038600, "WSPR -> 7.0386 (vfo %lld)", g_vfo);
     app_set_mode(&a, MODE_FT8);
 
-    printf("[3] band stepping skips bands the QMX lacks\n");
-    app_set_band(&a, 9);                        /* 10 m */
-    CHECK(g_vfo == 28074000, "10m FT8 28.074");
-    app_step_band(&a, 1);                       /* 6 m not on a QMX, 160 m neither -> wraps to 80 m */
-    CHECK(a.band == 1 && g_vfo == 3573000, "10m -> next is 80m (band %d vfo %lld)", a.band, g_vfo);
+    printf("[3] band stepping stays on the bands the QMX (80-20 m version) has\n");
+    app_set_band(&a, 5);                        /* 20 m */
+    CHECK(g_vfo == 14074000, "20m FT8 14.074");
+    app_step_band(&a, 1);                       /* 17-6 m and 160 m not on this QMX -> wraps to 80 m */
+    CHECK(a.band == 1 && g_vfo == 3573000, "20m -> next is 80m (band %d vfo %lld)", a.band, g_vfo);
     app_step_band(&a, -1);
-    CHECK(a.band == 9, "80m -> previous is 10m (band %d)", a.band);
+    CHECK(a.band == 5, "80m -> previous is 20m (band %d)", a.band);
     int before = g_sets;
-    app_set_band(&a, 10);
-    CHECK(a.band == 9 && g_sets == before, "explicit 6m on a QMX refused without touching the VFO");
+    app_set_band(&a, 9);
+    CHECK(a.band == 5 && g_sets == before, "explicit 10m on the 80-20 m QMX refused without touching the VFO");
 
     printf("[4] radio refusing a band: reported and skipped\n");
     g_refuse_lo = 10100000; g_refuse_hi = 10150000;  /* this QMX build has no 30 m */
@@ -143,10 +143,10 @@ int main(void)
     app_step_band(&a, -1);
     CHECK(a.band == 3 && g_vfo == 7074000, "20m -> previous skips 30m to 40m (band %d)", a.band);
 
-    g_refuse_lo = 18068000; g_refuse_hi = 18168000;  /* and no 17 m: stepping up passes it */
-    app_set_band(&a, 5);
-    app_step_band(&a, 1);
-    CHECK(a.band == 7 && g_vfo == 21074000, "20m -> next tries 17m, refused, lands on 15m (band %d)", a.band);
+    g_refuse_lo = 7000000; g_refuse_hi = 7300000;    /* and now no 40 m: stepping down passes it */
+    app_set_band(&a, 4);
+    app_step_band(&a, -1);
+    CHECK(a.band == 2 && g_vfo == 5357000, "30m -> previous tries 40m, refused, lands on 60m (band %d)", a.band);
     g_refuse_lo = g_refuse_hi = 0;
 
     printf("[5] VFO knob onto another band is followed\n");
@@ -341,6 +341,18 @@ int main(void)
         CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX selected: TX audio level 100%% (%.2f)", a.cfg.tx_level);
         app_use_radio(&a, "qmxplus");
         CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX+ keeps whatever it was (%.2f)", a.cfg.tx_level);
+        /* the three QMX hardware versions */
+        static const struct { const char *id; unsigned want; } qv[] = {
+            {"qmx", 0x03E}, {"qmxmid", 0x0FC}, {"qmxhigh", 0x3E0}};
+        int okv = 1;
+        for (int i = 0; i < 3; ++i) {
+            app_use_radio(&a, qv[i].id);
+            for (int k = 0; k < 60 && a.rig_busy; ++k) wait_s(0.1);
+            okv &= (a.band_mask == qv[i].want) && fabsf(a.cfg.tx_level - 1.0f) < 1e-6 && a.radio->digi_md6;
+        }
+        CHECK(okv, "QMX 80-20m / 60-15m / 20-10m: each offers only its own bands, 100%% TX audio, Digi mode");
+        app_use_radio(&a, "qmxplus");
+        for (int k = 0; k < 60 && a.rig_busy; ++k) wait_s(0.1);
         snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/ttyACM0");
         app_use_radio(&a, "qmxplus");
         CHECK(!strcmp(a.cfg.rig_device, "/dev/ttyACM0"), "same radio picked again: CAT port kept");
