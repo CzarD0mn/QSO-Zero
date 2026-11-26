@@ -258,40 +258,44 @@ static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
  * The working choice is remembered. This is the rule for every radio. */
 static char g_rig_mode[16];
 /* QMX / QMX+: its digital mode is "Digi" (CAT MD6), for which it reports a
- * 3.2 kHz bandwidth (FW;); USB is its voice mode. Whatever Hamlib's PKTUSB maps to,
- * check with the radio's own MD; command and put it in Digi if it isn't. */
-static int raw_num(const char *txt, const char *tag)
+ * 3.2 kHz bandwidth; USB is its voice mode. Hamlib's get_mode reads that
+ * bandwidth back as the passband, so: PKTUSB first; if the radio doesn't then
+ * report >= 3 kHz, try Hamlib's RTTY (Kenwood MD6 = the QMX's Digi) and keep
+ * whichever gives the full bandwidth for this connection. Two quick commands
+ * per change (set + read back), no raw CAT (which rigctld didn't pass through). */
+static void qmx_digi(app_t *a)
 {
-    for (const char *p = txt; (p = strstr(p, tag)); p += strlen(tag))
-        if (p[strlen(tag)] >= '0' && p[strlen(tag)] <= '9') return atoi(p + strlen(tag));
-    return -1;
-}
-
-static int qmx_digi(app_t *a)
-{
-    char r[512];
-    int md = rig_raw("MD;", r, sizeof r) == 0 ? raw_num(r, "MD") : -1;
-    if (md < 0) { if (!a->qmx_digi_logged) qlog("rig", "%s: raw CAT 'MD;' not answered (%s): using Hamlib's %s", a->radio->name, rig_error(), a->radio->data_mode); a->qmx_digi_logged = 1; return -1; }
-    if (md != 6) {
-        if (rig_raw("MD6;", r, sizeof r) != 0) { qlog("rig", "%s: could not switch to Digi (MD6): %s", a->radio->name, rig_error()); return -1; }
-        int now = rig_raw("MD;", r, sizeof r) == 0 ? raw_num(r, "MD") : -1;
-        int fw = rig_raw("FW;", r, sizeof r) == 0 ? raw_num(r, "FW") : -1;
-        qlog("rig", "%s: was in mode MD%d, switched to Digi: now MD%d, bandwidth %d Hz", a->radio->name, md, now, fw);
-        if (now != 6) app_status(a, "%s didn't go into Digi mode: set it on the radio", a->radio->name);
-    } else if (!a->qmx_digi_logged) {
-        int fw = rig_raw("FW;", r, sizeof r) == 0 ? raw_num(r, "FW") : -1;
-        qlog("rig", "%s in Digi mode (MD6), bandwidth %d Hz", a->radio->name, fw);
+    const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
+    char got[24] = "";
+    int pb = 0;
+    if (rig_set_mode(want, 3000)) rig_set_mode(want, 0);
+    rig_get_mode(got, sizeof got, &pb);
+    if (pb >= 3000) {
+        if (!a->qmx_digi_logged) qlog("rig", "%s: mode %s, bandwidth %d Hz (Digi)", a->radio->name, want, pb);
+        a->qmx_digi_logged = 1;
+        snprintf(g_rig_mode, sizeof g_rig_mode, "%s", want);
+        return;
     }
+    if (strcmp(want, "RTTY")) {
+        int pb2 = 0;
+        char got2[24] = "";
+        if (rig_set_mode("RTTY", 0) == 0 && rig_get_mode(got2, sizeof got2, &pb2) == 0 && pb2 >= 3000) {
+            qlog("rig", "%s: %s gave %d Hz; RTTY (the QMX's Digi mode) gives %d Hz: using it", a->radio->name, want, pb, pb2);
+            a->qmx_digi_logged = 1;
+            snprintf(g_rig_mode, sizeof g_rig_mode, "RTTY");
+            return;
+        }
+        rig_set_mode(want, 0);                           /* neither: back to the data mode */
+    }
+    if (!a->qmx_digi_logged) qlog("rig", "%s: mode %s, bandwidth %d Hz (not the 3.2 kHz Digi mode: set Digi on the radio)", a->radio->name, want, pb);
     a->qmx_digi_logged = 1;
-    return 0;
+    snprintf(g_rig_mode, sizeof g_rig_mode, "%s", want);
 }
 
 static void set_data_mode(app_t *a)
 {
     if (!(g_hw && a->rig_ok)) return;
-    if (a->radio->digi_md6) {                            /* QMX: Digi straight through CAT, Hamlib's PKTUSB if that fails */
-        if (qmx_digi(a) == 0) { snprintf(g_rig_mode, sizeof g_rig_mode, "Digi"); return; }
-    }
+    if (a->radio->digi_md6) { qmx_digi(a); return; }     /* QMX: whichever mode gives its 3.2 kHz Digi */
     const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
     char got[24] = "";
     int rc = rig_set_mode(want, 3000);

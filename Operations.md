@@ -349,7 +349,7 @@ With **Auto frequency** on (the default), changing mode or band tunes the radio 
 
 For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz passband (USB-D, U-DIG or DATA-U, depending on the radio) and reads it back to check. A radio without a data mode (such as the G90) gets USB at the widest passband it accepts. You don't need to set the mode on the radio.
 
-**QRP Labs QMX:** its digital mode is called **Digi**, and the QMX reports a 3.2 kHz bandwidth in it (its USB mode is for voice). QSO-Zero puts the QMX in Digi directly over CAT (the QMX's own `MD6;` command) on connect and after every mode or band change, and the activity log shows the mode and bandwidth the radio reports.
+**QRP Labs QMX:** its digital mode is called **Digi**, and the QMX reports a 3.2 kHz bandwidth in it (its USB mode is for voice). On connect, QSO-Zero sets the data mode and checks the bandwidth the QMX reports. If it isn't the full 3.2 kHz, it switches to Hamlib's RTTY mode, which is the QMX's Digi (its CAT `MD6`), and keeps using whichever gives 3.2 kHz. The activity log shows the mode and bandwidth.
 
 ### Choosing the radio, port and sound cards
 

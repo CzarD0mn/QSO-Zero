@@ -92,6 +92,8 @@ static void kill_child(void)
 }
 
 /* Send one command, read the reply up to "RPRT n" or a value line. */
+static char g_last[1024];       /* the whole text of the last rigctld reply (under g_lock) */
+
 static int rig_cmd(const char *cmd, char *reply, size_t rsz)
 {
     if (g_sock < 0) { snprintf(g_err, sizeof g_err, "rig not connected"); return -1; }
@@ -110,6 +112,7 @@ static int rig_cmd(const char *cmd, char *reply, size_t rsz)
         char *rp = strstr(acc, "RPRT ");
         if (rp && strchr(rp, '\n')) {
             int code = atoi(rp + 5);
+            snprintf(g_last, sizeof g_last, "%s", acc);
             if (reply) {
                 /* value lines are "Name: value" in extended mode */
                 reply[0] = 0;
@@ -163,40 +166,6 @@ static int try_model(int model, const rig_config_t *c)
     }
     qlog("rig", "radio answered, VFO %s Hz", f);
     return 0;
-}
-
-/* Send a raw CAT command through rigctld (its "w" / send_cmd) and return
- * everything rigctld printed before RPRT, so the caller can look for the
- * radio's answer (e.g. "MD6;"). 0 on success. */
-int rig_raw(const char *cat, char *out, size_t n)
-{
-    if (out && n) out[0] = 0;
-    if (g_sock < 0) { snprintf(g_err, sizeof g_err, "rig not connected"); return -1; }
-    char buf[96];
-    int k = snprintf(buf, sizeof buf, "+w %s\n", cat);
-    pthread_mutex_lock(&g_lock);
-    if (send(g_sock, buf, k, MSG_NOSIGNAL) != k) { pthread_mutex_unlock(&g_lock); return -1; }
-    size_t got = 0;
-    char acc[512];
-    int rc = -1;
-    for (;;) {
-        struct pollfd p = {.fd = g_sock, .events = POLLIN};
-        if (poll(&p, 1, 1500) <= 0) { snprintf(g_err, sizeof g_err, "rigctld timeout on raw '%s'", cat); break; }
-        ssize_t r = recv(g_sock, acc + got, sizeof acc - 1 - got, 0);
-        if (r <= 0) break;
-        got += r;
-        acc[got] = 0;
-        char *rp = strstr(acc, "RPRT ");
-        if (rp && strchr(rp, '\n')) {
-            rc = atoi(rp + 5);
-            *rp = 0;
-            if (out) snprintf(out, n, "%s", acc);
-            break;
-        }
-        if (got >= sizeof acc - 1) break;
-    }
-    pthread_mutex_unlock(&g_lock);
-    return rc;
 }
 
 int rig_open(const rig_config_t *cfg)
@@ -253,11 +222,13 @@ int rig_get_mode(char *mode, int msz, int *passband)
     char v[64];
     pthread_mutex_lock(&g_lock);
     int r = rig_cmd("m", v, sizeof v);           /* extended reply: "Mode: PKTUSB" then "Passband: 3000" */
+    const char *pb = r ? NULL : strstr(g_last, "Passband:");
+    int pbv = pb ? atoi(pb + 9) : 0;
     pthread_mutex_unlock(&g_lock);
     if (r) return r;
     v[strcspn(v, " \r\n")] = 0;
     snprintf(mode, msz, "%s", v);
-    if (passband) *passband = 0;
+    if (passband) *passband = pbv;
     return 0;
 }
 

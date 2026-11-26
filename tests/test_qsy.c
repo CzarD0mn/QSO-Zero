@@ -23,8 +23,8 @@ static volatile long long g_refuse_lo, g_refuse_hi;   /* radio silently ignores 
 static volatile int g_sets, g_no_data_mode, g_mode_sets;
 static char g_mode[16] = "USB";
 static int g_pb = 2400;
-static volatile int g_md = -1;      /* >= 0: answer raw CAT (rigctld "w") like a QMX in mode MD<g_md> */
-static volatile int g_raw_cmds;
+static volatile int g_qmx_sim;      /* 1: bandwidth like a QMX - 3200 Hz only in RTTY (its Digi, MD6), 2700 otherwise
+                                       2: a QMX whose PKTUSB already is Digi (3200) */
 static int g_lsock;
 
 static void *fake_rigctld(void *arg)
@@ -55,14 +55,12 @@ static void *fake_rigctld(void *arg)
                     sscanf(buf + 3, "%15s %d", m, &pb);
                     ++g_mode_sets;
                     if (g_no_data_mode && !strncmp(m, "PKT", 3)) snprintf(out, sizeof out, "set_mode:\nRPRT -11\n");   /* like a G90 */
-                    else { snprintf(g_mode, sizeof g_mode, "%s", m); if (pb) g_pb = pb; snprintf(out, sizeof out, "set_mode:\nRPRT 0\n"); }
-                } else if (!strncmp(buf, "+w ", 3) && g_md >= 0) {
-                    ++g_raw_cmds;
-                    const char *cat = buf + 3;
-                    if (!strncmp(cat, "MD", 2) && cat[2] >= '0' && cat[2] <= '9') { g_md = cat[2] - '0'; snprintf(out, sizeof out, "send_cmd: %s\nRPRT 0\n", cat); }
-                    else if (!strcmp(cat, "MD;")) snprintf(out, sizeof out, "send_cmd: MD;\nReply: MD%d;\nRPRT 0\n", g_md);
-                    else if (!strcmp(cat, "FW;")) snprintf(out, sizeof out, "send_cmd: FW;\nReply: FW%04d;\nRPRT 0\n", g_md == 6 ? 3200 : 2700);
-                    else snprintf(out, sizeof out, "send_cmd: %s\nRPRT -1\n", cat);
+                    else {
+                        snprintf(g_mode, sizeof g_mode, "%s", m);
+                        if (g_qmx_sim) g_pb = (!strcmp(m, "RTTY") || (g_qmx_sim == 2 && !strcmp(m, "PKTUSB"))) ? 3200 : 2700;
+                        else if (pb) g_pb = pb;
+                        snprintf(out, sizeof out, "set_mode:\nRPRT 0\n");
+                    }
                 } else if (!strcmp(buf, "+m"))
                     snprintf(out, sizeof out, "get_mode:\nMode: %s\nPassband: %d\nRPRT 0\n", g_mode, g_pb);
                 else
@@ -322,15 +320,27 @@ int main(void)
         a.tx_active = 0;
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
-        g_md = 2;                                        /* QMX sitting in USB (SSB) */
-        int before = g_raw_cmds;
-        app_set_mode(&a, MODE_JS8);
-        app_set_mode(&a, MODE_FT8);
-        CHECK(g_md == 6 && g_raw_cmds > before, "QMX put in Digi mode with MD6 (was MD2): now MD%d", g_md);
-        g_md = 2;                                        /* e.g. switched on the radio */
+        a.tx_active = 0;
+        g_qmx_sim = 1;                                   /* Hamlib's PKTUSB isn't the QMX's Digi here */
+        app_use_radio(&a, "qmxmid");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        app_use_radio(&a, "qmx");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(!strcmp(g_mode, "RTTY") && g_pb == 3200, "QMX: PKTUSB gave 2700 Hz, so Digi via RTTY/MD6: %s %d Hz", g_mode, g_pb);
+        int ms0 = g_mode_sets;
+        struct timespec t0, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
         app_set_band(&a, 3);
-        CHECK(g_md == 6, "and again after a band change");
-        g_md = -1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        double ms = (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+        CHECK(!strcmp(g_mode, "RTTY") && g_mode_sets - ms0 <= 2 && ms < 500, "band change: straight to RTTY (remembered), %.0f ms", ms);
+        g_qmx_sim = 2;                                   /* a QMX / Hamlib where PKTUSB is Digi */
+        app_use_radio(&a, "qmxhigh");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        app_use_radio(&a, "qmx");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3200, "PKTUSB already 3200 Hz: stays PKTUSB (%s %d)", g_mode, g_pb);
+        g_qmx_sim = 0;
         /* changing radio: a pinned CAT port goes back to auto; the QMX gets 100% TX audio */
         snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/serial/by-id/usb-1a86_USB_Dual_Serial-if02");
         a.cfg.tx_level = 0.5f;
