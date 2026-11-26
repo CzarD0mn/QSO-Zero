@@ -14,6 +14,7 @@
 #include "dsp/ft8w.h"
 #include "dsp/js8_varicode.h"
 #include "ui/input.h"
+#include "audio/audio.h"
 #include "ui/views.h"
 
 static int fails;
@@ -302,6 +303,13 @@ int main(void)
         snprintf(j.text, sizeof j.text, "W1AW: KM4FLG HELLO");
         CHECK(line_shown(&c, &j), "JS8 is never filtered");
     }
+
+    printf("[8] stereo sound cards: which channel is used\n");
+    CHECK(audio_pick_channel(1.0, 1.0) == 0, "both channels equal (QMX: right = inverted left) -> left");
+    CHECK(audio_pick_channel(0.0, 0.0) == 0, "silence -> left");
+    CHECK(audio_pick_channel(1.0, 0.0) == 0, "audio only on the left -> left");
+    CHECK(audio_pick_channel(0.0, 1.0) == 1, "audio only on the right -> right");
+    CHECK(audio_pick_channel(1.0, 1.5) == 0, "right only slightly stronger -> stays left");
 
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
     return fails != 0;

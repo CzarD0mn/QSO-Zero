@@ -364,6 +364,10 @@ Setup has pickers for **Radio**, **CAT port**, **Audio in** and **Audio out**. P
 | **Out level** | the sound card's transmit level |
 | **TX audio level** | QSO-Zero's own drive, on top of Out level. Adjust so the radio's ALC barely moves |
 
+Some sound cards have no level controls for Linux to adjust: the QRP Labs QMX, for example. In level and Out level then show **n/a**; set the levels in the radio's own menu, and use the **In signal** bar and **TX audio level** as usual.
+
+Stereo sound cards such as the QMX's are handled automatically: QSO-Zero records both channels and uses one, and the activity log shows each channel's level when receiving starts.
+
 ![Setup audio](docs/screenshots/setup_audio.png)
 
 ---

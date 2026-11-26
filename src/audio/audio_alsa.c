@@ -50,6 +50,7 @@ static double g_rate_t0;
 static long g_rate_f0;
 static volatile double g_rate;
 static char g_rx_err[80];
+static int g_in_ch = 1;            /* channels the input was opened with (2 = stereo card) */
 
 void audio_rx_stats(audio_rx_stats_t *o)
 {
@@ -146,6 +147,12 @@ static void sleep_ms(int ms) { struct timespec ts = {ms / 1000, (ms % 1000) * 10
  * Xiegu X6200 on the Cardputer Zero) intermittently fail to start a stream
  * with USB error -71 ("cannot set freq 48000"); a retry usually works. */
 #define SND_PCM_NONBLOCK 1
+/* Capture is opened in stereo when the card allows it, and one channel is
+ * used (see rx_thread). Letting ALSA mix a stereo card down to mono averages
+ * the channels, and some radios (the QRP Labs QMX) send the right channel as
+ * an inverted copy of the left: averaged, that is exact silence. Mono cards
+ * (C-Media in the X6100/X6200/Digirig) are opened in stereo through plughw too,
+ * which just duplicates the channel. Playback stays mono. */
 static int open_pcm(snd_pcm_t **pcm, const char *dev, int stream, int mode, unsigned latency_us, int tries)
 {
     int e = -1;
@@ -157,11 +164,21 @@ static int open_pcm(snd_pcm_t **pcm, const char *dev, int stream, int mode, unsi
             *pcm = NULL;
             continue;
         }
-        if ((e = A.set_params(*pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, AUDIO_HW_RATE, 1, latency_us)) < 0) {
-            qlog("audio", "%s %s: 48 kHz mono 16-bit setup failed (try %d/%d): %s", what, dev, t + 1, tries, A.strerror(e));
-            A.close(*pcm); *pcm = NULL;
+        int ch = stream == SND_PCM_STREAM_CAPTURE ? 2 : 1;
+        if ((e = A.set_params(*pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, ch, AUDIO_HW_RATE, 1, latency_us)) < 0 && ch == 2) {
+            A.close(*pcm);                                  /* no stereo on this input: mono */
+            ch = 1;
+            if ((e = A.open(pcm, dev, stream, mode)) >= 0)
+                e = A.set_params(*pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, AUDIO_HW_RATE, 1, latency_us);
+            else *pcm = NULL;
+        }
+        if (e < 0) {
+            qlog("audio", "%s %s: 48 kHz 16-bit setup failed (try %d/%d): %s", what, dev, t + 1, tries, A.strerror(e));
+            if (*pcm) A.close(*pcm);
+            *pcm = NULL;
             continue;
         }
+        if (stream == SND_PCM_STREAM_CAPTURE) g_in_ch = ch;
         /* snd_pcm_set_params() sets the start threshold to the whole buffer, so a
          * capture stream read in 20 ms pieces would never start: start it now. */
         if (stream == SND_PCM_STREAM_CAPTURE && (e = A.start(*pcm)) < 0) {
@@ -169,17 +186,31 @@ static int open_pcm(snd_pcm_t **pcm, const char *dev, int stream, int mode, unsi
             A.close(*pcm); *pcm = NULL;
             continue;
         }
-        if (t || stream == SND_PCM_STREAM_CAPTURE) qlog("audio", "%s %s open and running (48 kHz mono)%s", what, dev, t ? " after retrying" : "");
+        if (t || stream == SND_PCM_STREAM_CAPTURE)
+            qlog("audio", "%s %s open and running (48 kHz %s)%s", what, dev, stream == SND_PCM_STREAM_CAPTURE && ch == 2 ? "stereo, one channel used" : "mono",
+                 t ? " after retrying" : "");
         return 0;
     }
     return e;
+}
+
+/* Use the louder channel of a stereo input; the left one unless the right is
+ * clearly (3 dB) stronger, e.g. a card that only fills the right channel. */
+int audio_pick_channel(double energy_left, double energy_right)
+{
+    return energy_right > 2.0 * energy_left ? 1 : 0;
 }
 
 static void *rx_thread(void *arg)
 {
     (void)arg;
     enum { CHUNK = 960 };  /* 20 ms at 48 kHz */
-    int16_t buf[CHUNK], dec[CHUNK / 4 + 4];
+    int16_t raw[CHUNK * 2], buf[CHUNK], dec[CHUNK / 4 + 4];
+    /* which channel of a stereo input to use: measured over the first 3 s */
+    double e_ch[2] = {0, 0}, e_mix = 0;
+    float pk_ch[2] = {0, 0}, pk_mix = 0;
+    long n_meas = 0;
+    int use = 0, decided = 0;
     decim4_t d;
     decim4_init(&d);
     float peak = 0;
@@ -203,7 +234,29 @@ static void *rx_thread(void *arg)
             consec = 0;
         }
         int w = A.wait(g_in, 500);
-        long r = w < 0 ? w : A.readi(g_in, buf, CHUNK);
+        long r = w < 0 ? w : A.readi(g_in, raw, CHUNK);
+        if (r > 0) {
+            if (g_in_ch == 2) {
+                if (!decided) {
+                    for (long i = 0; i < r; ++i) {
+                        float l = raw[2 * i] / 32768.0f, rr = raw[2 * i + 1] / 32768.0f, m = (l + rr) / 2;
+                        e_ch[0] += l * l; e_ch[1] += rr * rr; e_mix += m * m;
+                        if (fabsf(l) > pk_ch[0]) pk_ch[0] = fabsf(l);
+                        if (fabsf(rr) > pk_ch[1]) pk_ch[1] = fabsf(rr);
+                        if (fabsf(m) > pk_mix) pk_mix = fabsf(m);
+                    }
+                    if ((n_meas += r) >= 3L * AUDIO_HW_RATE) {
+                        use = audio_pick_channel(e_ch[0], e_ch[1]);
+                        decided = 1;
+                        qlog("audio", "input is stereo: left peak %.2f%%, right peak %.2f%%, both mixed %.2f%%%s - using the %s channel",
+                             pk_ch[0] * 100, pk_ch[1] * 100, pk_mix * 100,
+                             e_mix < 0.01 * (e_ch[0] + e_ch[1]) / 2 && e_ch[0] + e_ch[1] > 0 ? " (the channels cancel when mixed)" : "",
+                             use ? "right" : "left");
+                    }
+                }
+                for (long i = 0; i < r; ++i) buf[i] = raw[2 * i + use];
+            } else memcpy(buf, raw, sizeof(int16_t) * (size_t)r);
+        }
         double t_end = clk_now(), tm = clk_mono();
         if (r == -EAGAIN || r == 0) r = 0;
         else if (r < 0) {

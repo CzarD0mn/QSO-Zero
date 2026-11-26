@@ -25,6 +25,8 @@ void audio_tx_abort(void);
 
 /* Peak input level 0..1 over the last ~0.5 s (for the RX level meter). */
 float audio_rx_level(void);
+/* Which channel of a stereo input to use (0 left, 1 right), from each channel's energy. */
+int audio_pick_channel(double energy_left, double energy_right);
 
 /* Capture health for Tools: samples/s actually arriving at 48 kHz over the
  * last few seconds (0 = nothing coming in), and the last read error. */
