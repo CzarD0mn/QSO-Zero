@@ -23,8 +23,7 @@ static volatile long long g_refuse_lo, g_refuse_hi;   /* radio silently ignores 
 static volatile int g_sets, g_no_data_mode, g_mode_sets;
 static char g_mode[16] = "USB";
 static int g_pb = 2400;
-static volatile int g_qmx_sim;      /* 1: bandwidth like a QMX - 3200 Hz only in RTTY (its Digi, MD6), 2700 otherwise
-                                       2: a QMX whose PKTUSB already is Digi (3200) */
+static volatile int g_qmx_sim;      /* >0: a QMX whose SSB "Filter RX" is this many Hz (it ignores the passband asked for) */
 static int g_lsock;
 
 static void *fake_rigctld(void *arg)
@@ -57,7 +56,7 @@ static void *fake_rigctld(void *arg)
                     if (g_no_data_mode && !strncmp(m, "PKT", 3)) snprintf(out, sizeof out, "set_mode:\nRPRT -11\n");   /* like a G90 */
                     else {
                         snprintf(g_mode, sizeof g_mode, "%s", m);
-                        if (g_qmx_sim) g_pb = (!strcmp(m, "RTTY") || (g_qmx_sim == 2 && !strcmp(m, "PKTUSB"))) ? 3200 : 2700;
+                        if (g_qmx_sim) g_pb = g_qmx_sim;
                         else if (pb) g_pb = pb;
                         snprintf(out, sizeof out, "set_mode:\nRPRT 0\n");
                     }
@@ -112,7 +111,7 @@ int main(void)
     app_set_mode(&a, MODE_FT8);
     CHECK(g_vfo == 7074000, "then 40m FT8 7.074 as before (vfo %lld)", g_vfo);
 
-    CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "on connect: radio in PKTUSB (USB-D), 3 kHz (mode %s, %d Hz)", g_mode, g_pb);
+    CHECK(!strcmp(g_mode, "USB") && g_pb == 3200, "on connect: QMX in USB, asked for 3.2 kHz (mode %s, %d Hz)", g_mode, g_pb);
 
     printf("[2] mode change retunes\n");
     app_set_mode(&a, MODE_JS8);
@@ -206,16 +205,18 @@ int main(void)
     {
         op_mode_t ms[] = {MODE_FT8, MODE_FT4, MODE_JS8, MODE_WSPR};
         int all = 1;
+        const char *dm = a.radio->data_mode;               /* PKTUSB; plain USB on the QMX */
+        int wpb = a.radio->qmx_ssb ? 3200 : 3000;
         for (int k = 0; k < 4; ++k) {
-            snprintf(g_mode, sizeof g_mode, "USB");          /* operator changed it on the radio */
+            snprintf(g_mode, sizeof g_mode, "LSB");          /* operator changed it on the radio */
             app_set_mode(&a, ms[k]);
-            all &= !strcmp(g_mode, "PKTUSB") && g_pb == 3000;
+            all &= !strcmp(g_mode, dm) && g_pb == wpb;
         }
-        CHECK(all, "FT8, FT4, JS8, WSPR each put the radio back in PKTUSB 3 kHz");
+        CHECK(all, "FT8, FT4, JS8, WSPR each put the radio back in %s %d Hz", dm, wpb);
         a.cfg.auto_qsy = 0;
-        snprintf(g_mode, sizeof g_mode, "USB");
+        snprintf(g_mode, sizeof g_mode, "LSB");
         app_set_mode(&a, MODE_FT8);
-        CHECK(!strcmp(g_mode, "PKTUSB"), "auto frequency off: VFO left alone but still PKTUSB");
+        CHECK(!strcmp(g_mode, dm), "auto frequency off: VFO left alone but still %s", dm);
         a.cfg.auto_qsy = 1;
     }
 
@@ -315,37 +316,40 @@ int main(void)
 
     app_stop_threads(&a);
     unlink(cfg);
-    printf("[14] QMX: Digi mode (3.2 kHz) through CAT, radio changes\n");
+    printf("[14] QMX: USB (SSB) mode, 3.2 kHz filter, radio changes\n");
     {
         a.tx_active = 0;
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
         a.tx_active = 0;
-        g_qmx_sim = 1;                                   /* Hamlib's PKTUSB isn't the QMX's Digi here */
+        g_qmx_sim = 2700;                                /* QMX with the default 2.7 kHz SSB filter */
         app_use_radio(&a, "qmxmid");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
-        CHECK(!strcmp(g_mode, "RTTY") && g_pb == 3200, "QMX: PKTUSB gave 2700 Hz, so Digi via RTTY/MD6: %s %d Hz", g_mode, g_pb);
-        int ms0 = g_mode_sets;
+        CHECK(!strcmp(g_mode, "USB"), "QMX put in USB (SSB) mode, not Digi (%s)", g_mode);
+        CHECK(strstr(a.status, "Filter RX 3200") != NULL, "2.7 kHz filter reported: says to set Filter RX 3200: \"%s\"", a.status);
         struct timespec t0, t1;
         clock_gettime(CLOCK_MONOTONIC, &t0);
         app_set_band(&a, 3);
         clock_gettime(CLOCK_MONOTONIC, &t1);
         double ms = (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
-        CHECK(!strcmp(g_mode, "RTTY") && g_mode_sets - ms0 <= 2 && ms < 500, "band change: straight to RTTY (remembered), %.0f ms", ms);
-        g_qmx_sim = 2;                                   /* a QMX / Hamlib where PKTUSB is Digi */
+        CHECK(!strcmp(g_mode, "USB") && ms < 500, "band change: still USB, %.0f ms", ms);
+        g_qmx_sim = 3200;                                /* Filter RX set to 3200 on the radio */
         app_use_radio(&a, "qmxhigh");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        a.status[0] = 0;
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
-        CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3200, "PKTUSB already 3200 Hz: stays PKTUSB (%s %d)", g_mode, g_pb);
+        CHECK(!strcmp(g_mode, "USB") && g_pb == 3200 && !strstr(a.status, "Filter RX"), "Filter RX 3200: no hint (%s %d)", g_mode, g_pb);
         g_qmx_sim = 0;
         /* changing radio: a pinned CAT port goes back to auto; the QMX gets 100% TX audio */
         snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/serial/by-id/usb-1a86_USB_Dual_Serial-if02");
         a.cfg.tx_level = 0.5f;
         app_use_radio(&a, "x6200");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
         CHECK(a.cfg.rig_device[0] == 0, "radio changed: pinned CAT port reset to auto");
+        CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "X6200 still gets PKTUSB (USB-D) 3 kHz (%s %d)", g_mode, g_pb);
         CHECK(fabsf(a.cfg.tx_level - 0.5f) < 1e-6, "X6200: TX audio level left alone (%.2f)", a.cfg.tx_level);
         app_use_radio(&a, "qmx");
         CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX selected: TX audio level 100%% (%.2f)", a.cfg.tx_level);
@@ -358,7 +362,7 @@ int main(void)
         for (int i = 0; i < 3; ++i) {
             app_use_radio(&a, qv[i].id);
             for (int k = 0; k < 60 && a.rig_busy; ++k) wait_s(0.1);
-            okv &= (a.band_mask == qv[i].want) && fabsf(a.cfg.tx_level - 1.0f) < 1e-6 && a.radio->digi_md6;
+            okv &= (a.band_mask == qv[i].want) && fabsf(a.cfg.tx_level - 1.0f) < 1e-6 && a.radio->qmx_ssb;
         }
         CHECK(okv, "QMX 80-20m / 60-15m / 20-10m: each offers only its own bands, 100%% TX audio, Digi mode");
         app_use_radio(&a, "qmxplus");

@@ -257,45 +257,31 @@ static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
  * passband the radio accepts on radios without a data mode (e.g. the G90).
  * The working choice is remembered. This is the rule for every radio. */
 static char g_rig_mode[16];
-/* QMX / QMX+: its digital mode is "Digi" (CAT MD6), for which it reports a
- * 3.2 kHz bandwidth; USB is its voice mode. Hamlib's get_mode reads that
- * bandwidth back as the passband, so: PKTUSB first; if the radio doesn't then
- * report >= 3 kHz, try Hamlib's RTTY (Kenwood MD6 = the QMX's Digi) and keep
- * whichever gives the full bandwidth for this connection. Two quick commands
- * per change (set + read back), no raw CAT (which rigctld didn't pass through). */
-static void qmx_digi(app_t *a)
+/* QMX / QMX+: digital modes run in the QMX's USB (SSB) mode - in its Digi
+ * mode FT8 didn't decode on the owner's radio. Ask for USB at 3200 Hz and
+ * read back what the radio reports; its SSB receive filter ("Filter RX",
+ * default 2700 Hz, choices 2500/2700/2900/3200) is a QMX menu setting that
+ * CAT through rigctld can't change, so if it reports less, say how to set it. */
+static void qmx_usb(app_t *a)
 {
-    const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
     char got[24] = "";
     int pb = 0;
-    if (rig_set_mode(want, 3000)) rig_set_mode(want, 0);
+    if (rig_set_mode("USB", 3200)) rig_set_mode("USB", 0);
     rig_get_mode(got, sizeof got, &pb);
-    if (pb >= 3000) {
-        if (!a->qmx_digi_logged) qlog("rig", "%s: mode %s, bandwidth %d Hz (Digi)", a->radio->name, want, pb);
-        a->qmx_digi_logged = 1;
-        snprintf(g_rig_mode, sizeof g_rig_mode, "%s", want);
-        return;
-    }
-    if (strcmp(want, "RTTY")) {
-        int pb2 = 0;
-        char got2[24] = "";
-        if (rig_set_mode("RTTY", 0) == 0 && rig_get_mode(got2, sizeof got2, &pb2) == 0 && pb2 >= 3000) {
-            qlog("rig", "%s: %s gave %d Hz; RTTY (the QMX's Digi mode) gives %d Hz: using it", a->radio->name, want, pb, pb2);
-            a->qmx_digi_logged = 1;
-            snprintf(g_rig_mode, sizeof g_rig_mode, "RTTY");
-            return;
-        }
-        rig_set_mode(want, 0);                           /* neither: back to the data mode */
-    }
-    if (!a->qmx_digi_logged) qlog("rig", "%s: mode %s, bandwidth %d Hz (not the 3.2 kHz Digi mode: set Digi on the radio)", a->radio->name, want, pb);
-    a->qmx_digi_logged = 1;
-    snprintf(g_rig_mode, sizeof g_rig_mode, "%s", want);
+    snprintf(g_rig_mode, sizeof g_rig_mode, "USB");
+    if (a->qmx_logged) return;
+    a->qmx_logged = 1;
+    if (pb > 0 && pb < 3200) {
+        qlog("rig", "%s: USB mode, bandwidth %d Hz: set the QMX's SSB menu > Filter RX to 3200 Hz for the full passband", a->radio->name, pb);
+        snprintf(a->rig_hint, sizeof a->rig_hint, "Set QMX SSB > Filter RX 3200 Hz (now %d)", pb);
+        app_status(a, "%s", a->rig_hint);
+    } else qlog("rig", "%s: USB mode, radio reports %s%d Hz", a->radio->name, pb ? "" : "bandwidth ", pb);
 }
 
 static void set_data_mode(app_t *a)
 {
     if (!(g_hw && a->rig_ok)) return;
-    if (a->radio->digi_md6) { qmx_digi(a); return; }     /* QMX: whichever mode gives its 3.2 kHz Digi */
+    if (a->radio->qmx_ssb) { qmx_usb(a); return; }       /* QMX: USB (SSB) mode, 3.2 kHz filter */
     const char *want = g_rig_mode[0] ? g_rig_mode : a->radio->data_mode;
     char got[24] = "";
     int rc = rig_set_mode(want, 3000);
@@ -617,7 +603,8 @@ static void rig_connect(app_t *a)
     a->rig_ok = 1;
     qlog("rig", "online, VFO %.6f MHz", f / 1e6);
     g_rig_mode[0] = 0;
-    a->qmx_digi_logged = 0;
+    a->qmx_logged = 0;
+    a->rig_hint[0] = 0;
     set_data_mode(a);
     a->dirty = 1;
 }
@@ -727,7 +714,8 @@ static void *rig_reconnect_thread(void *arg)
     rig_connect(a);
     if (a->rig_ok) {
         app_set_mode(a, a->mode);                        /* tunes (auto QSY) and sets USB */
-        app_status(a, "%s online", a->radio->name);
+        if (a->rig_hint[0]) app_status(a, "%s online. %s", a->radio->name, a->rig_hint);
+        else app_status(a, "%s online", a->radio->name);
     }
     a->rig_busy = 0;
     a->dirty = 1;

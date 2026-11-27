@@ -5,6 +5,11 @@
  * Hamlib model numbers (RIG_MAKE_MODEL(mfg, n) = mfg*1000 + n):
  *   Yaesu FT-891      1036   Kenwood TS-480 2028   QRP Labs QMX 2057
  *   Xiegu X6100       3087   Xiegu G90      3088   Xiegu X6200  3091
+ * QMX / QMX+ data_mode is plain "USB" on purpose: on the owner's QMX
+ * (firmware 1_04), FT8 decodes only with the radio in its USB (SSB) mode,
+ * not in its Digi mode, so the CLAUDE.md "USB only if PKTUSB misbehaves"
+ * exception applies. For the full passband the QMX's SSB menu "Filter RX"
+ * must be 3200 Hz (default 2700); see qmx_usb() in core/app.c.
  * Band coverage: the QMX comes in three hardware versions with different
  * filters - 80-20 m, 60-15 m and 20-10 m - that look the same over CAT (it
  * would happily tune a band it has no filters for), so each is its own entry;
@@ -21,19 +26,19 @@
  */
 static const radio_profile_t k_radios[] = {
     {"qmx", "QRP Labs QMX 80-20m", 2057, 2028, 115200, PTT_CAT,
-     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_LOW,
-     "QMX 80/60/40/30/20 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%: the QMX keys up only above 80% audio.",
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "USB", 5.0f, BANDS_QMX_LOW,
+     "QMX 80/60/40/30/20 m version. Single USB cable: CAT + audio. USB mode with SSB Filter RX 3200 Hz; TX audio 100%: the QMX keys up only above 80% audio.",
      1.0f, 1},
     {"qmxmid", "QRP Labs QMX 60-15m", 2057, 2028, 115200, PTT_CAT,
-     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_MID,
-     "QMX 60/40/30/20/17/15 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%.",
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "USB", 5.0f, BANDS_QMX_MID,
+     "QMX 60/40/30/20/17/15 m version. Single USB cable: CAT + audio. USB mode with SSB Filter RX 3200 Hz; TX audio 100%.",
      1.0f, 1},
     {"qmxhigh", "QRP Labs QMX 20-10m", 2057, 2028, 115200, PTT_CAT,
-     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_QMX_HIGH,
-     "QMX 20/17/15/12/11/10 m version. Single USB cable: CAT + audio. Digi mode (3.2 kHz); TX audio 100%.",
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "USB", 5.0f, BANDS_QMX_HIGH,
+     "QMX 20/17/15/12/11/10 m version. Single USB cable: CAT + audio. USB mode with SSB Filter RX 3200 Hz; TX audio 100%.",
      1.0f, 1},
     {"qmxplus", "QRP Labs QMX+", 2057, 2028, 115200, PTT_CAT,
-     "QMX", "/dev/ttyACM0", "QMX|QRP", "PKTUSB", 5.0f, BANDS_ALL,
+     "QMX", "/dev/ttyACM0", "QMX|QRP", "USB", 5.0f, BANDS_ALL,
      "Same CAT/audio as QMX. 160-6 m band coverage.", 0, 1},
     {"g90", "Xiegu G90 + Digirig", 3088, 0, 19200, PTT_CAT,
      "CP210", "/dev/ttyUSB0", "Device|C-Media|USB Audio", "PKTUSB", 20.0f, BANDS_NO6,
