@@ -311,6 +311,22 @@ int main(void)
     CHECK(audio_pick_channel(0.0, 1.0) == 1, "audio only on the right -> right");
     CHECK(audio_pick_channel(1.0, 1.5) == 0, "right only slightly stronger -> stays left");
 
+    printf("[9] tune carrier length\n");
+    {
+        static app_t t;
+        app_init(&t, "/nonexistent", 0);
+        snprintf(t.input, sizeof t.input, "/tune"); app_submit_input(&t);
+        CHECK(t.tune_secs == 10.0 && t.ntxq == 1 && t.txq[0].kind == TXK_TUNE, "/tune (and ctrl+U, Setup, Tools): 10 s");
+        snprintf(t.input, sizeof t.input, "/tune 3"); app_submit_input(&t);
+        CHECK(t.tune_secs == 3.0, "/tune 3: 3 s");
+        snprintf(t.input, sizeof t.input, "/tune 45"); app_submit_input(&t);
+        CHECK(t.tune_secs == 30.0, "/tune 45: capped at 30 s");
+        keyev_t u = {K_CHAR, 'u', MOD_CTRL};
+        ui_key(&t, &u);
+        CHECK(t.tune_secs == 10.0, "ctrl+U: 10 s");
+        t.ntxq = 0;
+    }
+
     printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
     return fails != 0;
 }

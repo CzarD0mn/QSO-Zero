@@ -518,7 +518,7 @@ static const char *k_menu_names[MI_COUNT] = {
     [MI_WRX] = "WSPR receive", [MI_WPWR] = "WSPR power", [MI_WPCT] = "WSPR TX %",
     [MI_BAND] = "Band", [MI_QSY] = "Auto frequency", [MI_CALL] = "Callsign", [MI_GRID] = "Grid",
     [MI_RADIO] = "Radio", [MI_PORT] = "CAT port", [MI_AIN] = "Audio in", [MI_AINLVL] = "  In level", [MI_AINMETER] = "  In signal", [MI_AOUT] = "Audio out", [MI_AOUTLVL] = "  Out level", [MI_ARESCAN] = "Rescan audio",
-    [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_TUNE] = "Tune 5 s",
+    [MI_TXL] = "TX audio level", [MI_AGRID] = "Grid from GPS", [MI_TUNE] = "Tune 10 s",
     [MI_SAVE] = "Save settings", [MI_QUIT] = "Quit"};
 
 /* Live receive-audio peak under "In level": green up to 70 %, yellow to
@@ -687,7 +687,7 @@ static void render_tools(app_t *a, surface_t *s, int big)
         if (home && !strncmp(log_path(), home, strlen(home))) snprintf(b, sizeof b, "log: ~%s", log_path() + strlen(home));
         gfx_text_n(s, 4, y, b, s->w / FONT_W - 1, C_DIM, 1); y += 10;
     }
-    gfx_text(s, 4, y, "U tune 5s   W WSPR beacon   X halt TX   +/- TX level", C_CYAN, 1);
+    gfx_text(s, 4, y, "U tune 10s  W WSPR beacon   X halt TX   +/- TX level", C_CYAN, 1);
 }
 
 static void render_help(app_t *a, surface_t *s)
@@ -958,7 +958,7 @@ static void menu_enter(app_t *a)
     case MI_GRID: snprintf(a->input, sizeof a->input, "/grid "); a->input_len = 6; a->screen = 0; break;
     case MI_INFO: snprintf(a->input, sizeof a->input, "/info "); a->input_len = 6; a->screen = 0; break;
     case MI_STATUS: snprintf(a->input, sizeof a->input, "/status "); a->input_len = 8; a->screen = 0; break;
-    case MI_TUNE: a->screen = 0; app_tune(a, 5); break;
+    case MI_TUNE: a->screen = 0; app_tune(a, TUNE_SECONDS); break;
     case MI_ARESCAN: app_rescan_audio(a); break;
     case MI_CQMOD: snprintf(a->input, sizeof a->input, "/cqmod "); a->input_len = 7; a->screen = 0; break;
     case MI_APRS: break;
@@ -993,7 +993,7 @@ void ui_key(app_t *a, const keyev_t *k)
         switch (k->ch) {
         case 'x': app_halt_tx(a); return;
         case 't': a->screen = a->screen == 2 ? 0 : 2; return;
-        case 'u': app_tune(a, 5); return;
+        case 'u': app_tune(a, TUNE_SECONDS); return;
         case 'w': if (a->mode != MODE_WSPR) app_set_mode(a, MODE_WSPR); app_toggle_wspr(a); return;
         case 'q': app_call_cq(a); return;
         case 'e': app_send_heartbeat(a); return;
@@ -1021,7 +1021,7 @@ void ui_key(app_t *a, const keyev_t *k)
         if (k->key == K_ESC) a->screen = 0;
         else if (k->key == K_CHAR) {
             switch (k->ch) {
-            case 'u': case 'U': app_tune(a, 5); break;
+            case 'u': case 'U': app_tune(a, TUNE_SECONDS); break;
             case 'w': case 'W': if (a->mode != MODE_WSPR) app_set_mode(a, MODE_WSPR); app_toggle_wspr(a); break;
             case 'x': case 'X': app_halt_tx(a); break;
             case '+': case '=': a->cfg.tx_level = (float)fmin(1.0, a->cfg.tx_level + 0.05); break;

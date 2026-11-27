@@ -1242,7 +1242,7 @@ static float *build_audio(app_t *a, const txitem_t *t, size_t *n)
         float wf = f0 < 1410 ? 1410 : f0 > 1590 ? 1590 : f0;
         *n = wspr_synth(sym, wf, R, 1.0f, buf);
     } else if (t->kind == TXK_TUNE) {
-        double secs = fmax(0.5, fmin(10.0, a->tune_until - clk_now()));
+        double secs = fmax(0.5, fmin(30.0, a->tune_secs));      /* never more than 30 s (/tune N) */
         *n = (size_t)(secs * R);
         buf = malloc(sizeof(float) * *n);
         for (size_t i = 0; i < *n; ++i) buf[i] = 0.8f * sinf(2 * (float)M_PI * f0 * i / R);
@@ -1444,7 +1444,8 @@ void app_halt_tx(app_t *a)
 void app_tune(app_t *a, double seconds)
 {
     pthread_mutex_lock(&a->lock);
-    a->tune_until = clk_now() + seconds;
+    if (seconds > 30) seconds = 30;
+    a->tune_secs = seconds;
     a->ntxq = 0;
     a->txq[a->ntxq++] = (txitem_t){.kind = TXK_TUNE, .slot_odd = -1};
     pthread_mutex_unlock(&a->lock);
@@ -1544,7 +1545,7 @@ static int handle_command(app_t *a, char *cmd)
     } else if (!strcmp(cmd, "/level")) {
         a->cfg.tx_level = (float)fmax(0.01, fmin(1.0, atof(arg) / 100.0));
         app_status(a, "TX level %.0f%%", a->cfg.tx_level * 100);
-    } else if (!strcmp(cmd, "/tune")) app_tune(a, *arg ? atof(arg) : 5);
+    } else if (!strcmp(cmd, "/tune")) app_tune(a, *arg ? atof(arg) : TUNE_SECONDS);
     else if (!strcmp(cmd, "/cq")) app_call_cq(a);
     else if (!strcmp(cmd, "/hb")) app_send_heartbeat(a);
     else if (!strcmp(cmd, "/wspr")) app_toggle_wspr(a);

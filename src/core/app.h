@@ -35,6 +35,7 @@ typedef struct {
 #define WF_ROWS 120
 #define WF_FMAX 3000.0f
 #define MAX_LINES 200
+#define TUNE_SECONDS 10.0    /* ctrl+U / Setup > Tune / Tools U / plain /tune */
 /* status line ticker: characters that fit on the 320 px screen, scroll speed, pauses */
 #define STATUS_COLS 52
 #define STATUS_SCROLL_CPS 8.0
@@ -106,7 +107,7 @@ typedef struct app {
     int        tx_enabled;    /* master TX enable (Ctrl+X clears) */
     int        wspr_beacon;   /* WSPR: beacon running */
     double     wspr_tx_slot;  /* start of the last slot we transmitted WSPR in */
-    double     tune_until;
+    double     tune_secs;         /* length of the queued tune carrier */
     ft8seq_t   seq;
 
     /* JS8 automation */

@@ -50,7 +50,7 @@ In Setup, move with ↑ / ↓ (fn+F / fn+X) and change values with ← / → (fn
 | 4 | **CAT port** | Leave on **auto**. If the radio isn't found, Enter shows every serial port with what it is. |
 | 5 | **Audio in / Audio out** | Leave on **auto**: it picks the radio's USB sound card. |
 | 6 | **In level** | Use ← / → until the **In signal** bar sits between the two white marks (50–70%) on a busy band. Red means it's clipping. |
-| 7 | **Out level** and **TX audio level** | Start around 50% and adjust so the radio's ALC barely moves when you transmit. **Tune 5 s** sends a carrier you can check with. |
+| 7 | **Out level** and **TX audio level** | Start around 50% and adjust so the radio's ALC barely moves when you transmit. **Tune 10 s** sends a carrier you can check with. |
 | 8 | **Save settings** | Writes everything to `~/.config/qso-zero.conf`. |
 
 Press **esc** to go back to the main screen. QSO-Zero starts in **WSPR on 20 m**, which is a good first check: press **ctrl+W** to start beaconing and look yourself up on wsprnet.org after a few minutes.
@@ -96,7 +96,7 @@ On the Cardputer Zero's keyboard, **fn**, **sym** and **shift** can be held, tap
 | ctrl+R | reply to the selected decode |
 | ctrl+E | JS8 heartbeat |
 | ctrl+W | WSPR beacon on / off (switches to WSPR) |
-| ctrl+U | tune carrier for 5 s |
+| ctrl+U | tune carrier for 10 s |
 | ctrl+X | **halt transmit immediately** and stop any QSO, CQ or beacon |
 | ctrl+T | Tools: GPS/time, radio, battery, audio and network status |
 
@@ -110,7 +110,7 @@ On the Cardputer Zero's keyboard, **fn**, **sym** and **shift** can be held, tap
 | R (in a port or sound card list) | look again for devices |
 | esc | back |
 
-In **Tools**, U tunes for 5 s, W toggles the WSPR beacon, X halts TX, and + / − change the TX audio level.
+In **Tools**, U tunes for 10 s, W toggles the WSPR beacon, X halts TX, and + / − change the TX audio level.
 
 ---
 
@@ -143,7 +143,7 @@ Anything you type on the main screen is sent as a message in the current mode, *
 | `/rx`, `/tx` | `/rx 1500` | set the RX or TX audio offset in Hz |
 | `/level` | `/level 40` | QSO-Zero's TX audio drive, in % |
 | `/inlevel`, `/outlevel` | `/inlevel 45` | the sound card's receive / transmit level, in % |
-| `/tune` | `/tune 5` | send a tune carrier for that many seconds |
+| `/tune` | `/tune 5` | send a tune carrier for that many seconds (up to 30; plain `/tune` is 10) |
 | `/port` | `/port /dev/ttyACM1` | CAT port (`/port auto` to go back to automatic) |
 | `/ain`, `/aout` | `/ain plughw:CARD=Device,DEV=0` | sound card for receive / transmit (`auto` for automatic) |
 | `/rescan` | `/rescan` | look for sound cards again and reconnect |
