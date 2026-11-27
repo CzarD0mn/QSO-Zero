@@ -206,6 +206,17 @@ Then add the radio's `/dev/serial/by-id` names and `/proc/asound` listing to `te
 
 `qso-zero --bench` times every decoder on the device itself. On the Cardputer Zero, an FT8 decode of a busy band takes about 400 ms.
 
+## Radios tested on the air
+
+These radios have been tested successfully with QSO-Zero on a Cardputer Zero:
+
+| Radio | Tested |
+|---|---|
+| Xiegu X6200 | CAT control, USB audio receive and transmit, FT8 and WSPR decoding, auto-sequenced FT8 contacts |
+| QRP Labs QMX | CAT control, USB audio receive and transmit (into a dummy load), FT8 decoding in USB mode |
+
+The other radios in the [supported list](#supported-radios) are set up from their documentation but haven't been tried yet. Reports are welcome: send the output of `qso-zero-setup --log all` with any problem.
+
 ## Known limits
 
 * No PSKReporter upload yet (WSPR spots go to wsprnet).
