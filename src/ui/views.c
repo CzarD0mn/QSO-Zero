@@ -222,7 +222,18 @@ static void draw_input(app_t *a, surface_t *s, int x, int y, int w)
             gfx_text_n(s, xx + 8, y + 2, hint, cols - 3, C_FAINT, 1);
         }
     } else {
-        gfx_text_n(s, x + 2, y + 2, a->status, cols + 2, C_SUN, 1);
+        /* too long for the line: scroll it like a news ticker - hold the start,
+         * move along one character at a time, hold the end, then start over */
+        int fit = cols + 2, len = (int)strlen(a->status), off = 0;
+        if (len > fit) {
+            int over = len - fit;
+            double cycle = 2 * STATUS_PAUSE_S + over / STATUS_SCROLL_CPS;
+            double t = fmod(clk_mono() - a->status_t0, cycle);
+            off = t < STATUS_PAUSE_S ? 0 : (int)((t - STATUS_PAUSE_S) * STATUS_SCROLL_CPS);
+            if (off > over) off = over;
+            a->dirty = 1;                                    /* keep redrawing while it moves */
+        }
+        gfx_text_n(s, x + 2, y + 2, a->status + off, fit, C_SUN, 1);
     }
 }
 

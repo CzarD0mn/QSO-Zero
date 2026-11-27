@@ -133,7 +133,11 @@ void app_status(app_t *a, const char *fmt, ...)
     vsnprintf(a->status, sizeof a->status, fmt, ap);
     va_end(ap);
     qlog("status", "%s", a->status);
-    a->status_until = clk_mono() + 6.0;
+    /* long messages scroll across the status line (see draw_input): keep them
+     * up long enough to be read in full - pause, scroll, pause at the end */
+    int over = (int)strlen(a->status) - STATUS_COLS;
+    a->status_t0 = clk_mono();
+    a->status_until = a->status_t0 + (over > 0 ? fmax(6.0, 2 * STATUS_PAUSE_S + over / STATUS_SCROLL_CPS + 1.0) : 6.0);
     a->dirty = 1;
 }
 

@@ -35,6 +35,10 @@ typedef struct {
 #define WF_ROWS 120
 #define WF_FMAX 3000.0f
 #define MAX_LINES 200
+/* status line ticker: characters that fit on the 320 px screen, scroll speed, pauses */
+#define STATUS_COLS 52
+#define STATUS_SCROLL_CPS 8.0
+#define STATUS_PAUSE_S 1.5
 #define MAX_TXQ 32
 
 typedef enum { TXK_NONE, TXK_FT8, TXK_JS8, TXK_WSPR, TXK_TUNE } tx_kind_t;
@@ -119,6 +123,7 @@ typedef struct app {
     mixer_level_t mix_in, mix_out;                    /* their sound card levels */
     char       status[96];
     double     status_until;
+    double     status_t0;         /* when the status was set (the status line scrolls long ones) */
     float      swr, power;
     int        decoding;
     double     last_decode_ms;
