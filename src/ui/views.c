@@ -731,6 +731,37 @@ static void draw_exit_toast(app_t *a, surface_t *s)
     gfx_hgrad(s, x + 8 * sc, y + 15 * sc, (int)((w - 16 * sc) * f), 3 * sc, C_PURPLE, C_MAGENTA);
 }
 
+/* Pop-up box over the current screen: a flashing border, the text wrapped
+ * inside, gone after notice_until or one press of esc. */
+static void draw_notice(app_t *a, surface_t *s)
+{
+    double now = clk_mono();
+    if (!a->notice[0] || now > a->notice_until) { a->notice[0] = 0; return; }
+    int sc = s->w >= LARGE_W ? 2 : 1;
+    int w = s->w - 24 * sc, room = (w - 12 * sc) / (FONT_W * sc);
+    int rows = wrap_rows(a->notice, room, 8);
+    int h = (rows + 1) * FONT_H * sc + 16 * sc;           /* + a title row with the countdown */
+    int x = (s->w - w) / 2, y = (s->h - h) / 2;
+    uint16_t edge = ((int)(now * 2)) & 1 ? C_SUN : C_MAGENTA;          /* flashes twice a second */
+    gfx_fill(s, x - 2 * sc, y - 2 * sc, w + 4 * sc, h + 4 * sc, edge);
+    gfx_fill(s, x, y, w, h, C_PANEL);
+    int left = (int)(a->notice_until - now + 0.99);
+    char tag[16];
+    snprintf(tag, sizeof tag, "%ds", left);
+    gfx_text(s, x + 6 * sc, y + 5 * sc, "SET ON THE RADIO", C_SUN, sc);
+    gfx_text(s, x + w - gfx_text_w(tag, sc) - 6 * sc, y + 5 * sc, tag, C_FAINT, sc);
+    const char *t = a->notice;
+    int yy = y + 9 * sc + FONT_H * sc;
+    for (int r = 0; r < rows && *t; ++r) {
+        int n = wrap_len(t, room);
+        gfx_text_n(s, x + 6 * sc, yy, t, n, C_TEXT, sc);
+        t += n;
+        while (*t == ' ') ++t;
+        yy += FONT_H * sc;
+    }
+    a->dirty = 1;                                                       /* keep flashing and counting down */
+}
+
 void ui_render(app_t *a, surface_t *s)
 {
     int big = s->w >= LARGE_W;
@@ -741,6 +772,7 @@ void ui_render(app_t *a, surface_t *s)
     case 4: render_picker(a, s, big); break;
     default: if (big) render_large_main(a, s); else render_compact_main(a, s);
     }
+    draw_notice(a, s);
     if (a->esc_t0 > 0) draw_exit_toast(a, s);
 }
 
@@ -954,6 +986,7 @@ void ui_key(app_t *a, const keyev_t *k)
     if (k->key == K_ESC_HOLDING) { a->esc_t0 = clk_mono(); return; }
     if (k->key == K_ESC_HOLD) { a->esc_t0 = 0; a->quit = 1; return; }
     if (k->key == K_ESC) a->esc_t0 = 0;
+    if (k->key == K_ESC && a->notice[0] && clk_mono() < a->notice_until) { a->notice[0] = 0; return; }   /* esc closes the pop-up */
     int ctrl = k->mods & MOD_CTRL;
     /* global hot keys */
     if (ctrl && k->key == K_CHAR) {

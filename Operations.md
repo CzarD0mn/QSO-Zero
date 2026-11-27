@@ -349,8 +349,8 @@ With **Auto frequency** on (the default), changing mode or band tunes the radio 
 
 For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz passband (USB-D, U-DIG or DATA-U, depending on the radio) and reads it back to check. A radio without a data mode (such as the G90) gets USB at the widest passband it accepts. You don't need to set the mode on the radio.
 
-**QRP Labs QMX:** QSO-Zero runs the QMX in its **USB** (SSB) mode for all digital modes, because FT8 decoded only in that mode, not in the QMX's Digi mode, in testing. Two settings in the QMX's own **SSB** menu make that work fully. Both are stored in the radio, so they only need setting once:
-* **Filter RX: 3200 Hz** (the default is 2700). This gives the full passband. QSO-Zero asks for 3.2 kHz and reads back what the radio reports; if it's narrower, the status line and log say *Set QMX SSB > Filter RX 3200 Hz*.
+**QRP Labs QMX:** QSO-Zero runs the QMX in its **USB** (SSB) mode for all digital modes, because FT8 decoded only in that mode, not in the QMX's Digi mode, in testing. Some settings in the QMX's own **SSB** menu make that work fully. They're stored in the radio, so they only need setting once, and QSO-Zero can't set them over CAT, so when you choose a QMX in Setup a flashing box reminds you for 30 seconds (esc closes it):
+* **Filter RX and Filter TX: 3200 Hz** (the default is 2700). Filter RX gives the full receive passband, so you see more stations; Filter TX lets the whole transmit audio range through. The QMX doesn't report these over CAT, so QSO-Zero can't check them either.
 * **SSB Input: USB or Auto**, so transmit audio comes from the Cardputer rather than the microphone. (Auto switches to USB audio whenever a transmission is started over CAT, which is how QSO-Zero transmits.)
 
 ### Choosing the radio, port and sound cards

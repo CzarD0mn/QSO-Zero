@@ -12,6 +12,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "core/app.h"
+#include "core/clock.h"
 #include "ui/input.h"
 #include "ui/views.h"
 
@@ -328,7 +329,6 @@ int main(void)
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
         CHECK(!strcmp(g_mode, "USB"), "QMX put in USB (SSB) mode, not Digi (%s)", g_mode);
-        CHECK(strstr(a.status, "Filter RX 3200") != NULL, "2.7 kHz filter reported: says to set Filter RX 3200: \"%s\"", a.status);
         struct timespec t0, t1;
         clock_gettime(CLOCK_MONOTONIC, &t0);
         app_set_band(&a, 3);
@@ -341,8 +341,21 @@ int main(void)
         a.status[0] = 0;
         app_use_radio(&a, "qmx");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
-        CHECK(!strcmp(g_mode, "USB") && g_pb == 3200 && !strstr(a.status, "Filter RX"), "Filter RX 3200: no hint (%s %d)", g_mode, g_pb);
+        CHECK(!strcmp(g_mode, "USB"), "QMX stays in USB (%s)", g_mode);
         g_qmx_sim = 0;
+        /* choosing a QMX: a 30 s pop-up says what to set on the radio; one esc closes it */
+        a.notice[0] = 0;
+        app_use_radio(&a, "x6200");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(!a.notice[0], "X6200: no pop-up");
+        app_use_radio(&a, "qmx");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        double left = a.notice_until - clk_mono();
+        CHECK(strstr(a.notice, "Filter RX and Filter TX to 3200 Hz") && left > 25 && left <= 30, "QMX: pop-up to set Filter RX/TX 3200 Hz, for 30 s (%.0f s left)", left);
+        a.screen = 1;
+        keyev_t esc = {K_ESC, 0, 0};
+        ui_key(&a, &esc);
+        CHECK(!a.notice[0] && a.screen == 1, "one esc closes the pop-up and nothing else (still in Setup)");
         /* changing radio: a pinned CAT port goes back to auto; the QMX gets 100% TX audio */
         snprintf(a.cfg.rig_device, sizeof a.cfg.rig_device, "/dev/serial/by-id/usb-1a86_USB_Dual_Serial-if02");
         a.cfg.tx_level = 0.5f;

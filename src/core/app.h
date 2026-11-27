@@ -78,7 +78,6 @@ typedef struct app {
     int64_t    ghost_hz[11];
     int        aprs_msgno;
     int        qmx_logged;        /* QMX mode/bandwidth logged for this connection */
-    char       rig_hint[80];      /* a setting to change on the radio, shown with "online" */
     batt_state_t batt;        /* battery, polled every 30 s */    /* APRS message number for the {n} ack id */  /* GHOSTNET: where the operator last tuned on each band (0 = net default) */
 
     /* audio ring (12 kHz) with UTC mapping */
@@ -124,6 +123,8 @@ typedef struct app {
     char       status[96];
     double     status_until;
     double     status_t0;         /* when the status was set (the status line scrolls long ones) */
+    char       notice[200];       /* pop-up box over every screen (e.g. QMX settings to make) */
+    double     notice_until;      /* shown until then, or until esc */
     float      swr, power;
     int        decoding;
     double     last_decode_ms;

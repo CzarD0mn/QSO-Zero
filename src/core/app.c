@@ -262,24 +262,16 @@ static void fmt_mhz(int64_t hz, char *out) { sprintf(out, "%.3f", hz / 1e6); }
  * The working choice is remembered. This is the rule for every radio. */
 static char g_rig_mode[16];
 /* QMX / QMX+: digital modes run in the QMX's USB (SSB) mode - in its Digi
- * mode FT8 didn't decode on the owner's radio. Ask for USB at 3200 Hz and
- * read back what the radio reports; its SSB receive filter ("Filter RX",
- * default 2700 Hz, choices 2500/2700/2900/3200) is a QMX menu setting that
- * CAT through rigctld can't change, so if it reports less, say how to set it. */
+ * mode FT8 didn't decode on the owner's radio. The QMX's SSB receive filter
+ * ("Filter RX", default 2700 Hz, up to 3200) is a menu setting on the radio;
+ * CAT doesn't report it (Hamlib hands back the width asked for), so it is
+ * documented as a one-time radio setting rather than checked here. */
 static void qmx_usb(app_t *a)
 {
-    char got[24] = "";
-    int pb = 0;
     if (rig_set_mode("USB", 3200)) rig_set_mode("USB", 0);
-    rig_get_mode(got, sizeof got, &pb);
     snprintf(g_rig_mode, sizeof g_rig_mode, "USB");
-    if (a->qmx_logged) return;
+    if (!a->qmx_logged) qlog("rig", "%s: USB mode (set SSB > Filter RX 3200 Hz on the radio for the full passband)", a->radio->name);
     a->qmx_logged = 1;
-    if (pb > 0 && pb < 3200) {
-        qlog("rig", "%s: USB mode, bandwidth %d Hz: set the QMX's SSB menu > Filter RX to 3200 Hz for the full passband", a->radio->name, pb);
-        snprintf(a->rig_hint, sizeof a->rig_hint, "Set QMX SSB > Filter RX 3200 Hz (now %d)", pb);
-        app_status(a, "%s", a->rig_hint);
-    } else qlog("rig", "%s: USB mode, radio reports %s%d Hz", a->radio->name, pb ? "" : "bandwidth ", pb);
 }
 
 static void set_data_mode(app_t *a)
@@ -608,7 +600,6 @@ static void rig_connect(app_t *a)
     qlog("rig", "online, VFO %.6f MHz", f / 1e6);
     g_rig_mode[0] = 0;
     a->qmx_logged = 0;
-    a->rig_hint[0] = 0;
     set_data_mode(a);
     a->dirty = 1;
 }
@@ -718,8 +709,7 @@ static void *rig_reconnect_thread(void *arg)
     rig_connect(a);
     if (a->rig_ok) {
         app_set_mode(a, a->mode);                        /* tunes (auto QSY) and sets USB */
-        if (a->rig_hint[0]) app_status(a, "%s online. %s", a->radio->name, a->rig_hint);
-        else app_status(a, "%s online", a->radio->name);
+        app_status(a, "%s online", a->radio->name);
     }
     a->rig_busy = 0;
     a->dirty = 1;
@@ -758,6 +748,13 @@ void app_use_radio(app_t *a, const char *id)
     if (changed && a->cfg.rig_device[0]) {               /* a CAT port pinned for the old radio: back to auto */
         qlog("rig", "radio changed to %s: CAT port %s -> auto", r->name, a->cfg.rig_device);
         a->cfg.rig_device[0] = 0;
+    }
+    if (r->qmx_ssb) {                                    /* settings only the operator can make on the radio */
+        snprintf(a->notice, sizeof a->notice,
+                 "On the QMX, set SSB menu > Filter RX and Filter TX to 3200 Hz, and SSB Input to USB or Auto. "
+                 "QSO-Zero can't set these over CAT. (esc closes this)");
+        a->notice_until = clk_mono() + 30.0;
+        qlog("rig", "%s chosen: reminder shown to set SSB Filter RX/TX 3200 Hz and SSB Input USB/Auto on the radio", r->name);
     }
     if (changed && r->tx_level > 0) {
         a->cfg.tx_level = r->tx_level;
