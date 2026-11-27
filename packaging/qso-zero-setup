@@ -3,6 +3,8 @@
 #   qso-zero-setup           create ~/.config/qso-zero.conf and fix group membership
 #   qso-zero-setup --check   print what QSO-Zero will find on this machine (no changes)
 #   qso-zero-setup --log     show QSO-Zero's activity log (--log all: this and the 4 earlier logs kept)
+#   qso-zero-setup --logbook optional: upload QSOs to QRZ Logbook and/or Wavelog
+#   qso-zero-setup --upload [qrz|wavelog]   send the QSOs not uploaded yet (and retry rejected ones)
 set -u
 CONF="${HOME}/.config/qso-zero.conf"
 EXAMPLE=/usr/share/qso-zero/qso-zero.conf.example
@@ -79,6 +81,100 @@ setup() {
     echo "  qso-zero --nohw          try the UI without a radio"
     echo "  qso-zero                 run with radio, audio and GPS"
     echo "  sudo systemctl enable --now qso-zero@$ME    start at boot"
+    echo "  qso-zero-setup --logbook optional: upload QSOs to QRZ Logbook / Wavelog"
+}
+
+# ---- QRZ Logbook / Wavelog uploads (optional) ------------------------------
+LBCONF="${HOME}/.config/qso-zero-logbook.conf"
+lbget() { [ -f "$LBCONF" ] && sed -n "s/^$1 *= *//p" "$LBCONF" | tail -n 1; return 0; }
+masked() { if [ -z "$1" ]; then echo "not set"; else echo "set, ends ...$(printf '%s' "$1" | tail -c 4)"; fi; }
+ask() {   # ask "question" default(Y|N) -> 0 for yes
+    printf '%s [%s]: ' "$1" "$(if [ "$2" = Y ]; then echo Y/n; else echo y/N; fi)"
+    read -r a
+    case "${a:-$2}" in [Yy]*) return 0 ;; *) return 1 ;; esac
+}
+lbwrite() {
+    mkdir -p "${HOME}/.config"
+    ( umask 077
+      { echo "# QSO-Zero logbook uploads - written by qso-zero-setup --logbook"
+        echo "# Keep this file private: it holds your API keys (mode 600)."
+        echo "qrz_api_key = $qrz_key"
+        echo "qrz_upload = $qrz_up"
+        [ -n "$qrz_url" ] && echo "qrz_url = $qrz_url"     # testing only
+        echo "wavelog_url = $wl_url"
+        echo "wavelog_api_key = $wl_key"
+        echo "wavelog_station_id = $wl_st"
+        echo "wavelog_upload = $wl_up"
+      } > "$LBCONF.new" ) && mv "$LBCONF.new" "$LBCONF" && chmod 600 "$LBCONF"
+}
+
+logbook() {
+    command -v qso-zero >/dev/null || { echo "qso-zero is not installed"; exit 1; }
+    echo "QSO-Zero logbook uploads (optional)"
+    echo "  Logged QSOs can go to QRZ Logbook and/or your Wavelog. Your ADIF log"
+    echo "  (~/qso-zero/qso-zero.adi) is only read: it is never changed or deleted."
+    echo "  Press Enter to keep a setting, type - to remove it."
+    qrz_key=$(lbget qrz_api_key); qrz_up=$(lbget qrz_upload); qrz_up=${qrz_up:-1}; qrz_url=$(lbget qrz_url)
+    wl_url=$(lbget wavelog_url); wl_key=$(lbget wavelog_api_key); wl_st=$(lbget wavelog_station_id)
+    wl_up=$(lbget wavelog_upload); wl_up=${wl_up:-1}
+
+    echo
+    echo "QRZ Logbook - needs a QRZ subscription (XML Data or higher)."
+    echo "  API key: qrz.com > My Logbook > Settings > API (the logbook of the callsign you log as)"
+    printf 'QRZ Logbook API key (%s): ' "$(masked "$qrz_key")"; read -r v
+    case "$v" in "") ;; -) qrz_key="" ;; *) qrz_key=$(printf '%s' "$v" | tr -d ' ') ;; esac
+    if [ -n "$qrz_key" ]; then
+        if ask "Upload to QRZ automatically after each QSO?" "$(if [ "$qrz_up" = 1 ]; then echo Y; else echo N; fi)"; then qrz_up=1; else qrz_up=0; fi
+    fi
+
+    echo
+    echo "Wavelog - your own or a hosted Wavelog server."
+    printf 'Wavelog URL, e.g. https://log.example.com (%s): ' "${wl_url:-not set}"; read -r v
+    case "$v" in "") ;; -) wl_url=""; wl_key=""; wl_st="" ;; *) wl_url=$v ;; esac
+    if [ -n "$wl_url" ]; then
+        case "$wl_url" in
+            https://*) ;;
+            http://*) warn "plain http: the API key travels unencrypted - only use this on your own network" ;;
+            *) wl_url="https://$wl_url" ;;
+        esac
+        echo "  API key: in Wavelog, your callsign menu (top right) > API Keys > Create a read+write key"
+        printf 'Wavelog API key (%s): ' "$(masked "$wl_key")"; read -r v
+        case "$v" in "") ;; -) wl_key="" ;; *) wl_key=$(printf '%s' "$v" | tr -d ' ') ;; esac
+        if [ -n "$wl_key" ]; then
+            lbwrite
+            echo "Station locations for this key (* = the one set now):"
+            qso-zero --logbook stations || warn "could not list them - check the URL and the key"
+            printf 'Station location ID to log into (%s): ' "${wl_st:-not set}"; read -r v
+            case "$v" in "") ;; -) wl_st="" ;; *) wl_st=$v ;; esac
+            if ask "Upload to Wavelog automatically after each QSO?" "$(if [ "$wl_up" = 1 ]; then echo Y; else echo N; fi)"; then wl_up=1; else wl_up=0; fi
+        fi
+    fi
+    lbwrite
+    echo
+    echo "Saved $LBCONF (readable only by you)."
+    if [ -z "$qrz_key" ] && { [ -z "$wl_url" ] || [ -z "$wl_key" ] || [ -z "$wl_st" ]; }; then
+        echo "Nothing set up: QSOs are only logged to the ADIF file."
+        return 0
+    fi
+    echo "Checking the settings:"
+    qso-zero --logbook test || warn "fix the setting above and run qso-zero-setup --logbook again"
+    for s in qrz wavelog; do
+        [ "$s" = qrz ] && [ -z "$qrz_key" ] && continue
+        [ "$s" = wavelog ] && { [ -z "$wl_url" ] || [ -z "$wl_key" ] || [ -z "$wl_st" ]; } && continue
+        n=$(qso-zero --logbook count "$s" 2>/dev/null || echo 0)
+        [ "${n:-0}" -gt 0 ] 2>/dev/null || continue
+        echo
+        echo "Your log has $n QSO(s) not sent to $s yet."
+        if ask "Upload them now? (No = treat them as already uploaded; only new QSOs will be sent)" Y; then
+            qso-zero --logbook upload "$s"
+        else
+            qso-zero --logbook mark "$s"
+        fi
+    done
+    echo
+    echo "QSO-Zero picks these settings up by itself (within 5 minutes, or type /upload)."
+    echo "  qso-zero-setup --upload     send anything still waiting, retry rejected QSOs"
+    echo "  qso-zero --logbook status   what has been sent"
 }
 
 showlog() {
@@ -99,6 +195,8 @@ showlog() {
 case "${1:-}" in
     --check|-c) check ;;
     --log|-l) showlog "${2:-}" ;;
+    --logbook) logbook ;;
+    --upload) qso-zero --logbook upload "${2:-all}" ;;
     "") setup ;;
-    *) echo "usage: qso-zero-setup [--check | --log [all]]"; exit 2 ;;
+    *) echo "usage: qso-zero-setup [--check | --log [all] | --logbook | --upload [qrz|wavelog]]"; exit 2 ;;
 esac

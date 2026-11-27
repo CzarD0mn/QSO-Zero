@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "net/logbook.h"
 #include "app.h"
 #include "core/clock.h"
 #include "dsp/js8.h"
@@ -333,4 +334,5 @@ void adif_log(app_t *a, const char *call, const char *grid, const char *mode, in
     fprintf(f, "<eor>\n");
     fclose(f);
     app_status(a, "logged %s", call);
+    logbook_kick();                                      /* QRZ / Wavelog, if set up (the log file is kept) */
 }

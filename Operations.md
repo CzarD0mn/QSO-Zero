@@ -12,6 +12,7 @@ This guide covers setting QSO-Zero up the first time, how commands work, and wha
 * [JS8](#js8)
 * [WSPR](#wspr)
 * [Radio, frequencies and audio](#radio-frequencies-and-audio)
+* [Uploading the log to QRZ and Wavelog](#uploading-the-log-to-qrz-and-wavelog)
 * [Saving settings](#saving-settings)
 * [Logs and troubleshooting](#logs-and-troubleshooting)
 
@@ -29,6 +30,8 @@ qso-zero-setup            # asks for your callsign and radio, writes ~/.config/q
 sudo reboot               # the new groups take effect after a reboot (or log out and back in)
 qso-zero-setup --check    # optional: shows what QSO-Zero will find (screen, keyboard, ports, sound cards)
 ```
+
+Uploading QSOs to QRZ Logbook or Wavelog is optional; set it up any time with `qso-zero-setup --logbook` (see [Uploading the log](#uploading-the-log-to-qrz-and-wavelog)).
 
 The radio names it asks for are `qmx`, `qmxplus`, `g90`, `x6100`, `x6200` and `ft891`. If the settings file already exists, `qso-zero-setup` leaves it alone and only checks the groups.
 
@@ -148,6 +151,7 @@ Anything you type on the main screen is sent as a message in the current mode, *
 | `/ain`, `/aout` | `/ain plughw:CARD=Device,DEV=0` | sound card for receive / transmit (`auto` for automatic) |
 | `/rescan` | `/rescan` | look for sound cards again and reconnect |
 | `/net` | `/net` | check the internet now and send any waiting WSPR spots |
+| `/upload` | `/upload` | upload waiting QSOs to QRZ / Wavelog now and show what has been sent (if set up) |
 | `/save` | `/save` | save settings |
 | `/help` | `/help` | help screen |
 | `/quit` | `/quit` | exit |
@@ -376,6 +380,55 @@ Stereo sound cards such as the QMX's are handled automatically: QSO-Zero records
 
 ---
 
+## Uploading the log to QRZ and Wavelog
+
+Every QSO is written to the ADIF log, `~/qso-zero/qso-zero.adi`. QSO-Zero can also send each QSO to **QRZ Logbook**, to **Wavelog**, or to both. This is optional; without it nothing leaves the Zero.
+
+The ADIF log is only read for uploads. It is never changed or deleted, so it stays a complete record of every contact, including for checking duplicates later.
+
+### Setting it up
+
+Over SSH (the settings are typed, so this is easier from a computer):
+
+```sh
+qso-zero-setup --logbook
+```
+
+It asks for:
+
+* **QRZ Logbook API key.** On qrz.com: *My Logbook › Settings › API*, for the logbook of the callsign you log as. Uploading through the API needs a QRZ subscription (XML Data or higher).
+* **Wavelog URL**, for example `https://log.example.com`. Give only the base address; `/index.php/api/qso` is added for you.
+* **Wavelog API key.** In Wavelog: your callsign menu (top right) › *API Keys* › create a **read+write** key.
+* **Wavelog station location.** The setup lists the station locations that key can see; pick the one whose callsign matches yours.
+* For each service, whether to **upload automatically** after every QSO. If you say no, QSOs wait until you run `qso-zero-setup --upload`.
+
+Press Enter to keep a setting, or type `-` to remove it. The setup then checks the keys. If your log already has QSOs, it asks whether to upload them now. Answering **No** marks them as already uploaded, so only new QSOs are sent.
+
+The settings go in `~/.config/qso-zero-logbook.conf`, which only you can read. A running QSO-Zero picks up changes within 5 minutes, or right away with `/upload`.
+
+### How uploads work
+
+* A QSO is uploaded as soon as it's logged. QSOs logged with no internet wait, and are sent on the next try (every 5 minutes, after the next QSO, or with `/upload`).
+* Each service gets each QSO once. What was sent is recorded in `~/qso-zero/uploads/qrz.txt` and `wavelog.txt`, one line per QSO (call, date, time, band, mode, then *sent*, *dupe*, *rejected* or *skipped*).
+* If QRZ or Wavelog already has the QSO, it's recorded as a duplicate and not sent again.
+* A QSO the service **rejects** (for example, Wavelog's station callsign doesn't match) isn't retried automatically. Fix the cause, then run `qso-zero-setup --upload` to try again.
+* If a key is refused or the server can't be reached, nothing is marked as sent. The QSOs stay waiting, and the reason appears in `/upload` and in the activity log (`[logbook]` lines).
+* The keys only travel over HTTPS, with the server's certificate checked. The exception is a Wavelog URL you give as `http://`, for a server on your own network; the setup warns about it.
+
+### Commands
+
+```sh
+qso-zero-setup --logbook          # set up, change or remove QRZ / Wavelog
+qso-zero-setup --upload           # send everything waiting, and retry rejected QSOs
+qso-zero-setup --upload qrz       # ... only to QRZ (or: wavelog)
+qso-zero --logbook status         # per service: QSOs in the log, waiting, rejected
+qso-zero --logbook test           # check the keys (and the Wavelog station location)
+qso-zero --logbook stations       # list the Wavelog station locations for your key
+qso-zero --logbook mark qrz       # treat every QSO now in the log as already uploaded
+```
+
+---
+
 ## Saving settings
 
 **Save settings** (or `/save`) writes `~/.config/qso-zero.conf`. That covers your callsign, grid, radio, ports and sound cards, levels, CQ modifier, CQ-only filter, WSPR power and TX %, JS8 auto-reply settings, GHOSTNET and Auto frequency. Changes you don't save last until you exit.
@@ -392,6 +445,7 @@ qso-zero-setup --log all    # all 5 kept logs, oldest first
 qso-zero-setup --check      # what QSO-Zero finds: screen, keyboard, ports, sound cards, permissions
 qso-zero --nohw             # run without radio, audio or GPS
 qso-zero --bench            # time the decoders on this device
+qso-zero --logbook status   # QRZ / Wavelog: what has been uploaded and what is waiting
 ```
 
 The activity log (`~/.cache/qso-zero/qso-zero.log`) records the radio connection, each frequency and mode change, the sound cards, every transmission, every decode cycle (`[decode]`) and every step of an FT8/FT4 QSO (`[seq]`, including why a message was ignored). Once a minute it adds a health line. Only the 5 newest logs are kept, at most 1 MB each.

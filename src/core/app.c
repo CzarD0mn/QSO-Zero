@@ -20,6 +20,7 @@
 #include "dsp/wspr.h"
 #include "dsp/wsprrx.h"
 #include "net/uplink.h"
+#include "net/logbook.h"
 #include "fft/kiss_fftr.h"
 #include "gps/gps.h"
 #include "rig/rigctl.h"
@@ -846,6 +847,7 @@ int app_init(app_t *a, const char *cfgpath, int hw)
         audio_connect(a);
         a->gps_ok = gps_start(a->cfg.gps_device, a->cfg.gps_baud, a->cfg.gps_latency_ms) == 0;
         if (a->cfg.wsprnet_upload) uplink_start(a->cfg.wsprnet_host, 443, 80, my_call, my_grid);
+        logbook_start(logbook_conf_path(), a->cfg.log_path);   /* QRZ / Wavelog, only if set up */
     }
     /* Start in WSPR on 20 m: in the field you spot yourself first (beacon
      * with Ctrl+W, check wsprnet / the band) before calling anyone. With
@@ -871,6 +873,7 @@ void app_shutdown(app_t *a)
     app_stop_threads(a);
     if (g_hw) {
         uplink_stop();
+        logbook_stop();
         rig_close();
         audio_close();
         gps_stop();
@@ -1562,6 +1565,20 @@ static int handle_command(app_t *a, char *cmd)
         uplink_check_now();
         app_status(a, "wsprnet: %s, sent %d (https %d) dropped %d - checking now", u.online ? "online" : "offline",
                    u.sent_https + u.sent_http, u.sent_https, u.dropped);
+    }
+    else if (!strcmp(cmd, "/upload") || !strcmp(cmd, "/logbook")) {
+        lb_stats_t s;
+        logbook_get(&s);
+        logbook_kick();
+        if (!s.configured[LB_QRZ] && !s.configured[LB_WAVELOG]) app_status(a, "QRZ / Wavelog uploads not set up: ssh in and run qso-zero-setup --logbook");
+        else {
+            char m[200] = "";
+            for (int i = 0; i < LB_N; ++i)
+                if (s.configured[i])
+                    snprintf(m + strlen(m), sizeof m - strlen(m), "%s%s: %d sent, %d waiting%s%s", m[0] ? "  " : "", lb_name(i),
+                             s.sent[i] + s.dupes[i], s.pending[i], s.last_error[i][0] ? " - " : "", s.last_error[i]);
+            app_status(a, "%s - uploading now", m);
+        }
     }
     else if (!strcmp(cmd, "/port")) app_use_rig_device(a, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);

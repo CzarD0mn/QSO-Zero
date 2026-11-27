@@ -8,6 +8,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <time.h>
@@ -138,20 +139,26 @@ static void set_err(const char *m)
     pthread_mutex_unlock(&g_lock);
 }
 
-static int conn_open(conn_t *c, int tls)
+/* open host:port, with TLS (certificate and host name verified) if tls;
+ * err gets a reason on failure */
+static int conn_open_to(conn_t *c, const char *host, int port, int tls, char *err, size_t esz)
 {
+    static pthread_mutex_t tls_lock = PTHREAD_MUTEX_INITIALIZER;   /* wsprnet and logbook threads */
     c->ssl = NULL;
-    c->fd = tcp_connect(g_host, tls ? g_https_port : g_http_port, CONNECT_MS);
-    if (c->fd < 0) { set_err(tls ? "https: no connection" : "http: no connection"); return -1; }
+    c->fd = tcp_connect(host, port, CONNECT_MS);
+    if (c->fd < 0) { snprintf(err, esz, "%s: no connection to %s:%d", tls ? "https" : "http", host, port); return -1; }
     if (!tls) return 0;
-    if (tls_load()) { close(c->fd); set_err("https: libssl not available"); return -1; }
+    pthread_mutex_lock(&tls_lock);
+    int tl = tls_load();
+    pthread_mutex_unlock(&tls_lock);
+    if (tl) { close(c->fd); snprintf(err, esz, "https: libssl not available"); return -1; }
     c->ssl = S.new_(g_ctx);
-    if (!c->ssl) { close(c->fd); return -1; }
+    if (!c->ssl) { close(c->fd); snprintf(err, esz, "https: out of memory"); return -1; }
     S.set_fd(c->ssl, c->fd);
-    S.ctrl(c->ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, g_host);   /* SNI */
-    S.set1_host(c->ssl, g_host);                                                       /* name check */
+    S.ctrl(c->ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, (void *)host);   /* SNI */
+    S.set1_host(c->ssl, host);                                                               /* name check */
     if (S.connect(c->ssl) != 1) {
-        set_err("https: TLS handshake / certificate failed");
+        snprintf(err, esz, "https: TLS handshake / certificate failed for %s", host);
         S.free_(c->ssl);
         close(c->fd);
         c->ssl = NULL;
@@ -160,9 +167,23 @@ static int conn_open(conn_t *c, int tls)
     return 0;
 }
 
+static int conn_open(conn_t *c, int tls)
+{
+    char err[96];
+    int rc = conn_open_to(c, g_host, tls ? g_https_port : g_http_port, tls, err, sizeof err);
+    if (rc) set_err(strstr(err, "TLS") ? "https: TLS handshake / certificate failed" : err);
+    return rc;
+}
+
 static int conn_write(conn_t *c, const char *b, int n)
 {
-    return c->ssl ? S.write(c->ssl, b, n) : (int)send(c->fd, b, n, MSG_NOSIGNAL);
+    int done = 0;
+    while (done < n) {                                   /* send() may write part of a large body */
+        int r = c->ssl ? S.write(c->ssl, b + done, n - done) : (int)send(c->fd, b + done, n - done, MSG_NOSIGNAL);
+        if (r <= 0) return done ? done : r;
+        done += r;
+    }
+    return done;
 }
 
 static int conn_read(conn_t *c, char *b, int n)
@@ -282,6 +303,60 @@ static void *thread_fn(void *arg)
 }
 
 void uplink_set_ca_file(const char *path) { snprintf(g_ca, sizeof g_ca, "%s", path); }
+
+/* One-shot HTTP(S) request to a full URL (http://host[:port]/path or https://...).
+ * No fallback from HTTPS to HTTP: these requests carry API keys. resp gets
+ * the response body (or the error text); *status the HTTP status (0 if none).
+ * body NULL = no body (GET). Returns 0 if a response was received. */
+int net_request(const char *method, const char *url, const char *ctype, const char *ua, const char *body,
+                char *resp, size_t rsz, int *status)
+{
+    *status = 0;
+    if (rsz) resp[0] = 0;
+    int tls;
+    const char *p;
+    if (!strncmp(url, "https://", 8)) { tls = 1; p = url + 8; }
+    else if (!strncmp(url, "http://", 7)) { tls = 0; p = url + 7; }
+    else { snprintf(resp, rsz, "not an http(s) URL: %s", url); return -1; }
+    char host[128];
+    size_t hl = strcspn(p, ":/");
+    if (hl == 0 || hl >= sizeof host) { snprintf(resp, rsz, "bad host in %s", url); return -1; }
+    memcpy(host, p, hl);
+    host[hl] = 0;
+    p += hl;
+    int port = tls ? 443 : 80;
+    if (*p == ':') { port = atoi(p + 1); p += strcspn(p, "/"); }
+    const char *path = *p ? p : "/";
+    conn_t c;
+    if (conn_open_to(&c, host, port, tls, resp, rsz)) return -1;
+    size_t bl = body ? strlen(body) : 0;
+    char hdr[1024], ct[96] = "";
+    if (body) snprintf(ct, sizeof ct, "Content-Type: %s\r\nContent-Length: %zu\r\n", ctype, bl);
+    int hn = snprintf(hdr, sizeof hdr,
+                      "%s %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: %s\r\n%sAccept: application/json, text/plain, */*\r\n"
+                      "Connection: close\r\n\r\n", method, path, host, ua, ct);
+    if (hn >= (int)sizeof hdr) { conn_close(&c); snprintf(resp, rsz, "URL too long"); return -1; }
+    if (conn_write(&c, hdr, hn) != hn || (bl && conn_write(&c, body, (int)bl) != (int)bl)) {
+        conn_close(&c);
+        snprintf(resp, rsz, "%s: sending to %s failed", tls ? "https" : "http", host);
+        return -1;
+    }
+    size_t got = 0;
+    for (;;) {
+        if (got + 1 >= rsz) break;
+        int r = conn_read(&c, resp + got, (int)(rsz - 1 - got));
+        if (r <= 0) break;
+        got += (size_t)r;
+    }
+    resp[got] = 0;
+    conn_close(&c);
+    if (strncmp(resp, "HTTP/", 5)) { snprintf(resp, rsz, "no HTTP response from %s", host); return -1; }
+    *status = atoi(strchr(resp, ' ') ? strchr(resp, ' ') + 1 : "0");
+    char *b = strstr(resp, "\r\n\r\n");
+    if (b) memmove(resp, b + 4, strlen(b + 4) + 1);
+    else resp[0] = 0;
+    return 0;
+}
 
 void uplink_start(const char *host, int https_port, int http_port,
                   const char *(*rcall)(void), const char *(*rgrid)(void))

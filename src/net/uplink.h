@@ -8,6 +8,7 @@
 #ifndef QSOZERO_UPLINK_H
 #define QSOZERO_UPLINK_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define UPLINK_INTERVAL_S 300
@@ -37,6 +38,12 @@ void uplink_stop(void);
 void uplink_add_wspr(const uplink_spot_t *s);
 void uplink_check_now(void);           /* force a check + upload (e.g. /net) */
 void uplink_get(uplink_stats_t *out);
+
+/* One-shot HTTP(S) request (used by the QRZ / Wavelog logbook uploads). HTTPS
+ * is verified; there is no HTTP fallback. resp gets the body or an error text;
+ * body NULL sends no body (GET). Returns 0 when a response came back. */
+int net_request(const char *method, const char *url, const char *ctype, const char *ua, const char *body,
+                char *resp, size_t rsz, int *status);
 
 /* tests only: trust this CA file instead of the system store */
 void uplink_set_ca_file(const char *path);

@@ -708,7 +708,7 @@ static void render_help(app_t *a, surface_t *s)
         "/freq 7.074  /call K1ABC  /grid FN42",
         "/level 40  /pwr 23  /save  /quit",
         "/auto on|off  /hback on|off  /ghost 40|off",
-        "/info TEXT  /status TEXT  /net",
+        "/info TEXT  /status TEXT  /net  /upload",
     };
     gfx_clear(s, C_BG);
     int sc = s->w >= 640 ? 2 : 1;

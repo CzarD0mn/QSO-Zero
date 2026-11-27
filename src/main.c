@@ -10,6 +10,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <unistd.h>
+#include "net/logbook.h"
 #include "core/log.h"
 #include "core/bench.h"
 #include <time.h>
@@ -26,7 +27,8 @@
 
 static void usage(void)
 {
-    fprintf(stderr, "usage: qso-zero [--config FILE] [--fb /dev/fbN|auto] [--nohw] [--version] [--bench]\n");
+    fprintf(stderr, "usage: qso-zero [--config FILE] [--fb /dev/fbN|auto] [--nohw] [--version] [--bench]\n"
+                    "       qso-zero [--config FILE] --logbook status|test|stations|upload|mark [qrz|wavelog|all]\n");
 }
 
 int main(int argc, char **argv)
@@ -39,6 +41,13 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--nohw")) hw = 0;
         else if (!strcmp(argv[i], "--version")) { printf("qso-zero %s\n", QSOZERO_VERSION); return 0; }
         else if (!strcmp(argv[i], "--bench")) return bench_run();
+        else if (!strcmp(argv[i], "--logbook")) {
+            /* QRZ / Wavelog uploads from the command line (qso-zero-setup --logbook / --upload) */
+            config_t c;
+            config_defaults(&c);
+            config_load(&c, cfg ? cfg : config_default_path());
+            return logbook_cli(argc - i - 1, argv + i + 1, logbook_conf_path(), c.log_path);
+        }
         else { usage(); return 2; }
     }
     log_open(NULL);

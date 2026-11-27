@@ -11,7 +11,7 @@ A pocket FT8 / FT4 / JS8 / WSPR station for the **M5Stack Cardputer Zero**, buil
 
 ## What it does
 
-* **FT8 and FT4:** decode, call CQ, answer stations, and run the whole QSO automatically (report, R-report, RR73, 73). Each QSO is logged to an ADIF file.
+* **FT8 and FT4:** decode, call CQ, answer stations, and run the whole QSO automatically (report, R-report, RR73, 73). Each QSO is logged to an ADIF file, and can optionally be uploaded to QRZ Logbook and Wavelog.
 * **JS8:** a native port of JS8Call that works with JS8Call stations. All four speeds, heartbeats, directed messages, free text, optional automatic replies, GHOSTNET and APRS messaging.
 * **WSPR:** beacon to see how far you're heard, and decode other beacons with distance to each one. Spots upload to wsprnet when you're online.
 * **Rig control:** puts the radio on the right frequency and in USB-Digital mode, and keys PTT over CAT.
@@ -69,7 +69,7 @@ Each release on the **[Releases page](../../releases/latest)** has two packages.
 |---|---|---|
 | `libhamlib-utils` | `rigctld`, which QSO-Zero uses to control the radio | required |
 | `libasound2` (`libasound2t64` on newer images) | the sound cards: receive and transmit audio | recommended, installed by default |
-| `libssl3` (or `libssl1.1`) | HTTPS uploads to wsprnet; plain HTTP is used without it | recommended, installed by default |
+| `libssl3` (or `libssl1.1`) | HTTPS uploads to wsprnet (plain HTTP is used without it) and to QRZ / Wavelog (which need it) | recommended, installed by default |
 
 ### Installing
 
@@ -102,6 +102,8 @@ sudo apt install -f        # installs the missing dependencies and finishes conf
 If `apt` still refuses, check the OS version with `cat /etc/os-release`: images older than Bookworm can't run this package.
 
 **Updating:** install the new package the same way. Your settings (`~/.config/qso-zero.conf`) and your QSO log (`~/qso-zero/qso-zero.adi`) are in your home folder, so updates and even uninstalling leave them alone.
+
+**Optional: QRZ Logbook and Wavelog uploads.** Run `qso-zero-setup --logbook` over SSH to add a QRZ Logbook API key and/or your Wavelog URL, API key and station location. QSO-Zero then uploads each QSO as it's logged, and anything logged offline once it's back online. The ADIF log is never changed or deleted. See [Operations.md](Operations.md#uploading-the-log-to-qrz-and-wavelog).
 
 **Uninstalling:** `sudo apt remove qso-zero`.
 
@@ -180,7 +182,9 @@ The package lands in `build/`. Use `--platform linux/arm/v7` for armhf. Emulatio
 | What | Where |
 |---|---|
 | Settings | `~/.config/qso-zero.conf` (written by **Save settings** or `/save`) |
-| QSO log (ADIF) | `~/qso-zero/qso-zero.adi` (the folder is created automatically) |
+| QSO log (ADIF) | `~/qso-zero/qso-zero.adi` (the folder is created automatically; never deleted) |
+| QRZ / Wavelog settings | `~/.config/qso-zero-logbook.conf` (optional, readable only by you; written by `qso-zero-setup --logbook`) |
+| What was uploaded | `~/qso-zero/uploads/qrz.txt` and `wavelog.txt`, one line per QSO |
 | Activity log | `~/.cache/qso-zero/qso-zero.log`; the 5 newest are kept. View with `qso-zero-setup --log` |
 | JS8 message inbox | `~/qso-zero/js8/qso-zero-inbox.txt` (the folder is created automatically) |
 
@@ -202,7 +206,7 @@ Then add the radio's `/dev/serial/by-id` names and `/proc/asound` listing to `te
 * **FT8 and FT4:** over-the-air round trips.
 * **WSPR:** symbols identical to JTEncode, and 5/5 copy down to −28 dB.
 * **Real time:** decoding through the live audio path, the early decode pass, and a full auto-sequenced QSO.
-* **App behaviour:** keyboard handling with the Cardputer Zero's real keymap, the CQ filter, the radio frequency and mode commands against a fake rigctld, sound card detection from real device listings, wsprnet upload, and log rotation.
+* **App behaviour:** keyboard handling with the Cardputer Zero's real keymap, the CQ filter, the radio frequency and mode commands against a fake rigctld, sound card detection from real device listings, wsprnet upload, QRZ / Wavelog uploads against a fake server, and log rotation.
 
 `qso-zero --bench` times every decoder on the device itself. On the Cardputer Zero, an FT8 decode of a busy band takes about 400 ms.
 

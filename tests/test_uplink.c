@@ -132,14 +132,30 @@ int main(void)
     if (f) { if (!fgets(req, sizeof req, f)) req[0] = 0; fclose(f); }
     CHECK(strstr(req, "/post?function=wspr&rcall=KN4CRD&rgrid=EM73&rqrg=14.097101") && strstr(req, "&tcall=G4JNT&tgrid=IO90&dbm=37"),
           "same wsprnet request over TLS");
+    {   /* logbook uploads (QRZ / Wavelog) use the same verified TLS */
+        char url[96], resp[256];
+        int st;
+        snprintf(url, sizeof url, "https://localhost:%d/api", g_https_port);
+        int r = net_request("POST", url, "application/x-www-form-urlencoded", "QSO-Zero/test", "KEY=abc&ACTION=STATUS", resp, sizeof resp, &st);
+        CHECK(r == 0 && st == 200 && !strcmp(resp, "RESULT=OK&LOGID=7"), "net_request POST over verified HTTPS: HTTP %d \"%s\"", st, resp);
+        CHECK(lines(DIR "/https.log") == 3, "POST body reached the HTTPS server");
+    }
     stop_tls(tls);
 
     printf("[B] HTTPS certificate does not match the host\n");
     tls = start_tls("wronghost");
     u = run_cycle(2);
     CHECK(u.sent_https == 2 && u.sent_http == 2, "rejected the bad certificate, both sent over HTTP (http %d)", u.sent_http);
-    CHECK(g_reqs == 2 && lines(DIR "/https.log") == 2, "no request leaked to the bad-cert server");
+    CHECK(g_reqs == 2 && lines(DIR "/https.log") == 3, "no request leaked to the bad-cert server");
     CHECK(strstr(u.last_error, "certificate") != NULL, "failure was the certificate check: \"%s\"", u.last_error);
+    {   /* an API key never goes to a server with a bad certificate, and never falls back to HTTP */
+        char url[96], resp[256];
+        int st, before = g_reqs;
+        snprintf(url, sizeof url, "https://localhost:%d/api", g_https_port);
+        int r = net_request("POST", url, "application/x-www-form-urlencoded", "QSO-Zero/test", "KEY=secret", resp, sizeof resp, &st);
+        CHECK(r != 0 && strstr(resp, "certificate") && g_reqs == before && lines(DIR "/https.log") == 3,
+              "net_request refuses the bad certificate, no HTTP fallback: %s", resp);
+    }
     stop_tls(tls);
 
     printf("[C] HTTPS port closed\n");
