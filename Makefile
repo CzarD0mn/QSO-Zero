@@ -71,7 +71,7 @@ $(BUILD)/test_log: tests/test_log.c $(BUILD)/src/core/log.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_mixer: tests/test_mixer.c $(BUILD)/src/audio/mixer.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
-$(BUILD)/test_devices: tests/test_devices.c $(BUILD)/src/core/devices.o
+$(BUILD)/test_devices: tests/test_devices.c $(BUILD)/src/core/devices.o $(BUILD)/src/rig/radios.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 $(BUILD)/test_%: tests/test_%.c $(CORE_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)

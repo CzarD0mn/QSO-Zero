@@ -113,7 +113,7 @@ int config_save(const config_t *c, const char *path)
     if (!f) return -1;
     fprintf(f, "# QSO-Zero configuration\n");
     fprintf(f, "callsign = %s\ngrid = %s\nauto_grid = %d\n", c->callsign, c->grid, c->auto_grid);
-    fprintf(f, "\n# radio: qmx | qmxplus | g90 | x6100 | x6200 | ft891\nradio = %s\n", c->radio);
+    fprintf(f, "\n# radio: qmx | qmxplus | g90 | x6100 | x6200 | ic705 | ft891\nradio = %s\n", c->radio);
     fprintf(f, "rig_device = %s\nrig_baud = %d\nptt = %s\nptt_device = %s\nspawn_rigctld = %d\n",
             c->rig_device, c->rig_baud, c->ptt, c->ptt_device, c->spawn_rigctld);
     fprintf(f, "\n# blank = auto-detect from the radio profile\naudio_in = %s\naudio_out = %s\ntx_level = %.2f\n",

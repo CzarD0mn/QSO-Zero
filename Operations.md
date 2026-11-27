@@ -33,7 +33,7 @@ qso-zero-setup --check    # optional: shows what QSO-Zero will find (screen, key
 
 Uploading QSOs to QRZ Logbook or Wavelog is optional; set it up any time with `qso-zero-setup --logbook` (see [Uploading the log](#uploading-the-log-to-qrz-and-wavelog)).
 
-The radio names it asks for are `qmx`, `qmxplus`, `g90`, `x6100`, `x6200` and `ft891`. If the settings file already exists, `qso-zero-setup` leaves it alone and only checks the groups.
+The radio names it asks for are `qmx`, `qmxplus`, `g90`, `x6100`, `x6200`, `ic705` and `ft891`. If the settings file already exists, `qso-zero-setup` leaves it alone and only checks the groups.
 
 ### 2. Connect the radio
 
@@ -353,6 +353,8 @@ With **Auto frequency** on (the default), changing mode or band tunes the radio 
 
 For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz passband (USB-D, U-DIG or DATA-U, depending on the radio) and reads it back to check. A radio without a data mode (such as the G90) gets USB at the widest passband it accepts. You don't need to set the mode on the radio.
 
+**Icom IC-705:** set **DATA MOD** to **USB** on the radio (*MENU › SET › Connectors › MOD Input › DATA MOD*), so that in USB-D the transmit audio comes from the Cardputer. Leave the CI-V address at A4h and *CI-V USB Echo Back* OFF (the defaults). The IC-705 hasn't been tested with QSO-Zero yet.
+
 **QRP Labs QMX:** QSO-Zero runs the QMX in its **USB** (SSB) mode for all digital modes, because FT8 decoded only in that mode, not in the QMX's Digi mode, in testing. Some settings in the QMX's own **SSB** menu make that work fully. They're stored in the radio, so they only need setting once, and QSO-Zero can't set them over CAT, so when you choose a QMX in Setup a flashing box reminds you for 30 seconds (esc closes it):
 * **Filter RX and Filter TX: 3200 Hz** (the default is 2700). Filter RX gives the full receive passband, so you see more stations; Filter TX lets the whole transmit audio range through. The QMX doesn't report these over CAT, so QSO-Zero can't check them either.
 * **SSB Input: USB or Auto**, so transmit audio comes from the Cardputer rather than the microphone. (Auto switches to USB audio whenever a transmission is started over CAT, which is how QSO-Zero transmits.)
@@ -361,7 +363,7 @@ For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz pa
 
 Setup has pickers for **Radio**, **CAT port**, **Audio in** and **Audio out**. Press Enter on one to see what's plugged in right now, pick with ↑ / ↓ and press Enter. Changes take effect straight away; use Save settings to keep them.
 * **auto** (the default) finds the radio by its USB ID and uses its USB sound card. It never picks the Cardputer's built-in audio.
-* The X6100 and X6200 have CAT on their second USB serial interface; auto finds it.
+* The X6100 and X6200 have CAT on their second USB serial interface; auto finds it. The IC-705 has CAT on its first (`…IC-705…-if00`); its second carries GPS / RTTY data.
 * After plugging the radio in while QSO-Zero is running, use Setup › **Rescan audio** (or `/rescan`).
 
 ### Levels

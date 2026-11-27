@@ -5,6 +5,7 @@
  * Hamlib model numbers (RIG_MAKE_MODEL(mfg, n) = mfg*1000 + n):
  *   Yaesu FT-891      1036   Kenwood TS-480 2028   QRP Labs QMX 2057
  *   Xiegu X6100       3087   Xiegu G90      3088   Xiegu X6200  3091
+ *   Icom IC-705       3085
  * QMX / QMX+ data_mode is plain "USB" on purpose: on the owner's QMX
  * (firmware 1_04), FT8 decodes only with the radio in its USB (SSB) mode,
  * not in its Digi mode, so the CLAUDE.md "USB only if PKTUSB misbehaves"
@@ -13,7 +14,15 @@
  * Band coverage: the QMX comes in three hardware versions with different
  * filters - 80-20 m, 60-15 m and 20-10 m - that look the same over CAT (it
  * would happily tune a band it has no filters for), so each is its own entry;
- * QMX+ 160-6 m, G90 160-10 m, X6100/X6200/FT-891 160-6 m.
+ * QMX+ 160-6 m, G90 160-10 m, X6100/X6200/FT-891/IC-705 160-6 m (the IC-705's
+ * 2 m / 70 cm have no FT8/JS8/WSPR spots in the band table).
+ * IC-705: native USB (no UART bridge), two CDC-ACM ports named
+ * usb-Icom_Inc._IC-705_<serial>-if00 / -if02. CAT (CI-V, "Serial Port A") is
+ * the first one, if00; if02 is USB (B) for GPS / RTTY decode / DV data. Audio
+ * is a Burr-Brown "USB Audio CODEC" (ALSA id CODEC). CI-V address 0xA4, the
+ * Hamlib default. Not yet tried on a Cardputer Zero: the device listing in
+ * tests/test_devices.c is from the documentation and still to be replaced by
+ * a real one.
  * QMX and X6200 entries need Hamlib >= 4.6; on older Hamlib the app falls
  * back to the TS-480 / X6100 backends, which speak the same protocol.
  *
@@ -49,6 +58,10 @@ static const radio_profile_t k_radios[] = {
     {"x6200", "Xiegu X6200", 3091, 3087, 19200, PTT_CAT,
      "1a86|USB_Dual_Serial|CH34|CP210|@if02", "/dev/ttyACM1", "X6200|CODEC|USB Audio", "PKTUSB", 8.0f, BANDS_ALL,
      "Built-in USB CAT + audio (uses Hamlib X6200 backend, X6100 on older Hamlib). CAT baud 19200."},
+    {"ic705", "Icom IC-705", 3085, 0, 19200, PTT_CAT,
+     "Icom|IC-705|IC705", "/dev/ttyACM0", "CODEC|Burr-Brown|IC-705|IC705", "PKTUSB", 10.0f, BANDS_ALL,
+     "One USB cable to the micro-USB port: CAT (Serial Port A, if00) + audio. On the radio: SET > Connectors > MOD Input > "
+     "DATA MOD = USB; CI-V address A4h; CI-V USB Echo Back OFF. 10 W on 13.8 V, 5 W on the battery."},
     {"ft891", "Yaesu FT-891 + Digirig", 1036, 0, 38400, PTT_RTS,
      "CP210", "/dev/ttyUSB0", "Device|C-Media|USB Audio", "PKTUSB", 100.0f, BANDS_ALL,
      "In the radio menu set CAT RATE to 38400, data input to the rear DATA jack and PTT to RTS. Turn power down for QRP."},

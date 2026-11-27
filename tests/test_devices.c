@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "core/devices.h"
+#include "rig/radios.h"
 
 static int fails;
 #define CHECK(c, ...) do { if (c) printf("  ok    " __VA_ARGS__); else { printf("  FAIL  " __VA_ARGS__); ++fails; } printf("\n"); } while (0)
@@ -95,6 +96,43 @@ int main(void)
               "no match and default missing -> first USB serial port (%s), not the GPS UART", v3);
         CHECK(!dev_serial_auto(r3, "nothing", "/dev/ttyACM1", v3, sizeof v3) && !strcmp(v3, "/dev/ttyACM1"), "existing default kept (%s)", v3);
         snprintf(q, sizeof q, "rm -rf %s", r3); if (system(q)) {}
+    }
+
+    printf("[1c] Icom IC-705 (names from Icom / fldigi documentation; replace with a real device listing)\n");
+    {
+        /* PROVISIONAL: not yet captured from a Cardputer Zero with an IC-705.
+         * Native USB CDC-ACM, VID 0c26 PID 0036: CAT (CI-V, "Serial Port A")
+         * on if00, USB (B) (GPS / RTTY decode / DV data) on if02; audio is a
+         * Burr-Brown "USB Audio CODEC". */
+        char r4[] = "/tmp/qsoz-705XXXXXX", q[600], v4[160];
+        if (!mkdtemp(r4)) return 1;
+        snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id %s/proc/asound && cd %s/dev && touch ttyACM0 ttyACM1 ttyS0 serial0 && cd serial/by-id && "
+                 "ln -s ../../ttyACM0 usb-Icom_Inc._IC-705_12001234-if00 && ln -s ../../ttyACM1 usb-Icom_Inc._IC-705_12001234-if02", r4, r4, r4);
+        if (system(q)) return 1;
+        const radio_profile_t *ic = radio_find("ic705");
+        CHECK(ic && !strcmp(ic->data_mode, "PKTUSB") && ic->hamlib_model == 3085, "ic705 profile: Hamlib 3085, PKTUSB (USB-D)");
+        CHECK(ic && !dev_serial_auto(r4, ic->serial_hint, ic->serial_default, v4, sizeof v4) && strstr(v4, "IC-705_12001234-if00"),
+              "IC-705 CAT -> %s (Serial Port A, not the GPS port)", v4);
+        snprintf(q, sizeof q, "%s/proc/asound/cards", r4);
+        f = fopen(q, "w");
+        fputs(" 0 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n"
+              "                      vc4-hdmi\n"
+              " 1 [ES8389Audio    ]: cardputerzero-a - ES8389-Audio\n"
+              "                      ES8389-Audio\n"
+              " 2 [CODEC          ]: USB-Audio - USB Audio CODEC\n"
+              "                      Burr-Brown from TI USB Audio CODEC at usb-3f980000.usb-1.2, full speed\n", f);
+        fclose(f);
+        snprintf(q, sizeof q, "%s/proc/asound/pcm", r4);
+        f = fopen(q, "w");
+        fputs("00-00: MAI PCM i2s-hifi-0 : MAI PCM i2s-hifi-0 : playback 1\n"
+              "01-00: (null)-ES8389 HiFi ES8389 HiFi-0 : (null)-ES8389 HiFi ES8389 HiFi-0 : playback 1 : capture 1\n"
+              "02-00: USB Audio : USB Audio : playback 1 : capture 1\n", f);
+        fclose(f);
+        char vi[96] = "", vo[96] = "";
+        CHECK(ic && !dev_audio_auto(r4, ic->audio_hint, 1, NULL, vi, sizeof vi) && !strcmp(vi, "plughw:CARD=CODEC,DEV=0")
+              && !dev_audio_auto(r4, ic->audio_hint, 0, "CODEC", vo, sizeof vo) && !strcmp(vo, "plughw:CARD=CODEC,DEV=0"),
+              "IC-705 audio in %s, out %s", vi, vo);
+        snprintf(q, sizeof q, "rm -rf %s", r4); if (system(q)) {}
     }
 
     printf("[2] sound devices, split by direction\n");

@@ -58,7 +58,7 @@ setup() {
     if [ ! -f "$CONF" ]; then
         cp "$EXAMPLE" "$CONF"
         printf 'Callsign: '; read -r call
-        printf 'Radio: qmx (QMX 80-20m), qmxmid (QMX 60-15m), qmxhigh (QMX 20-10m), qmxplus, g90, x6100, x6200, ft891 [qmx]: '; read -r radio
+        printf 'Radio: qmx (QMX 80-20m), qmxmid (QMX 60-15m), qmxhigh (QMX 20-10m), qmxplus, g90, x6100, x6200, ic705, ft891 [qmx]: '; read -r radio
         call=$(printf '%s' "$call" | tr 'a-z' 'A-Z')
         [ -n "$call" ] && sed -i "s/^callsign *=.*/callsign = $call/" "$CONF"
         [ -n "$radio" ] && sed -i "s/^radio *=.*/radio = $radio/" "$CONF"

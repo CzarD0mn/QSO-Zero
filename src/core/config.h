@@ -6,7 +6,7 @@ typedef struct {
     char callsign[16];
     char grid[8];            /* 4 or 6 chars; GPS overrides when auto_grid */
     int  auto_grid;
-    char radio[16];          /* qmx | qmxplus | g90 | x6100 | x6200 | ft891 */
+    char radio[16];          /* qmx | qmxplus | g90 | x6100 | x6200 | ic705 | ft891 */
     char rig_device[128];
     int  rig_baud;           /* 0 = profile default */
     char ptt[8];             /* cat | rts | dtr | "" = profile default */

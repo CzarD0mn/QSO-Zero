@@ -3,7 +3,7 @@ callsign = N0CALL
 grid = FN42
 auto_grid = 1              # take the grid from GPS when there is a fix
 
-# radio: qmx | qmxplus | g90 | x6100 | x6200 | ft891
+# radio: qmx | qmxplus | g90 | x6100 | x6200 | ic705 | ft891
 radio = qmx
 rig_device =               # blank = profile default (/dev/ttyACM0 or /dev/ttyUSB0)
                            # tip: use /dev/serial/by-id/... so it survives re-plugging

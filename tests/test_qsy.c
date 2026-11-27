@@ -364,6 +364,12 @@ int main(void)
         CHECK(a.cfg.rig_device[0] == 0, "radio changed: pinned CAT port reset to auto");
         CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "X6200 still gets PKTUSB (USB-D) 3 kHz (%s %d)", g_mode, g_pb);
         CHECK(fabsf(a.cfg.tx_level - 0.5f) < 1e-6, "X6200: TX audio level left alone (%.2f)", a.cfg.tx_level);
+        a.notice[0] = 0;
+        app_use_radio(&a, "ic705");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000 && !a.notice[0] && fabsf(a.cfg.tx_level - 0.5f) < 1e-6,
+              "IC-705: PKTUSB (USB-D) 3 kHz, no pop-up, TX audio left alone (%s %d)", g_mode, g_pb);
+        CHECK(a.band_mask == 0x7FF, "IC-705: all bands 160-6 m (mask 0x%03X)", a.band_mask);
         app_use_radio(&a, "qmx");
         CHECK(fabsf(a.cfg.tx_level - 1.0f) < 1e-6, "QMX selected: TX audio level 100%% (%.2f)", a.cfg.tx_level);
         app_use_radio(&a, "qmxplus");
