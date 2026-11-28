@@ -7,7 +7,7 @@ auto_grid = 1              # take the grid from GPS when there is a fix
 radio = qmx
 rig_device =               # blank = profile default (/dev/ttyACM0 or /dev/ttyUSB0)
                            # tip: use /dev/serial/by-id/... so it survives re-plugging
-rig_baud = 0               # 0 = profile default
+rig_baud = 0               # 0 = profile default; else 4800 9600 19200 38400 57600 115200 (Setup > CAT baud)
 ptt =                      # cat | rts | dtr, blank = profile default
 ptt_device =               # only if RTS/DTR keying is on a different port
 spawn_rigctld = 1          # 0 = connect to a rigctld you started yourself on :4532

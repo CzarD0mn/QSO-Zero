@@ -91,11 +91,13 @@ int dev_serial_candidates(const char *root, const char *hints, char out[][160], 
     }
     for (int i = 1; i < n; ++i) {
         if (strncmp(o[i].value, "/dev/serial/by-id/", 18)) continue;
-        int score = 0;
+        /* earlier hints win: "CP2105|CP210" prefers the FT-891's own CP2105
+         * over a Digirig Mobile's CP2102N */
+        int score = 0, ti = 0;
         char h[128];
         snprintf(h, sizeof h, "%s", hints ? hints : "");
-        for (char *save = NULL, *t = strtok_r(h, "|", &save); t; t = strtok_r(NULL, "|", &save))
-            if (t[0] != '@' && strcasestr(o[i].value, t)) { score = 10; break; }
+        for (char *save = NULL, *t = strtok_r(h, "|", &save); t; t = strtok_r(NULL, "|", &save), ++ti)
+            if (t[0] != '@' && strcasestr(o[i].value, t)) { score = 10 + 2 * (8 - (ti < 8 ? ti : 8)); break; }
         if (!score) continue;
         if (strstr(o[i].value, pref)) score += 5;
         sc[k] = score; idx[k] = i; ++k;

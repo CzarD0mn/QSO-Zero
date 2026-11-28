@@ -47,11 +47,11 @@ On an HDMI monitor:
 | Xiegu X6100 | `x6100` | built-in USB | 160–6 m |
 | Xiegu X6200 | `x6200` | built-in USB | 160–6 m |
 | Icom IC-705 | `ic705` | built-in USB (micro-USB port) | 160–6 m |
-| Yaesu FT-891 | `ft891` | Digirig (CAT + DATA jack), PTT on RTS | 160–6 m |
+| Yaesu FT-891 | `ft891` | Digirig DR-891 (one USB cable), or a Digirig Mobile plus the radio's USB cable; CAT and PTT over the radio's USB port at 9600 baud | 160–6 m |
 
 The QMX comes in three hardware versions with different band filters. They all look the same to the computer, so pick the one you have in **Setup › Radio**: QSO-Zero then only offers that version's bands.
 
-QSO-Zero finds the radio's CAT port and USB sound card by itself. You can also pick them in Setup.
+QSO-Zero finds the radio's CAT port and USB sound card by itself. You can also pick them in Setup, along with the **CAT baud** rate, which must match the rate set in the radio's own menu.
 
 Even with the defaults, you may need to set the correct paths yourself, for example when the radio has more than one serial port or another USB device is plugged in. Check that Setup shows your radio's port under **CAT port** (the X6100 and X6200 use their second port, `/dev/ttyACM1`, shown as `…-if02`; the IC-705 uses its first, `…-if00`) and its sound card under **Audio in** and **Audio out** (usually `plughw:CARD=Device,DEV=0`; on the IC-705, `plughw:CARD=CODEC,DEV=0`). The `[rig]` and `[audio]` lines from `qso-zero-setup --log` show which paths were used.
 

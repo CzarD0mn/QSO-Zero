@@ -49,8 +49,9 @@ In Setup, move with ↑ / ↓ (fn+F / fn+X) and change values with ← / → (fn
 |---|---|---|
 | 1 | **Callsign** | Enter opens the input line with `/call ` filled in. Type your call and press Enter. |
 | 2 | **Grid** | Enter, then type your 4- or 6-character locator in capitals (`FN42` or `FN42HN`) and press Enter. With the GPS Cap, turn on **Grid from GPS** instead. |
-| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. Changing the radio puts **CAT port** back on auto. There are three QMX entries, one per hardware version (80-20m, 60-15m and 20-10m): choose yours, because they look identical over CAT and only the right one keeps band changes to bands your QMX has filters for. Choosing any of them also sets **TX audio level** to 100%, because the QMX only keys up when its audio is above 80%. |
+| 3 | **Radio** | Enter shows the list. Pick your radio with ↑ / ↓ and press Enter. Changing the radio puts **CAT port** and **CAT baud** back on auto. There are three QMX entries, one per hardware version (80-20m, 60-15m and 20-10m): choose yours, because they look identical over CAT and only the right one keeps band changes to bands your QMX has filters for. Choosing any of them also sets **TX audio level** to 100%, because the QMX only keys up when its audio is above 80%. |
 | 4 | **CAT port** | Leave on **auto**. If the radio isn't found, Enter shows every serial port with what it is. |
+| 4a | **CAT baud** | **auto** uses the radio's usual rate (shown in brackets). If you've set a different CAT baud rate in the radio's menu, pick the same one here: 4800, 9600, 19200, 38400, 57600 or 115200. Changing the radio puts it back on auto. |
 | 5 | **Audio in / Audio out** | Leave on **auto**: it picks the radio's USB sound card. |
 | 6 | **In level** | Use ← / → until the **In signal** bar sits between the two white marks (50–70%) on a busy band. Red means it's clipping. |
 | 7 | **Out level** and **TX audio level** | Start around 50% and adjust so the radio's ALC barely moves when you transmit. **Tune 10 s** sends a carrier you can check with. |
@@ -148,6 +149,7 @@ Anything you type on the main screen is sent as a message in the current mode, *
 | `/inlevel`, `/outlevel` | `/inlevel 45` | the sound card's receive / transmit level, in % |
 | `/tune` | `/tune 5` | send a tune carrier for that many seconds (up to 30; plain `/tune` is 10) |
 | `/port` | `/port /dev/ttyACM1` | CAT port (`/port auto` to go back to automatic) |
+| `/baud` | `/baud 9600` | CAT baud rate: 4800, 9600, 19200, 38400, 57600, 115200 or `auto` (the radio's usual rate) |
 | `/ain`, `/aout` | `/ain plughw:CARD=Device,DEV=0` | sound card for receive / transmit (`auto` for automatic) |
 | `/rescan` | `/rescan` | look for sound cards again and reconnect |
 | `/net` | `/net` | check the internet now and send any waiting WSPR spots |
@@ -353,6 +355,13 @@ With **Auto frequency** on (the default), changing mode or band tunes the radio 
 
 For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz passband (USB-D, U-DIG or DATA-U, depending on the radio) and reads it back to check. A radio without a data mode (such as the G90) gets USB at the widest passband it accepts. You don't need to set the mode on the radio.
 
+**Yaesu FT-891 with a Digirig DR-891:** the DR-891 passes the radio's own USB port through, so CAT and PTT both go over it (PTT is CAT, not RTS). In the radio's menu (hold **F**), set:
+* **05-06 CAT RATE: 9600** (QSO-Zero's default for the FT-891; if you use another rate, pick it in **CAT baud**)
+* **05-08 CAT RTS: DISABLE**
+* **08-09 DATA IN SELECT: REAR** and **08-12 DATA BFO: USB**
+
+Auto picks the radio's **Enhanced** serial port (`…CP2105…-if00`), even with an older Digirig Mobile plugged in too. With a Digirig Mobile, connect the radio's own USB cable for CAT as well.
+
 **Icom IC-705:** set **DATA MOD** to **USB** on the radio (*MENU › SET › Connectors › MOD Input › DATA MOD*), so that in USB-D the transmit audio comes from the Cardputer. Leave the CI-V address at A4h and *CI-V USB Echo Back* OFF (the defaults). The IC-705 hasn't been tested with QSO-Zero yet.
 
 **QRP Labs QMX:** QSO-Zero runs the QMX in its **USB** (SSB) mode for all digital modes, because FT8 decoded only in that mode, not in the QMX's Digi mode, in testing. Some settings in the QMX's own **SSB** menu make that work fully. They're stored in the radio, so they only need setting once, and QSO-Zero can't set them over CAT, so when you choose a QMX in Setup a flashing box reminds you for 30 seconds (esc closes it):
@@ -361,8 +370,9 @@ For every digital mode, QSO-Zero puts the radio in its data mode with a 3 kHz pa
 
 ### Choosing the radio, port and sound cards
 
-Setup has pickers for **Radio**, **CAT port**, **Audio in** and **Audio out**. Press Enter on one to see what's plugged in right now, pick with ↑ / ↓ and press Enter. Changes take effect straight away; use Save settings to keep them.
+Setup has pickers for **Radio**, **CAT port**, **CAT baud**, **Audio in** and **Audio out**. Press Enter on one to see what's plugged in right now, pick with ↑ / ↓ and press Enter. Changes take effect straight away; use Save settings to keep them.
 * **auto** (the default) finds the radio by its USB ID and uses its USB sound card. It never picks the Cardputer's built-in audio.
+* **CAT baud** has to match the CAT baud rate set in the radio's own menu. The usual rates are: QMX 115200, X6100 / X6200 / G90 / IC-705 19200, FT-891 9600.
 * The X6100 and X6200 have CAT on their second USB serial interface; auto finds it. The IC-705 has CAT on its first (`…IC-705…-if00`); its second carries GPS / RTTY data.
 * After plugging the radio in while QSO-Zero is running, use Setup › **Rescan audio** (or `/rescan`).
 
@@ -454,7 +464,7 @@ The activity log (`~/.cache/qso-zero/qso-zero.log`) records the radio connection
 
 | Problem | Try |
 |---|---|
-| *radio not connected* | Check the cable and that the radio is on. Setup › CAT port: pick the port by name. |
+| *radio not connected* | Check the cable and that the radio is on. Setup › CAT port: pick the port by name. Setup › CAT baud: the same rate as the radio's CAT baud menu. |
 | No decodes, waterfall dark | Setup › Audio in, then Rescan audio. Check the In signal bar moves. |
 | Few decodes, In signal red | Turn **In level** down until the bar is 50–70%. |
 | Decodes but nobody answers | Check the clock chip (green GPS, or SYS with internet time), TX audio level and ALC, and that the radio is transmitting. |

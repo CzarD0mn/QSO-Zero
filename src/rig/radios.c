@@ -23,6 +23,11 @@
  * Hamlib default. Not yet tried on a Cardputer Zero: the device listing in
  * tests/test_devices.c is from the documentation and still to be replaced by
  * a real one.
+ * FT-891: the radio's built-in CP2105 (Enhanced port = CAT, interface 0) is
+ * the only serial port on its CAT path - the mini-DIN DATA jack has no serial
+ * lines. The Digirig DR-891 passes that USB port through its own hub; its
+ * PTT is CAT only (no RTS), confirmed on the owner's FT-891 + DR-891. 9600
+ * baud is the rate Digirig's DR-891 manual gives for menu 05-06 CAT RATE.
  * QMX and X6200 entries need Hamlib >= 4.6; on older Hamlib the app falls
  * back to the TS-480 / X6100 backends, which speak the same protocol.
  *
@@ -62,9 +67,11 @@ static const radio_profile_t k_radios[] = {
      "Icom|IC-705|IC705", "/dev/ttyACM0", "CODEC|Burr-Brown|IC-705|IC705", "PKTUSB", 10.0f, BANDS_ALL,
      "One USB cable to the micro-USB port: CAT (Serial Port A, if00) + audio. On the radio: SET > Connectors > MOD Input > "
      "DATA MOD = USB; CI-V address A4h; CI-V USB Echo Back OFF. 10 W on 13.8 V, 5 W on the battery."},
-    {"ft891", "Yaesu FT-891 + Digirig", 1036, 0, 38400, PTT_RTS,
-     "CP210", "/dev/ttyUSB0", "Device|C-Media|USB Audio", "PKTUSB", 100.0f, BANDS_ALL,
-     "In the radio menu set CAT RATE to 38400, data input to the rear DATA jack and PTT to RTS. Turn power down for QRP."},
+    {"ft891", "Yaesu FT-891 + Digirig", 1036, 0, 9600, PTT_CAT,
+     "CP2105|CP210", "/dev/ttyUSB0", "Device|C-Media|USB Audio", "PKTUSB", 100.0f, BANDS_ALL,
+     "CAT through the radio's own USB port (CP2105, Enhanced port), PTT over CAT: works with the Digirig DR-891 and with a "
+     "Digirig Mobile plus the radio's USB cable. Radio menu: 05-06 CAT RATE 9600, 05-08 CAT RTS DISABLE, 08-09 DATA IN SELECT REAR, "
+     "08-12 DATA BFO USB. Turn power down for QRP."},
 };
 
 const radio_profile_t *radio_find(const char *id)

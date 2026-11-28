@@ -183,6 +183,7 @@ int64_t ghostnet_freq(int band);
 void app_set_ghostnet(app_t *a, int on);          /* on: JS8 on the nearest GHOSTNET band */
 void app_ghostnet_band(app_t *a, int band);       /* JS8 + GHOSTNET default frequency on this band */
 void app_use_rig_device(app_t *a, const char *dev);
+void app_use_rig_baud(app_t *a, int baud);                 /* 0 = the radio's default */
 void app_use_audio(app_t *a, const char *in, const char *out);
 void app_rescan_audio(app_t *a);
 int  log_dir_make(const char *file);   /* create the folder a file goes in (mkdir -p); 0 = ok */

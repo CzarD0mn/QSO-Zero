@@ -364,6 +364,17 @@ int main(void)
         CHECK(a.cfg.rig_device[0] == 0, "radio changed: pinned CAT port reset to auto");
         CHECK(!strcmp(g_mode, "PKTUSB") && g_pb == 3000, "X6200 still gets PKTUSB (USB-D) 3 kHz (%s %d)", g_mode, g_pb);
         CHECK(fabsf(a.cfg.tx_level - 0.5f) < 1e-6, "X6200: TX audio level left alone (%.2f)", a.cfg.tx_level);
+        /* CAT baud: chosen in Setup, back to the radio's default when the radio changes */
+        app_use_radio(&a, "ft891");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        app_use_rig_baud(&a, 38400);
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(a.cfg.rig_baud == 38400 && a.radio->baud == 9600, "FT-891: CAT baud set to 38400 (radio default 9600)");
+        app_use_radio(&a, "x6200");
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
+        CHECK(a.cfg.rig_baud == 0, "radio changed: CAT baud back to auto");
+        app_use_rig_baud(&a, 0);
+        for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);
         a.notice[0] = 0;
         app_use_radio(&a, "ic705");
         for (int i = 0; i < 60 && a.rig_busy; ++i) wait_s(0.1);

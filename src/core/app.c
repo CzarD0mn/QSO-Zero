@@ -750,6 +750,10 @@ void app_use_radio(app_t *a, const char *id)
         qlog("rig", "radio changed to %s: CAT port %s -> auto", r->name, a->cfg.rig_device);
         a->cfg.rig_device[0] = 0;
     }
+    if (changed && a->cfg.rig_baud) {                    /* likewise a CAT baud rate: the new radio's default */
+        qlog("rig", "radio changed to %s: CAT baud %d -> auto (%d)", r->name, a->cfg.rig_baud, r->baud);
+        a->cfg.rig_baud = 0;
+    }
     if (r->qmx_ssb) {                                    /* settings only the operator can make on the radio */
         snprintf(a->notice, sizeof a->notice,
                  "On the QMX, set SSB menu > Filter RX and Filter TX to 3200 Hz, and SSB Input to USB or Auto. "
@@ -771,6 +775,17 @@ void app_use_rig_device(app_t *a, const char *dev)
 {
     if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
     snprintf(a->cfg.rig_device, sizeof a->cfg.rig_device, "%s", dev);
+    rig_reconnect(a);
+}
+
+/* CAT serial speed; 0 = the radio profile's default. Must match the radio's
+ * own CAT baud menu setting (e.g. FT-891 menu 05-06 CAT RATE). */
+void app_use_rig_baud(app_t *a, int baud)
+{
+    if (a->tx_active) { app_status(a, "can't change while transmitting"); return; }
+    a->cfg.rig_baud = baud;
+    qlog("rig", "CAT baud %s%d", baud ? "" : "auto: ", baud ? baud : a->radio->baud);
+    app_status(a, "CAT baud %d%s - set the same on the radio", baud ? baud : a->radio->baud, baud ? "" : " (radio default)");
     rig_reconnect(a);
 }
 
@@ -1581,6 +1596,12 @@ static int handle_command(app_t *a, char *cmd)
         }
     }
     else if (!strcmp(cmd, "/port")) app_use_rig_device(a, strcmp(arg, "auto") ? arg : "");
+    else if (!strcmp(cmd, "/baud")) {
+        int b = atoi(arg);
+        if (!strcasecmp(arg, "auto") || b == 0) app_use_rig_baud(a, 0);
+        else if (b == 4800 || b == 9600 || b == 19200 || b == 38400 || b == 57600 || b == 115200) app_use_rig_baud(a, b);
+        else app_status(a, "baud: auto, 4800, 9600, 19200, 38400, 57600 or 115200");
+    }
     else if (!strcmp(cmd, "/ain")) app_use_audio(a, strcmp(arg, "auto") ? arg : "", NULL);
     else if (!strcmp(cmd, "/aout")) app_use_audio(a, NULL, strcmp(arg, "auto") ? arg : "");
     else if (!strcmp(cmd, "/cqmod")) app_set_cq_mod(a, arg);

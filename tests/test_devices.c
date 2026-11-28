@@ -135,6 +135,27 @@ int main(void)
         snprintf(q, sizeof q, "rm -rf %s", r4); if (system(q)) {}
     }
 
+    printf("[1d] Yaesu FT-891: its own CP2105 (Enhanced = if00) wins over a Digirig Mobile CP2102N\n");
+    {
+        /* PROVISIONAL names (Silicon Labs CP2105 / CP2102N by-id form); replace
+         * with the listing from the owner's FT-891 + Digirig DR-891 */
+        char r5[] = "/tmp/qsoz-891XXXXXX", q[700], v5[160];
+        if (!mkdtemp(r5)) return 1;
+        snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id && cd %s/dev && touch ttyUSB0 ttyUSB1 ttyUSB2 && cd serial/by-id && "
+                 "ln -s ../../ttyUSB0 usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_a1b2-if00-port0 && "
+                 "ln -s ../../ttyUSB1 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if00-port0 && "
+                 "ln -s ../../ttyUSB2 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if01-port0", r5, r5);
+        if (system(q)) return 1;
+        const radio_profile_t *ft = radio_find("ft891");
+        CHECK(ft && ft->ptt == PTT_CAT && ft->baud == 9600, "ft891 profile: PTT over CAT, 9600 baud (Digirig DR-891)");
+        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5) && strstr(v5, "CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if00"),
+              "FT-891 CAT -> %s (the radio's Enhanced port, not the Digirig's CP2102N)", v5);
+        snprintf(q, sizeof q, "rm -f %s/dev/serial/by-id/*CP2102N*", r5); if (system(q)) {}
+        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5) && strstr(v5, "01A2B3C4-if00"),
+              "DR-891 alone (radio's CP2105 only) -> Enhanced port if00");
+        snprintf(q, sizeof q, "rm -rf %s", r5); if (system(q)) {}
+    }
+
     printf("[2] sound devices, split by direction\n");
     n = dev_audio_list(root, 1, "auto", o, DEV_MAX);
     CHECK(n == 4, "Audio in: auto + QMX, Device, ES8388Audio (got %d)", n);
