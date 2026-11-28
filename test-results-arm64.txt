@@ -1,0 +1,148 @@
+QSO-Zero 0.2.9 tests on arm64 (aarch64-linux-gnu, QEMU)
+### test_input
+  ok    short ESC: HOLDING then ESC on release (2 events)
+  ok    held ESC 1.2 s: HOLDING then HOLD, nothing on release (2 events)
+  ok    keymap file read; device treated as the Zero keypad
+  ok    all 32 Sym symbols type what the keymap says (32/32)
+  ok    Sym+6 = ^, Sym+9 = (, slash = / (were \ and / before)
+  ok    Shift leaves Sym symbols alone, still capitalises letters; digits plain
+  ok    code 41 is Sym '%', not an ESC alias any more
+  ok    USB keyboard: [ \ / and Shift+` = ~
+  ok    missing keymap file -> fallback table
+  ok    fallback table gives the same symbols
+  ok    Ctrl+X (halt TX) still arrives
+PASS
+### test_varicode
+  NORMAL 1 frames                    identical                ok
+  FAST 4 frames                      identical                ok
+  FAST 4 frames                      identical                ok
+  FAST 1 frames                      identical                ok
+  TURBO 4 frames                     identical                ok
+  TURBO 4 frames                     identical                ok
+  TURBO 1 frames                     identical                ok
+  SLOW 4 frames                      identical                ok
+  SLOW 4 frames                      identical                ok
+  SLOW 1 frames                      identical                ok
+
+PASS
+### test_wspr
+K1ABC FN42 37: matches reference vector
+power snapping: 5->3 25->23 36->37
+reject N0CALL (4-letter suffix): rejected
+1-letter prefix K1JT -> ' K1JT  ': ok
+synth: 1327104 samples = 110.59 s
+PASS
+### test_wsprrx
+   -18 dB dt +0.0   1429.9 Hz drift +0  K1ABC FN42 37   
+   -20 dB dt -0.0   1574.9 Hz drift +0  KN4CRD EM73 37  
+   -22 dB dt +0.0   1465.5 Hz drift +0  G4JNT IO90 23   
+   -24 dB dt -0.1   1531.3 Hz drift +0  JA1ABC PM95 10  
+  5/5 decoded correctly, 4748 ms
+== sensitivity (1 station, 5 trials) ==
+  -22 dB: 5/5
+  -24 dB: 5/5
+  -26 dB: 5/5
+  -28 dB: 5/5
+  -30 dB: 1/5
+PASS
+### test_ft8
+   -13 dB +0.00  700.0 Hz  CQ K1ABC FN42
+   -15 dB +0.00 1200.0 Hz  W9XYZ K1ABC -12
+   -14 dB +0.00 1650.0 Hz  K1ABC W9XYZ R-08
+   -14 dB +0.00 2200.0 Hz  CQ POTA KN4CRD EM73
+  @ -12 dB: 4/4, 352 ms
+== sweep (4 signals x 5 trials) ==
+  -14 dB: 20/20
+  -16 dB: 20/20
+  -18 dB: 20/20
+  -20 dB:  1/20
+  -22 dB:  0/20
+PASS
+### test_js8
+  TURBO @ -10 dB: 4/4 decoded, 0 spurious, 1313 ms
+   SLOW   -16 dB  dt -0.04   1500.0 Hz  i3=1  HELLOWORLD12 
+   SLOW   -16 dB  dt -0.04   1000.0 Hz  i3=0  N0CALLK1ABC+ 
+   SLOW   -16 dB  dt -0.04   2100.0 Hz  i3=3  CQCQCQDE4WAY 
+   SLOW   -16 dB  dt -0.04    619.8 Hz  i3=2  abcXYZ-+0987 
+  SLOW @ -10 dB: 4/4 decoded, 0 spurious, 7438 ms
+== Sensitivity sweep (1 signal, 10 trials each) ==
+  NORMAL -14:10/10 -16:10/10 -18:10/10 -20: 1/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  FAST   -14:10/10 -16: 9/10 -18: 1/10 -20: 0/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  TURBO  -14: 4/10 -16: 0/10 -18: 0/10 -20: 0/10 -22: 0/10 -24: 0/10 -26: 0/10 -28: 0/10
+  SLOW   -14:10/10 -16:10/10 -18:10/10 -20:10/10 -22: 6/10 -24: 0/10 -26: 0/10 -28: 0/10
+PASS
+### test_qsy
+  ok    X6200 still gets PKTUSB (USB-D) 3 kHz (PKTUSB 3000)
+  ok    X6200: TX audio level left alone (0.50)
+  ok    FT-891: CAT baud set to 38400 (radio default 9600)
+  ok    radio changed: CAT baud back to auto
+  ok    IC-705: PKTUSB (USB-D) 3 kHz, no pop-up, TX audio left alone (PKTUSB 3000)
+  ok    IC-705: all bands 160-6 m (mask 0x7FF)
+  ok    QMX selected: TX audio level 100% (1.00)
+  ok    QMX+ keeps whatever it was (1.00)
+  ok    QMX 80-20m / 60-15m / 20-10m: each offers only its own bands, 100% TX audio, Digi mode
+  ok    same radio picked again: CAT port kept
+
+all passed
+### test_devices
+  ok    auto = the radio's USB codec (plughw:CARD=Device,DEV=0) for in and out, never ES8389 or HDMI
+[4] short names for the menu
+  ok    by-id -> ttyUSB0 (ttyUSB0)
+  ok    missing device -> (unplugged)
+  ok    plughw:CARD=Device,DEV=0 -> Device
+  ok    DEV=1 -> X6100,1
+  ok    blank -> auto
+[5] nothing plugged in
+  ok    only auto
+  ok    only auto
+
+all passed
+### test_modes
+  ok    both channels equal (QMX: right = inverted left) -> left
+  ok    silence -> left
+  ok    audio only on the left -> left
+  ok    audio only on the right -> right
+  ok    right only slightly stronger -> stays left
+[9] tune carrier length
+  ok    /tune (and ctrl+U, Setup, Tools): 10 s
+  ok    /tune 3: 3 s
+  ok    /tune 45: capped at 30 s
+  ok    ctrl+U: 10 s
+
+all passed
+### test_battery
+  ok    plugged in: charging, estimate restarts
+  ok    USB online + not full counts as charging
+  ok    full
+[5] no capacity file: derived from charge
+  ok    500/2000 mAh -> 25% (got 25)
+[6] low-battery warning in the app
+  ok    read at start-up
+  ok    warns: "BATTERY 14% - about 42 min left"
+  ok    doesn't repeat at the same level
+  ok    warns again at 5%: "BATTERY 4% - about 11 min left"
+
+all passed
+### test_mixer
+[1] picking the control
+  ok    C-Media: in level = Mic
+  ok    C-Media: out level = Speaker (not the Mic monitor)
+  ok    PCM / Capture codec
+  ok    a Mic monitor is never used as the out level
+  ok    unknown names: first with a capture volume
+  ok    no volume controls -> none
+[2] no such card
+  ok    error, not a crash: "libasound.so.2 not found"
+  ok    no device: "no device"
+
+all passed
+### test_log
+  ok    opened /tmp/qsoz-logwYVGe5/.cache/qso-zero/qso-zero.log
+  ok    default location ~/.cache/qso-zero/qso-zero.log
+  ok    timestamped [area] lines, written straight away
+  ok    nothing logged before log_open
+  ok    previous run kept as qso-zero.log.1
+  ok    7 runs -> qso-zero.log (run 7) + .1 .. .4 (runs 6..3), nothing older
+  ok    1 MB cap: 5 files, largest 1024 KB, total 5074 KB
+
+all passed
