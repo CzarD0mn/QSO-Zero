@@ -384,7 +384,7 @@ Stereo sound cards such as the QMX's are handled automatically: QSO-Zero records
 
 ## Uploading the log to QRZ and Wavelog
 
-Every QSO is written to the ADIF log, `~/qso-zero/qso-zero.adi`. QSO-Zero can also send each QSO to **QRZ Logbook**, to **Wavelog**, or to both. This is optional; without it nothing leaves the Zero.
+Every QSO is written to the ADIF log, `~/qso-zero/qso-zero.adi`. QSO-Zero can also send each QSO to **QRZ Logbook**, to **Wavelog** (hosted or on your own network), or to both. This is optional; without it nothing leaves the Zero. Both have been tested on the air with QSO-Zero.
 
 The ADIF log is only read for uploads. It is never changed or deleted, so it stays a complete record of every contact, including for checking duplicates later.
 

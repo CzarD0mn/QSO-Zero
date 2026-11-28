@@ -220,7 +220,9 @@ These radios have been tested successfully with QSO-Zero on a Cardputer Zero:
 | Xiegu X6200 | CAT control, USB audio receive and transmit, FT8 and WSPR decoding, auto-sequenced FT8 contacts |
 | QRP Labs QMX | CAT control, USB audio receive and transmit (into a dummy load), FT8 decoding in USB mode |
 
-The other radios in the [supported list](#supported-radios) are set up from their documentation but haven't been tried yet. Reports are welcome: send the output of `qso-zero-setup --log all` with any problem.
+Uploading the log has been tested with QRZ Logbook and with a self-hosted Wavelog server on a local network.
+
+The other radios in the [supported list](#supported-radios), including the Icom IC-705, are set up from their documentation but haven't been tried yet. Reports are welcome: send the output of `qso-zero-setup --log all` with any problem.
 
 ## Known limits
 
