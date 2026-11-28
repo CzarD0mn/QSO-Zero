@@ -28,6 +28,9 @@
  * lines. The Digirig DR-891 passes that USB port through its own hub; its
  * PTT is CAT only (no RTS), confirmed on the owner's FT-891 + DR-891. 9600
  * baud is the rate Digirig's DR-891 manual gives for menu 05-06 CAT RATE.
+ * Seen on the owner's Zero: usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_
+ * Controller_<serial>-if00-port0 (CAT) / -if01-port0, and the DR-891's C-Media
+ * codec as ALSA card "Device" (tests/test_devices.c [1d]).
  * QMX and X6200 entries need Hamlib >= 4.6; on older Hamlib the app falls
  * back to the TS-480 / X6100 backends, which speak the same protocol.
  *

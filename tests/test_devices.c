@@ -135,24 +135,48 @@ int main(void)
         snprintf(q, sizeof q, "rm -rf %s", r4); if (system(q)) {}
     }
 
-    printf("[1d] Yaesu FT-891: its own CP2105 (Enhanced = if00) wins over a Digirig Mobile CP2102N\n");
+    printf("[1d] Yaesu FT-891 + Digirig DR-891 (from the owner's Cardputer Zero)\n");
     {
-        /* PROVISIONAL names (Silicon Labs CP2105 / CP2102N by-id form); replace
-         * with the listing from the owner's FT-891 + Digirig DR-891 */
-        char r5[] = "/tmp/qsoz-891XXXXXX", q[700], v5[160];
+        /* real listing: the DR-891's hub passes through the FT-891's own
+         * CP2105 (if00 = Enhanced = CAT, if01 = Standard) and adds a C-Media
+         * codec. by-id, /proc/asound/cards and /proc/asound/pcm all as captured. */
+        char r5[] = "/tmp/qsoz-891XXXXXX", q[900], v5[160];
         if (!mkdtemp(r5)) return 1;
-        snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id && cd %s/dev && touch ttyUSB0 ttyUSB1 ttyUSB2 && cd serial/by-id && "
-                 "ln -s ../../ttyUSB0 usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_a1b2-if00-port0 && "
-                 "ln -s ../../ttyUSB1 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if00-port0 && "
-                 "ln -s ../../ttyUSB2 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if01-port0", r5, r5);
+        snprintf(q, sizeof q, "mkdir -p %s/dev/serial/by-id %s/proc/asound && cd %s/dev && touch ttyUSB0 ttyUSB1 && cd serial/by-id && "
+                 "ln -s ../../ttyUSB0 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01AE07B1-if00-port0 && "
+                 "ln -s ../../ttyUSB1 usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_01AE07B1-if01-port0", r5, r5, r5);
         if (system(q)) return 1;
         const radio_profile_t *ft = radio_find("ft891");
         CHECK(ft && ft->ptt == PTT_CAT && ft->baud == 9600, "ft891 profile: PTT over CAT, 9600 baud (Digirig DR-891)");
-        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5) && strstr(v5, "CP2105_Dual_USB_to_UART_Bridge_Controller_01A2B3C4-if00"),
-              "FT-891 CAT -> %s (the radio's Enhanced port, not the Digirig's CP2102N)", v5);
-        snprintf(q, sizeof q, "rm -f %s/dev/serial/by-id/*CP2102N*", r5); if (system(q)) {}
-        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5) && strstr(v5, "01A2B3C4-if00"),
-              "DR-891 alone (radio's CP2105 only) -> Enhanced port if00");
+        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5)
+              && strstr(v5, "CP2105_Dual_USB_to_UART_Bridge_Controller_01AE07B1-if00-port0"), "FT-891 CAT -> %s (Enhanced port)", v5);
+        char sn[48];
+        dev_short_name(r5, v5, sn, sizeof sn);
+        CHECK(!strcmp(sn, "ttyUSB0"), "shown as ttyUSB0 (%s)", sn);
+        snprintf(q, sizeof q, "%s/proc/asound/cards", r5);
+        f = fopen(q, "w");
+        fputs(" 0 [vc4hdmi        ]: vc4-hdmi - vc4-hdmi\n"
+              "                      vc4-hdmi\n"
+              " 1 [ES8389Audio    ]: cardputerzero-a - ES8389-Audio\n"
+              "                      ES8389-Audio\n"
+              " 2 [Device         ]: USB-Audio - USB Audio Device\n"
+              "                      C-Media Electronics Inc. USB Audio Device at usb-3f980000.usb-1.3.2, full speed\n", f);
+        fclose(f);
+        snprintf(q, sizeof q, "%s/proc/asound/pcm", r5);
+        f = fopen(q, "w");
+        fputs("00-00: MAI PCM i2s-hifi-0 : MAI PCM i2s-hifi-0 : playback 1\n"
+              "01-00: (null)-ES8389 HiFi ES8389 HiFi-0 : (null)-ES8389 HiFi ES8389 HiFi-0 : playback 1 : capture 1\n"
+              "02-00: USB Audio : USB Audio : playback 1 : capture 1\n", f);
+        fclose(f);
+        char vi[96] = "", vo[96] = "";
+        CHECK(ft && !dev_audio_auto(r5, ft->audio_hint, 1, NULL, vi, sizeof vi) && !strcmp(vi, "plughw:CARD=Device,DEV=0")
+              && !dev_audio_auto(r5, ft->audio_hint, 0, "Device", vo, sizeof vo) && !strcmp(vo, "plughw:CARD=Device,DEV=0"),
+              "DR-891 audio in %s, out %s", vi, vo);
+        /* a Digirig Mobile (CP2102N) plugged in as well: the radio's CP2105 still wins */
+        snprintf(q, sizeof q, "cd %s/dev && touch ttyUSB2 && ln -s ../../ttyUSB2 serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_a1b2-if00-port0", r5);
+        if (system(q)) return 1;
+        CHECK(ft && !dev_serial_auto(r5, ft->serial_hint, ft->serial_default, v5, sizeof v5) && strstr(v5, "01AE07B1-if00"),
+              "with a Digirig Mobile's CP2102N too, CAT stays on the radio's Enhanced port");
         snprintf(q, sizeof q, "rm -rf %s", r5); if (system(q)) {}
     }
 
